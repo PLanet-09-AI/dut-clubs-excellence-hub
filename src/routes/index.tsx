@@ -254,6 +254,9 @@ function Index() {
         </div>
       </section>
 
+      {/* Detailed Programme & Venue */}
+      <EventProgram />
+
       {/* CTA */}
       <section id="nominate" className="relative z-10 mx-auto max-w-5xl px-6 py-24 text-center">
         <motion.div
@@ -270,12 +273,16 @@ function Index() {
             whose story deserves the spotlight.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <Button size="lg" className="bg-gold text-primary-foreground shadow-gold hover:opacity-95">
-              Submit Nomination <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-            <Button size="lg" variant="outline" className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10">
-              Past Winners
-            </Button>
+            <Link to="/nominate">
+              <Button size="lg" className="bg-gold text-primary-foreground shadow-gold hover:opacity-95">
+                Submit Nomination <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+            <Link to="/winners">
+              <Button size="lg" variant="outline" className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10">
+                Past Winners
+              </Button>
+            </Link>
           </div>
         </motion.div>
       </section>
