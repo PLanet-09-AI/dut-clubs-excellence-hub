@@ -56,29 +56,7 @@ function Index() {
       </div>
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,oklch(0.08_0.04_265/0.6)_70%,oklch(0.06_0.04_265)_100%)]" />
 
-      {/* Nav */}
-      <header className="relative z-20 border-b border-primary/10 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gold shadow-gold">
-              <span className="font-serif text-lg font-bold text-primary-foreground">D</span>
-            </div>
-            <div>
-              <p className="text-sm font-semibold tracking-wider text-primary">DUT</p>
-              <p className="-mt-0.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Student Services Awards</p>
-            </div>
-          </div>
-          <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
-            <a href="#about" className="transition hover:text-primary">About</a>
-            <a href="#categories" className="transition hover:text-primary">Categories</a>
-            <a href="#event" className="transition hover:text-primary">The Evening</a>
-            <a href="#nominate" className="transition hover:text-primary">Nominate</a>
-          </nav>
-          <Button variant="default" className="bg-gold text-primary-foreground hover:opacity-90">
-            Reserve Seat
-          </Button>
-        </div>
-      </header>
+      <SiteNav />
 
       {/* Hero */}
       <section className="relative z-10">
