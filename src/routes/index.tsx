@@ -102,13 +102,20 @@ function Index() {
             </div>
           </motion.div>
 
-          {/* 3D scene */}
           <motion.div
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.2, ease: "easeOut", delay: 0.2 }}
-            className="relative h-[460px] sm:h-[560px] lg:h-[640px]"
+            className="relative h-[460px] sm:h-[560px] lg:h-[640px] order-last lg:order-none"
           >
+            <Suspense fallback={null}>
+              <PhotoBackdrop />
+            </Suspense>
+            <Suspense fallback={<div className="grid h-full place-items-center text-primary">Loading…</div>}>
+              <AwardScene />
+            </Suspense>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent rounded-b-[2rem]" />
+          </motion.div>
             <div className="absolute inset-0 -z-10 rounded-[2rem] bg-gradient-to-br from-primary/10 via-transparent to-transparent blur-2xl" />
             <Suspense fallback={<div className="grid h-full place-items-center text-primary">Loading…</div>}>
               <AwardScene />
