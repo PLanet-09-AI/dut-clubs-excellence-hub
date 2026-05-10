@@ -1,11 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import { Award, Sparkles, Calendar, MapPin, Users, Star, Trophy, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import SiteNav from "@/components/SiteNav";
+import EventProgram from "@/components/EventProgram";
 
 const AwardScene = lazy(() => import("@/components/AwardScene"));
 const BackgroundScene = lazy(() => import("@/components/BackgroundScene"));
+const PhotoBackdrop = lazy(() => import("@/components/PhotoBackdrop"));
 
 export const Route = createFileRoute("/")({
   component: Index,
