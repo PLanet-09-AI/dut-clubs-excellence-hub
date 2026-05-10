@@ -81,12 +81,16 @@ function Index() {
             </p>
 
             <div className="mt-10 flex flex-wrap items-center gap-4">
-              <Button size="lg" className="bg-gold text-primary-foreground shadow-gold transition hover:scale-[1.02] hover:opacity-95">
-                Nominate a Star <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button size="lg" variant="outline" className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10">
-                Watch the 2024 Highlights
-              </Button>
+              <Link to="/nominate">
+                <Button size="lg" className="bg-gold text-primary-foreground shadow-gold transition hover:scale-[1.02] hover:opacity-95">
+                  Nominate a Star <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+              <Link to="/winners">
+                <Button size="lg" variant="outline" className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10">
+                  View Past Winners
+                </Button>
+              </Link>
             </div>
 
             <div className="mt-12 flex flex-wrap gap-x-10 gap-y-4 text-sm">
