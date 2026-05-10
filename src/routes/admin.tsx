@@ -80,7 +80,9 @@ function AdminPage() {
 
 function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [nominations, setNominations] = useState<Nomination[]>([]);
-  const [categories, setCategories] = useState(() => [...AWARD_CATEGORIES]);
+  const [categories, setCategories] = useState<{ id: string; name: string; eligibility: string }[]>(
+    () => AWARD_CATEGORIES.map((c) => ({ id: c.id, name: c.name, eligibility: c.eligibility }))
+  );
   const [newCat, setNewCat] = useState({ name: "", eligibility: "" });
 
   useEffect(() => { setNominations(loadNominations()); }, []);
