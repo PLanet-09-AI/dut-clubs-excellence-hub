@@ -116,12 +116,6 @@ function Index() {
             </Suspense>
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent rounded-b-[2rem]" />
           </motion.div>
-            <div className="absolute inset-0 -z-10 rounded-[2rem] bg-gradient-to-br from-primary/10 via-transparent to-transparent blur-2xl" />
-            <Suspense fallback={<div className="grid h-full place-items-center text-primary">Loading…</div>}>
-              <AwardScene />
-            </Suspense>
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent" />
-          </motion.div>
         </div>
 
         {/* Marquee */}
