@@ -1,11 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import { Award, Sparkles, Calendar, MapPin, Users, Star, Trophy, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import SiteNav from "@/components/SiteNav";
+import EventProgram from "@/components/EventProgram";
 
 const AwardScene = lazy(() => import("@/components/AwardScene"));
 const BackgroundScene = lazy(() => import("@/components/BackgroundScene"));
+const PhotoBackdrop = lazy(() => import("@/components/PhotoBackdrop"));
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -53,29 +56,7 @@ function Index() {
       </div>
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,oklch(0.08_0.04_265/0.6)_70%,oklch(0.06_0.04_265)_100%)]" />
 
-      {/* Nav */}
-      <header className="relative z-20 border-b border-primary/10 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gold shadow-gold">
-              <span className="font-serif text-lg font-bold text-primary-foreground">D</span>
-            </div>
-            <div>
-              <p className="text-sm font-semibold tracking-wider text-primary">DUT</p>
-              <p className="-mt-0.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Student Services Awards</p>
-            </div>
-          </div>
-          <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
-            <a href="#about" className="transition hover:text-primary">About</a>
-            <a href="#categories" className="transition hover:text-primary">Categories</a>
-            <a href="#event" className="transition hover:text-primary">The Evening</a>
-            <a href="#nominate" className="transition hover:text-primary">Nominate</a>
-          </nav>
-          <Button variant="default" className="bg-gold text-primary-foreground hover:opacity-90">
-            Reserve Seat
-          </Button>
-        </div>
-      </header>
+      <SiteNav />
 
       {/* Hero */}
       <section className="relative z-10">
@@ -100,12 +81,16 @@ function Index() {
             </p>
 
             <div className="mt-10 flex flex-wrap items-center gap-4">
-              <Button size="lg" className="bg-gold text-primary-foreground shadow-gold transition hover:scale-[1.02] hover:opacity-95">
-                Nominate a Star <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button size="lg" variant="outline" className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10">
-                Watch the 2024 Highlights
-              </Button>
+              <Link to="/nominate">
+                <Button size="lg" className="bg-gold text-primary-foreground shadow-gold transition hover:scale-[1.02] hover:opacity-95">
+                  Nominate a Star <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+              <Link to="/winners">
+                <Button size="lg" variant="outline" className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10">
+                  View Past Winners
+                </Button>
+              </Link>
             </div>
 
             <div className="mt-12 flex flex-wrap gap-x-10 gap-y-4 text-sm">
@@ -121,18 +106,19 @@ function Index() {
             </div>
           </motion.div>
 
-          {/* 3D scene */}
           <motion.div
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.2, ease: "easeOut", delay: 0.2 }}
-            className="relative h-[460px] sm:h-[560px] lg:h-[640px]"
+            className="relative h-[460px] sm:h-[560px] lg:h-[640px] order-last lg:order-none"
           >
-            <div className="absolute inset-0 -z-10 rounded-[2rem] bg-gradient-to-br from-primary/10 via-transparent to-transparent blur-2xl" />
+            <Suspense fallback={null}>
+              <PhotoBackdrop />
+            </Suspense>
             <Suspense fallback={<div className="grid h-full place-items-center text-primary">Loading…</div>}>
               <AwardScene />
             </Suspense>
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent rounded-b-[2rem]" />
           </motion.div>
         </div>
 
@@ -268,6 +254,9 @@ function Index() {
         </div>
       </section>
 
+      {/* Detailed Programme & Venue */}
+      <EventProgram />
+
       {/* CTA */}
       <section id="nominate" className="relative z-10 mx-auto max-w-5xl px-6 py-24 text-center">
         <motion.div
@@ -284,12 +273,16 @@ function Index() {
             whose story deserves the spotlight.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <Button size="lg" className="bg-gold text-primary-foreground shadow-gold hover:opacity-95">
-              Submit Nomination <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-            <Button size="lg" variant="outline" className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10">
-              Past Winners
-            </Button>
+            <Link to="/nominate">
+              <Button size="lg" className="bg-gold text-primary-foreground shadow-gold hover:opacity-95">
+                Submit Nomination <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+            <Link to="/winners">
+              <Button size="lg" variant="outline" className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10">
+                Past Winners
+              </Button>
+            </Link>
           </div>
         </motion.div>
       </section>
