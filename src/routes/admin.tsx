@@ -81,7 +81,7 @@ function AdminPage() {
 function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string; eligibility: string }[]>(
-    () => AWARD_CATEGORIES.map((c) => ({ id: c.id, name: c.name, eligibility: c.eligibility }))
+    () => AWARD_CATEGORIES.map((c) => ({ id: c.id, name: c.name, eligibility: c.tagline }))
   );
   const [newCat, setNewCat] = useState({ name: "", eligibility: "" });
 

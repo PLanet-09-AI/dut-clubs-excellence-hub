@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 import { motion } from "framer-motion";
-import { Award, Sparkles, Calendar, MapPin, Users, Star, Trophy, ArrowRight } from "lucide-react";
+import { Award, Sparkles, Calendar, MapPin, Users, Star, Trophy, ArrowRight, Heart, Leaf, Briefcase, Home, Globe, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SiteNav from "@/components/SiteNav";
 import EventProgram from "@/components/EventProgram";
+import { AWARD_CATEGORIES, AWARD_THEME } from "@/data/awards";
 
 const AwardScene = lazy(() => import("@/components/AwardScene"));
 const BackgroundScene = lazy(() => import("@/components/BackgroundScene"));
@@ -14,33 +15,35 @@ export const Route = createFileRoute("/")({
   component: Index,
   head: () => ({
     meta: [
-      { title: "DUT Student Services Awards 2026 — A Night of Excellence" },
+      { title: "DUT Student Services Awards — ENVISION2030 in Action" },
       {
         name: "description",
         content:
-          "Celebrate the brightest stars at the Durban University of Technology Student Services Awards — an annual gala honouring leadership, service and excellence.",
+          "Celebrate the brightest stars at the Durban University of Technology Student Services Awards — Leadership, Innovation & Service. Nominations close 31 July 2025.",
       },
-      { property: "og:title", content: "DUT Student Services Awards 2026" },
+      { property: "og:title", content: "DUT Student Services Awards — ENVISION2030 in Action" },
       {
         property: "og:description",
-        content: "An annual gala honouring DUT students who lead, serve and inspire.",
+        content: "21 years of honouring DUT students who lead, serve and inspire.",
       },
     ],
   }),
 });
 
-const categories = [
-  { icon: Trophy, title: "Student Leader of the Year", desc: "Honouring transformative leadership across SRC, clubs and societies." },
-  { icon: Star, title: "Academic Excellence", desc: "Recognising scholars whose intellect lights the path forward." },
-  { icon: Users, title: "Community Impact", desc: "Celebrating service that uplifts neighbourhoods and lives." },
-  { icon: Award, title: "Sportsperson of the Year", desc: "For athletes who carry the DUT colours with distinction." },
-  { icon: Sparkles, title: "Cultural Ambassador", desc: "Voices of art, music and heritage that shape our identity." },
-  { icon: Trophy, title: "Residence of the Year", desc: "Where home becomes a community of growth and care." },
-];
+const CATEGORY_ICONS: Record<string, typeof Award> = {
+  dean: Trophy,
+  sport: Award,
+  wellness: Heart,
+  society: Users,
+  residence: Home,
+  entrepreneur: Briefcase,
+  emerging: GraduationCap,
+  diversity: Globe,
+};
 
 const stats = [
   { num: "21", label: "Years of Tradition" },
-  { num: "30+", label: "Award Categories" },
+  { num: "8", label: "Award Categories" },
   { num: "500+", label: "Nominees Annually" },
   { num: "1", label: "Unforgettable Night" },
 ];
@@ -68,16 +71,16 @@ function Index() {
             className="relative"
           >
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-xs uppercase tracking-[0.25em] text-primary">
-              <Sparkles className="h-3 w-3" /> Annual Gala · 21st Edition
+              <Sparkles className="h-3 w-3" /> {AWARD_THEME.yearsBadge}
             </div>
             <h1 className="text-5xl font-bold leading-[1.05] sm:text-6xl lg:text-7xl">
-              A Night Where <br />
-              <span className="text-gradient-gold">Excellence</span> <br />
-              Wears a Crown.
+              <span className="text-gradient-gold">ENVISION2030</span> <br />
+              in Action: <br />
+              Leadership. Innovation. Service.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-              The Durban University of Technology Student Services Awards return — a luminous evening
-              dedicated to the students whose courage, scholarship and service define the soul of DUT.
+              The DUT Student Services Awards honour students whose courage, scholarship and service
+              bring our ENVISION2030 strategy to life — across leadership, innovation and service.
             </p>
 
             <div className="mt-10 flex flex-wrap items-center gap-4">
@@ -93,16 +96,11 @@ function Index() {
               </Link>
             </div>
 
-            <div className="mt-12 flex flex-wrap gap-x-10 gap-y-4 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Calendar className="h-4 w-4 text-primary" /> 14 November 2026
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <MapPin className="h-4 w-4 text-primary" /> Durban ICC, Hall 3
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Users className="h-4 w-4 text-primary" /> Black-tie · 19:00
-              </div>
+            <div className="mt-12 grid gap-3 text-sm sm:grid-cols-2">
+              <InfoChip icon={Calendar} title="Recognition Period" value={AWARD_THEME.recognitionPeriod} />
+              <InfoChip icon={Sparkles} title="Nominations Close" value={AWARD_THEME.closingDate} />
+              <InfoChip icon={MapPin} title="Venue" value="Durban ICC · Hall 3" />
+              <InfoChip icon={Users} title="Dress · Time" value="Black-tie · 19:00" />
             </div>
           </motion.div>
 
@@ -162,15 +160,31 @@ function Index() {
           </div>
           <div className="space-y-6 text-muted-foreground lg:col-span-7">
             <p className="text-lg leading-relaxed">
-              Each year the Student Services Awards gather the DUT community — students, families,
-              faculty and friends — under one roof to celebrate the quiet acts and brilliant
-              achievements that shape our institution.
+              The Student Services Awards recognise the outstanding work of individuals and teams of
+              students whose projects, initiatives and contributions reflect the values DUT upholds —
+              and the ENVISION2030 strategy. The Division comprises five units:
+              <span className="text-foreground"> Student Governance &amp; Development</span>,
+              <span className="text-foreground"> Student Housing &amp; Residence Life</span>,
+              <span className="text-foreground"> Sports Administration</span>,
+              <span className="text-foreground"> Student Counselling &amp; Health</span> and the
+              <span className="text-foreground"> Financial Aid Unit</span>.
             </p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {[
+                { t: "Nominee", d: "A student or group put forward in recognition of their contributions." },
+                { t: "Nominator", d: "The person — peer, staff or self — who submits the nomination." },
+                { t: "Self-nomination", d: "Permitted and encouraged when supported by a credible Portfolio of Evidence." },
+              ].map((d) => (
+                <div key={d.t} className="rounded-xl border border-primary/20 bg-card/40 p-4">
+                  <p className="text-xs uppercase tracking-wider text-primary">{d.t}</p>
+                  <p className="mt-1 text-sm text-foreground/80">{d.d}</p>
+                </div>
+              ))}
+            </div>
             <p className="leading-relaxed">
-              From the residence ambassador who stays up late to comfort a homesick first-year, to the
-              SRC leader negotiating change, to the athlete who carries our colours abroad — this is
-              their night. Held annually since 2004, the gala has become the most anticipated evening
-              on the DUT calendar.
+              The 2025 theme — <span className="text-foreground">"{AWARD_THEME.title}: {AWARD_THEME.subtitle}"</span> —
+              celebrates students who bring DUT's strategic values to life through campus initiatives,
+              creative solutions and meaningful service to fellow students.
             </p>
           </div>
         </div>
@@ -180,26 +194,42 @@ function Index() {
       <section id="categories" className="relative z-10 mx-auto max-w-7xl px-6 py-20">
         <div className="mb-14 text-center">
           <p className="text-xs uppercase tracking-[0.3em] text-primary">The Categories</p>
-          <h2 className="mt-3 text-4xl font-bold sm:text-5xl">Six pillars. <span className="text-gradient-gold">One legacy.</span></h2>
+          <h2 className="mt-3 text-4xl font-bold sm:text-5xl">
+            Eight pillars. <span className="text-gradient-gold">One legacy.</span>
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
+            Each category honours a distinct dimension of student excellence. Tap a tile to read
+            the recognition criteria and start a nomination.
+          </p>
         </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {categories.map((c, i) => {
-            const Icon = c.icon;
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {AWARD_CATEGORIES.map((c, i) => {
+            const Icon = CATEGORY_ICONS[c.id] ?? Award;
             return (
               <motion.div
-                key={i}
+                key={c.id}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
-                transition={{ delay: i * 0.08, duration: 0.6 }}
-                className="group relative overflow-hidden rounded-2xl border border-primary/20 bg-card/60 p-8 backdrop-blur-sm transition hover:border-primary/60 hover:shadow-gold"
+                transition={{ delay: i * 0.06, duration: 0.5 }}
+                className="group relative flex flex-col overflow-hidden rounded-2xl border border-primary/20 bg-card/60 p-6 backdrop-blur-sm transition hover:border-primary/60 hover:shadow-gold"
               >
-                <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/0 via-transparent to-primary/0 opacity-0 transition group-hover:opacity-100 group-hover:from-primary/10" />
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-gold shadow-gold transition group-hover:scale-110">
-                  <Icon className="h-6 w-6 text-primary-foreground" />
+                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl transition group-hover:bg-primary/30" />
+                <div className="relative mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gold shadow-gold transition group-hover:scale-110">
+                  <Icon className="h-5 w-5 text-primary-foreground" />
                 </div>
-                <h3 className="text-xl font-semibold">{c.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{c.desc}</p>
+                <h3 className="relative text-lg font-semibold leading-snug">{c.name}</h3>
+                <p className="relative mt-2 text-sm leading-relaxed text-muted-foreground">{c.tagline}</p>
+                <ul className="relative mt-4 space-y-1.5 text-xs text-foreground/75">
+                  {c.recognises.slice(0, 3).map((r) => (
+                    <li key={r} className="flex items-start gap-2">
+                      <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-gold" /> {r}
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/nominate" className="relative mt-5 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-primary hover:text-gold">
+                  Nominate <ArrowRight className="h-3 w-3" />
+                </Link>
               </motion.div>
             );
           })}
@@ -293,6 +323,18 @@ function Index() {
           <p>P O Box 1334, Durban 4000 · info@dut.ac.za</p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function InfoChip({ icon: Icon, title, value }: { icon: typeof Award; title: string; value: string }) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-primary/15 bg-background/30 p-3">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+      <div>
+        <p className="text-xs uppercase tracking-wider text-primary">{title}</p>
+        <p className="text-foreground">{value}</p>
+      </div>
     </div>
   );
 }

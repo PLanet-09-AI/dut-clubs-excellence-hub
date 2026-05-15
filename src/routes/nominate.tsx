@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, AlertCircle, ArrowRight, Sparkles } from "lucide-react";
+import { CheckCircle2, AlertCircle, ArrowRight, Sparkles, FileText } from "lucide-react";
 import SiteNav from "@/components/SiteNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AWARD_CATEGORIES, FACULTIES } from "@/data/awards";
+import { AWARD_CATEGORIES, FACULTIES, AWARD_THEME } from "@/data/awards";
 import { addNomination } from "@/lib/nominations";
 import { z } from "zod";
 
@@ -17,20 +17,20 @@ export const Route = createFileRoute("/nominate")({
   component: NominatePage,
   head: () => ({
     meta: [
-      { title: "Nominate · DUT Student Services Awards 2026" },
-      { name: "description", content: "Submit a nomination for the 2026 DUT Student Services Awards. Choose a category, confirm eligibility and put forward an extraordinary student." },
+      { title: "Nominate · DUT Student Services Awards" },
+      { name: "description", content: "Submit a nomination for the DUT Student Services Awards. Choose a category, confirm eligibility, then answer the official portfolio questions." },
     ],
   }),
 });
 
-const schema = z.object({
+const baseSchema = z.object({
   categoryId: z.string().min(1, "Choose a category"),
   nomineeName: z.string().trim().min(2).max(120),
   nomineeEmail: z.string().trim().email().max(255),
   studentNumber: z.string().trim().regex(/^\d{6,10}$/, "Student number must be 6–10 digits"),
   faculty: z.string().min(1, "Choose a faculty"),
   yearOfStudy: z.string().min(1),
-  motivation: z.string().trim().min(80, "Please write at least 80 characters").max(1500),
+  motivation: z.string().trim().min(80, "Please write at least 80 characters").max(8000),
   nominatorName: z.string().trim().min(2).max(120),
   nominatorEmail: z.string().trim().email().max(255),
 });
@@ -38,27 +38,47 @@ const schema = z.object({
 function NominatePage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [categoryId, setCategoryId] = useState("");
-  const [eligibility, setEligibility] = useState({ active: false, conduct: false, consent: false });
+  const [eligibility, setEligibility] = useState({ active: false, conduct: false, consent: false, period: false });
   const [form, setForm] = useState({
     nomineeName: "", nomineeEmail: "", studentNumber: "", faculty: "", yearOfStudy: "1",
-    motivation: "", nominatorName: "", nominatorEmail: "",
+    nominatorName: "", nominatorEmail: "",
   });
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
 
   const category = AWARD_CATEGORIES.find((c) => c.id === categoryId);
-  const allEligible = eligibility.active && eligibility.conduct && eligibility.consent;
+  const allEligible = eligibility.active && eligibility.conduct && eligibility.consent && eligibility.period;
+
+  const sections = useMemo(() => {
+    if (!category) return [] as { name: string; items: typeof AWARD_CATEGORIES[number]["questions"] }[];
+    const map = new Map<string, typeof category.questions>();
+    for (const q of category.questions) {
+      if (!map.has(q.section)) map.set(q.section, [] as typeof category.questions);
+      map.get(q.section)!.push(q);
+    }
+    return Array.from(map.entries()).map(([name, items]) => ({ name, items }));
+  }, [category]);
 
   function update<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
   function submit() {
-    const result = schema.safeParse({ categoryId, ...form });
+    const motivation = (category?.questions ?? [])
+      .map((q) => `## ${q.section} — ${q.prompt}\n${answers[q.id] ?? ""}`)
+      .join("\n\n");
+    const result = baseSchema.safeParse({ categoryId, motivation, ...form });
     if (!result.success) {
       const errs: Record<string, string> = {};
       for (const issue of result.error.issues) errs[issue.path.join(".")] = issue.message;
       setErrors(errs);
+      return;
+    }
+    // require at least the first question of each section
+    const missing = (category?.questions ?? []).filter((q) => !(answers[q.id] ?? "").trim());
+    if (missing.length > 0) {
+      setErrors({ motivation: `Please answer all ${category?.questions.length} portfolio questions (${missing.length} remaining).` });
       return;
     }
     setErrors({});
@@ -71,14 +91,15 @@ function NominatePage() {
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,oklch(0.25_0.12_265)_0%,transparent_60%)]" />
       <SiteNav />
 
-      <main className="relative z-10 mx-auto max-w-4xl px-6 py-16">
+      <main className="relative z-10 mx-auto max-w-5xl px-6 py-16">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-xs uppercase tracking-[0.25em] text-primary">
-            <Sparkles className="h-3 w-3" /> Nominations close 30 September 2026
+            <Sparkles className="h-3 w-3" /> Closing date: {AWARD_THEME.closingDate}
           </div>
           <h1 className="text-4xl font-bold sm:text-5xl">Nominate <span className="text-gradient-gold">a star.</span></h1>
           <p className="mt-4 max-w-2xl text-muted-foreground">
-            Three simple steps. Choose a category, confirm the eligibility checks, then tell us their story.
+            Recognition period <span className="text-foreground">{AWARD_THEME.recognitionPeriod}</span>. Three steps —
+            choose a category, confirm eligibility, then complete the official Portfolio of Evidence questions.
           </p>
         </motion.div>
 
@@ -104,10 +125,10 @@ function NominatePage() {
             <p className="mx-auto mt-3 max-w-md text-muted-foreground">
               Thank you. We've recorded the nomination of <span className="text-foreground font-semibold">{form.nomineeName}</span> for the
               {" "}<span className="text-primary font-semibold">{category?.name}</span> category.
-              Our panel will be in touch by 15 October.
+              Our panel will review your Portfolio of Evidence and be in touch.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Button onClick={() => { setSubmitted(false); setStep(1); setCategoryId(""); setEligibility({active:false,conduct:false,consent:false}); setForm({nomineeName:"",nomineeEmail:"",studentNumber:"",faculty:"",yearOfStudy:"1",motivation:"",nominatorName:"",nominatorEmail:""}); }}
+              <Button onClick={() => { setSubmitted(false); setStep(1); setCategoryId(""); setAnswers({}); setEligibility({active:false,conduct:false,consent:false,period:false}); setForm({nomineeName:"",nomineeEmail:"",studentNumber:"",faculty:"",yearOfStudy:"1",nominatorName:"",nominatorEmail:""}); }}
                 className="bg-gold text-primary-foreground">Submit another</Button>
               <Link to="/"><Button variant="outline" className="border-primary/40 bg-primary/5 text-primary">Back home</Button></Link>
             </div>
@@ -124,7 +145,7 @@ function NominatePage() {
                         categoryId === c.id ? "border-primary bg-primary/10 shadow-gold" : "border-primary/20 bg-background/40 hover:border-primary/50"
                       }`}>
                       <p className="font-semibold">{c.name}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{c.eligibility}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{c.tagline}</p>
                     </button>
                   ))}
                 </div>
@@ -140,16 +161,24 @@ function NominatePage() {
               <div className="space-y-6">
                 <h2 className="font-serif text-2xl font-bold">2. Eligibility checks</h2>
                 {category && (
-                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
+                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 text-sm">
                     <p className="text-xs uppercase tracking-[0.2em] text-primary">{category.name}</p>
-                    <p className="mt-1 text-muted-foreground">{category.eligibility}</p>
+                    <p className="mt-2 text-muted-foreground">{category.description}</p>
+                    <ul className="mt-4 space-y-1.5">
+                      {category.recognises.map((r) => (
+                        <li key={r} className="flex items-start gap-2 text-foreground/90">
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" /> {r}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {[
                     ["active", "The nominee is a currently registered DUT student."],
-                    ["conduct", "The nominee has no active disciplinary record for the 2025–2026 cycle."],
-                    ["consent", "I have the nominee's consent to submit this nomination on their behalf."],
+                    ["conduct", "The nominee has no active disciplinary record for the recognition period."],
+                    ["period", `The contributions occurred between ${AWARD_THEME.recognitionPeriod}.`],
+                    ["consent", "I have the nominee's consent to submit this nomination on their behalf (or this is a self-nomination)."],
                   ].map(([k, label]) => (
                     <label key={k} className="flex items-start gap-3 rounded-xl border border-primary/20 bg-background/40 p-4 cursor-pointer">
                       <Checkbox checked={eligibility[k as keyof typeof eligibility]}
@@ -160,7 +189,7 @@ function NominatePage() {
                 </div>
                 {!allEligible && (
                   <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <AlertCircle className="h-4 w-4 text-primary" /> Tick all three to continue.
+                    <AlertCircle className="h-4 w-4 text-primary" /> Tick all four to continue.
                   </p>
                 )}
                 <div className="flex justify-between pt-2">
@@ -173,8 +202,10 @@ function NominatePage() {
             )}
 
             {step === 3 && (
-              <div className="space-y-6">
-                <h2 className="font-serif text-2xl font-bold">3. Their story</h2>
+              <div className="space-y-8">
+                <h2 className="font-serif text-2xl font-bold">3. Portfolio of Evidence</h2>
+
+                {/* Identity */}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Nominee full name" err={errors.nomineeName}>
                     <Input value={form.nomineeName} onChange={(e) => update("nomineeName", e.target.value)} maxLength={120} />
@@ -202,12 +233,51 @@ function NominatePage() {
                     </Select>
                   </Field>
                 </div>
-                <Field label="Why do they deserve this award? (80–1500 chars)" err={errors.motivation}>
-                  <Textarea value={form.motivation} onChange={(e) => update("motivation", e.target.value)} rows={6} maxLength={1500} />
-                  <p className="mt-1 text-xs text-muted-foreground">{form.motivation.length} / 1500</p>
-                </Field>
+
+                {/* Section-grouped questions */}
+                <div className="space-y-6">
+                  {sections.map((sec) => (
+                    <div key={sec.name} className="rounded-2xl border border-primary/20 bg-background/30 p-5">
+                      <p className="text-xs uppercase tracking-[0.25em] text-primary">{sec.name}</p>
+                      <div className="mt-4 space-y-5">
+                        {sec.items.map((q) => {
+                          const value = answers[q.id] ?? "";
+                          const limit = q.wordLimit;
+                          const words = value.trim() ? value.trim().split(/\s+/).length : 0;
+                          return (
+                            <div key={q.id}>
+                              <Label className="mb-2 block text-sm text-foreground/90">{q.prompt}</Label>
+                              <Textarea
+                                rows={4}
+                                value={value}
+                                maxLength={6000}
+                                onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                              />
+                              <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                                {q.evidence && q.evidence.length > 0 ? (
+                                  <span className="flex flex-wrap items-center gap-1">
+                                    <FileText className="h-3 w-3 text-primary" />
+                                    Suggested evidence: {q.evidence.join(" · ")}
+                                  </span>
+                                ) : <span />}
+                                {limit && (
+                                  <span className={words > limit ? "text-destructive" : ""}>
+                                    {words} / {limit} words
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {errors.motivation && <p className="text-sm text-destructive">{errors.motivation}</p>}
+
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Your name" err={errors.nominatorName}>
+                  <Field label="Your name (nominator)" err={errors.nominatorName}>
                     <Input value={form.nominatorName} onChange={(e) => update("nominatorName", e.target.value)} maxLength={120} />
                   </Field>
                   <Field label="Your email" err={errors.nominatorEmail}>
