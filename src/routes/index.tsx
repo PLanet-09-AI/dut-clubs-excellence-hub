@@ -71,16 +71,16 @@ function Index() {
             className="relative"
           >
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-xs uppercase tracking-[0.25em] text-primary">
-              <Sparkles className="h-3 w-3" /> Annual Gala · 21st Edition
+              <Sparkles className="h-3 w-3" /> {AWARD_THEME.yearsBadge}
             </div>
             <h1 className="text-5xl font-bold leading-[1.05] sm:text-6xl lg:text-7xl">
-              A Night Where <br />
-              <span className="text-gradient-gold">Excellence</span> <br />
-              Wears a Crown.
+              <span className="text-gradient-gold">ENVISION2030</span> <br />
+              in Action: <br />
+              Leadership. Innovation. Service.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-              The Durban University of Technology Student Services Awards return — a luminous evening
-              dedicated to the students whose courage, scholarship and service define the soul of DUT.
+              The DUT Student Services Awards honour students whose courage, scholarship and service
+              bring our ENVISION2030 strategy to life — across leadership, innovation and service.
             </p>
 
             <div className="mt-10 flex flex-wrap items-center gap-4">
@@ -96,16 +96,11 @@ function Index() {
               </Link>
             </div>
 
-            <div className="mt-12 flex flex-wrap gap-x-10 gap-y-4 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Calendar className="h-4 w-4 text-primary" /> 14 November 2026
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <MapPin className="h-4 w-4 text-primary" /> Durban ICC, Hall 3
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Users className="h-4 w-4 text-primary" /> Black-tie · 19:00
-              </div>
+            <div className="mt-12 grid gap-3 text-sm sm:grid-cols-2">
+              <InfoChip icon={Calendar} title="Recognition Period" value={AWARD_THEME.recognitionPeriod} />
+              <InfoChip icon={Sparkles} title="Nominations Close" value={AWARD_THEME.closingDate} />
+              <InfoChip icon={MapPin} title="Venue" value="Durban ICC · Hall 3" />
+              <InfoChip icon={Users} title="Dress · Time" value="Black-tie · 19:00" />
             </div>
           </motion.div>
 
@@ -183,26 +178,42 @@ function Index() {
       <section id="categories" className="relative z-10 mx-auto max-w-7xl px-6 py-20">
         <div className="mb-14 text-center">
           <p className="text-xs uppercase tracking-[0.3em] text-primary">The Categories</p>
-          <h2 className="mt-3 text-4xl font-bold sm:text-5xl">Six pillars. <span className="text-gradient-gold">One legacy.</span></h2>
+          <h2 className="mt-3 text-4xl font-bold sm:text-5xl">
+            Eight pillars. <span className="text-gradient-gold">One legacy.</span>
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
+            Each category honours a distinct dimension of student excellence. Tap a tile to read
+            the recognition criteria and start a nomination.
+          </p>
         </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {categories.map((c, i) => {
-            const Icon = c.icon;
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {AWARD_CATEGORIES.map((c, i) => {
+            const Icon = CATEGORY_ICONS[c.id] ?? Award;
             return (
               <motion.div
-                key={i}
+                key={c.id}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
-                transition={{ delay: i * 0.08, duration: 0.6 }}
-                className="group relative overflow-hidden rounded-2xl border border-primary/20 bg-card/60 p-8 backdrop-blur-sm transition hover:border-primary/60 hover:shadow-gold"
+                transition={{ delay: i * 0.06, duration: 0.5 }}
+                className="group relative flex flex-col overflow-hidden rounded-2xl border border-primary/20 bg-card/60 p-6 backdrop-blur-sm transition hover:border-primary/60 hover:shadow-gold"
               >
-                <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/0 via-transparent to-primary/0 opacity-0 transition group-hover:opacity-100 group-hover:from-primary/10" />
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-gold shadow-gold transition group-hover:scale-110">
-                  <Icon className="h-6 w-6 text-primary-foreground" />
+                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl transition group-hover:bg-primary/30" />
+                <div className="relative mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gold shadow-gold transition group-hover:scale-110">
+                  <Icon className="h-5 w-5 text-primary-foreground" />
                 </div>
-                <h3 className="text-xl font-semibold">{c.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{c.desc}</p>
+                <h3 className="relative text-lg font-semibold leading-snug">{c.name}</h3>
+                <p className="relative mt-2 text-sm leading-relaxed text-muted-foreground">{c.tagline}</p>
+                <ul className="relative mt-4 space-y-1.5 text-xs text-foreground/75">
+                  {c.recognises.slice(0, 3).map((r) => (
+                    <li key={r} className="flex items-start gap-2">
+                      <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-gold" /> {r}
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/nominate" className="relative mt-5 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-primary hover:text-gold">
+                  Nominate <ArrowRight className="h-3 w-3" />
+                </Link>
               </motion.div>
             );
           })}
