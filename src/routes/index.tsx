@@ -310,3 +310,15 @@ function Index() {
     </div>
   );
 }
+
+function InfoChip({ icon: Icon, title, value }: { icon: typeof Award; title: string; value: string }) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-primary/15 bg-background/30 p-3">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+      <div>
+        <p className="text-xs uppercase tracking-wider text-primary">{title}</p>
+        <p className="text-foreground">{value}</p>
+      </div>
+    </div>
+  );
+}
