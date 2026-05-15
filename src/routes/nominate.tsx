@@ -51,7 +51,7 @@ function NominatePage() {
   const allEligible = eligibility.active && eligibility.conduct && eligibility.consent && eligibility.period;
 
   const sections = useMemo(() => {
-    if (!category) return [] as { name: string; items: typeof category.questions }[];
+    if (!category) return [] as { name: string; items: typeof AWARD_CATEGORIES[number]["questions"] }[];
     const map = new Map<string, typeof category.questions>();
     for (const q of category.questions) {
       if (!map.has(q.section)) map.set(q.section, [] as typeof category.questions);
