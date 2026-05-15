@@ -160,15 +160,31 @@ function Index() {
           </div>
           <div className="space-y-6 text-muted-foreground lg:col-span-7">
             <p className="text-lg leading-relaxed">
-              Each year the Student Services Awards gather the DUT community — students, families,
-              faculty and friends — under one roof to celebrate the quiet acts and brilliant
-              achievements that shape our institution.
+              The Student Services Awards recognise the outstanding work of individuals and teams of
+              students whose projects, initiatives and contributions reflect the values DUT upholds —
+              and the ENVISION2030 strategy. The Division comprises five units:
+              <span className="text-foreground"> Student Governance &amp; Development</span>,
+              <span className="text-foreground"> Student Housing &amp; Residence Life</span>,
+              <span className="text-foreground"> Sports Administration</span>,
+              <span className="text-foreground"> Student Counselling &amp; Health</span> and the
+              <span className="text-foreground"> Financial Aid Unit</span>.
             </p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {[
+                { t: "Nominee", d: "A student or group put forward in recognition of their contributions." },
+                { t: "Nominator", d: "The person — peer, staff or self — who submits the nomination." },
+                { t: "Self-nomination", d: "Permitted and encouraged when supported by a credible Portfolio of Evidence." },
+              ].map((d) => (
+                <div key={d.t} className="rounded-xl border border-primary/20 bg-card/40 p-4">
+                  <p className="text-xs uppercase tracking-wider text-primary">{d.t}</p>
+                  <p className="mt-1 text-sm text-foreground/80">{d.d}</p>
+                </div>
+              ))}
+            </div>
             <p className="leading-relaxed">
-              From the residence ambassador who stays up late to comfort a homesick first-year, to the
-              SRC leader negotiating change, to the athlete who carries our colours abroad — this is
-              their night. Held annually since 2004, the gala has become the most anticipated evening
-              on the DUT calendar.
+              The 2025 theme — <span className="text-foreground">"{AWARD_THEME.title}: {AWARD_THEME.subtitle}"</span> —
+              celebrates students who bring DUT's strategic values to life through campus initiatives,
+              creative solutions and meaningful service to fellow students.
             </p>
           </div>
         </div>
