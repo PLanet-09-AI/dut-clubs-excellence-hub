@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 import { motion } from "framer-motion";
-import { Award, Sparkles, Calendar, MapPin, Users, Star, Trophy, ArrowRight } from "lucide-react";
+import { Award, Sparkles, Calendar, MapPin, Users, Star, Trophy, ArrowRight, Heart, Leaf, Briefcase, Home, Globe, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SiteNav from "@/components/SiteNav";
 import EventProgram from "@/components/EventProgram";
+import { AWARD_CATEGORIES, AWARD_THEME } from "@/data/awards";
 
 const AwardScene = lazy(() => import("@/components/AwardScene"));
 const BackgroundScene = lazy(() => import("@/components/BackgroundScene"));
@@ -14,33 +15,35 @@ export const Route = createFileRoute("/")({
   component: Index,
   head: () => ({
     meta: [
-      { title: "DUT Student Services Awards 2026 — A Night of Excellence" },
+      { title: "DUT Student Services Awards — ENVISION2030 in Action" },
       {
         name: "description",
         content:
-          "Celebrate the brightest stars at the Durban University of Technology Student Services Awards — an annual gala honouring leadership, service and excellence.",
+          "Celebrate the brightest stars at the Durban University of Technology Student Services Awards — Leadership, Innovation & Service. Nominations close 31 July 2025.",
       },
-      { property: "og:title", content: "DUT Student Services Awards 2026" },
+      { property: "og:title", content: "DUT Student Services Awards — ENVISION2030 in Action" },
       {
         property: "og:description",
-        content: "An annual gala honouring DUT students who lead, serve and inspire.",
+        content: "21 years of honouring DUT students who lead, serve and inspire.",
       },
     ],
   }),
 });
 
-const categories = [
-  { icon: Trophy, title: "Student Leader of the Year", desc: "Honouring transformative leadership across SRC, clubs and societies." },
-  { icon: Star, title: "Academic Excellence", desc: "Recognising scholars whose intellect lights the path forward." },
-  { icon: Users, title: "Community Impact", desc: "Celebrating service that uplifts neighbourhoods and lives." },
-  { icon: Award, title: "Sportsperson of the Year", desc: "For athletes who carry the DUT colours with distinction." },
-  { icon: Sparkles, title: "Cultural Ambassador", desc: "Voices of art, music and heritage that shape our identity." },
-  { icon: Trophy, title: "Residence of the Year", desc: "Where home becomes a community of growth and care." },
-];
+const CATEGORY_ICONS: Record<string, typeof Award> = {
+  dean: Trophy,
+  sport: Award,
+  wellness: Heart,
+  society: Users,
+  residence: Home,
+  entrepreneur: Briefcase,
+  emerging: GraduationCap,
+  diversity: Globe,
+};
 
 const stats = [
   { num: "21", label: "Years of Tradition" },
-  { num: "30+", label: "Award Categories" },
+  { num: "8", label: "Award Categories" },
   { num: "500+", label: "Nominees Annually" },
   { num: "1", label: "Unforgettable Night" },
 ];
