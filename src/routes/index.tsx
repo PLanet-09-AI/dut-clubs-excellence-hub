@@ -258,17 +258,15 @@ function Index() {
 
       {/* Event details */}
       <section id="event" className="relative z-10 mx-auto max-w-7xl px-6 py-20">
-        <div className="relative overflow-hidden rounded-3xl border border-primary/30 bg-gradient-to-br from-card via-card to-secondary/40 p-10 sm:p-16">
-          <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-primary/20 blur-3xl" />
-          <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-chart-2/20 blur-3xl" />
+        <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-white p-10 sm:p-16">
 
           <div className="relative grid gap-12 lg:grid-cols-2 lg:items-center">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-primary">The Gala Evening</p>
-              <h2 className="mt-3 text-4xl font-bold leading-tight sm:text-5xl">
+              <h2 className="mt-3 text-4xl font-bold leading-tight sm:text-5xl text-black">
                 Celebrating <span className="text-gradient-gold">academic excellence</span> and leadership.
               </h2>
-              <p className="mt-6 leading-relaxed text-muted-foreground">
+              <p className="mt-6 leading-relaxed text-gray-600">
                 Join us for an elegant evening honouring the brightest students. Doors open at 18:00 with a reception, 
                 followed by the awards ceremony at 19:00, featuring performances, recognition of excellence, 
                 and an evening of celebration of student achievement.
@@ -280,22 +278,21 @@ function Index() {
                   ["20:30", "Banquet & Performances"],
                   ["22:00", "After-party"],
                 ].map(([t, l]) => (
-                  <div key={t} className="rounded-xl border border-primary/20 bg-background/40 p-4">
+                  <div key={t} className="rounded-xl border border-primary/20 bg-gray-50 p-4">
                     <p className="text-gradient-gold font-serif text-2xl font-bold">{t}</p>
-                    <p className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">{l}</p>
+                    <p className="mt-1 text-xs uppercase tracking-wider text-gray-500">{l}</p>
                   </div>
                 ))}
               </div>
             </div>
 
             <div className="relative">
-              <div className="absolute inset-0 animate-float rounded-3xl bg-gold opacity-20 blur-3xl" />
-              <div className="relative rounded-3xl border border-primary/40 bg-background/60 p-8 backdrop-blur-md">
+              <div className="relative rounded-3xl border border-primary/30 bg-gray-50 p-8">
                 <Trophy className="mb-4 h-10 w-10 text-primary" />
-                <p className="font-serif text-3xl font-bold leading-tight">
+                <p className="font-serif text-3xl font-bold leading-tight text-black">
                   "Recognising Excellence. Celebrating Leadership. Inspiring Greatness."
                 </p>
-                <p className="mt-6 text-sm uppercase tracking-[0.2em] text-muted-foreground">
+                <p className="mt-6 text-sm uppercase tracking-[0.2em] text-gray-500">
                   — SALEA 2026 Mission
                 </p>
               </div>
