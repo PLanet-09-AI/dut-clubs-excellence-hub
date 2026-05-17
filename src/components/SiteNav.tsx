@@ -8,7 +8,7 @@ import {
   SheetTrigger,
   SheetHeader,
 } from "@/components/ui/sheet";
-import logo from "@/assets/logo.png";
+import logo from "@/assets/logo.svg";
 
 export default function SiteNav() {
   const [isOpen, setIsOpen] = useState(false);
