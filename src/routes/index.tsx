@@ -66,7 +66,7 @@ function Index() {
 
       {/* Hero */}
       <section className="relative z-10 pt-20">
-        <div className="mx-auto grid max-w-7xl items-center gap-8 px-6 pt-12 pb-24 lg:grid-cols-2 lg:pt-20 lg:pb-32">
+          <div className="mx-auto max-w-3xl px-6 pt-12 pb-24 lg:pt-20 lg:pb-32">
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
@@ -105,20 +105,7 @@ function Index() {
             </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1.2, ease: "easeOut", delay: 0.2 }}
-            className="relative h-[460px] sm:h-[560px] lg:h-[640px] order-last lg:order-none"
-          >
-            <Suspense fallback={null}>
-              <PhotoBackdrop />
-            </Suspense>
-            <Suspense fallback={<div className="grid h-full place-items-center text-primary">Loading…</div>}>
-              <AwardScene />
-            </Suspense>
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent rounded-b-[2rem]" />
-          </motion.div>
+          {/* Image/3D section hidden */}
         </div>
 
         {/* Marquee */}
