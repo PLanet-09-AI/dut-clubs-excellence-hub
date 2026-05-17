@@ -2,6 +2,10 @@
  * Post-build script for Netlify deployment.
  * TanStack Start + Cloudflare adapter does not emit index.html (SSR generates HTML at runtime).
  * This script generates a minimal HTML shell so Netlify can serve the app as an SPA.
+ *
+ * TanStack Start's startClient() (cE) requires window.$_TSR to be defined — normally injected
+ * by the SSR server. We inject a minimal CSR stub that satisfies all invariants and lets the
+ * router boot in pure client-side rendering mode.
  */
 import { readFileSync, writeFileSync, readdirSync } from "fs";
 import { join } from "path";
@@ -21,6 +25,15 @@ const jsFile = files.find((f) => {
 });
 if (!jsFile) throw new Error("Bootstrap JS not found in dist/client/assets");
 
+// TanStack Start's startClient() requires window.$_TSR to be defined (injected by the SSR
+// server during normal operation). Without it, the invariant at `window.$_TSR || Re()` throws.
+// Providing an empty-but-valid stub lets the router boot in CSR (client-side only) mode:
+//   - matches: [] means every route match falls into the CSR branch (no hydration attempted)
+//   - dehydratedData: null skips server-data rehydration
+//   - manifest: null is stored as n.ssr.manifest (optional, used for preloading)
+//   - h: () => {}  is called as a post-init notification (window.$_TSR?.h())
+const tsrStub = `window.$_TSR={router:{matches:[],lastMatchId:null,manifest:null,dehydratedData:null},buffer:[],h:function(){}};`;
+
 const html = `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -37,6 +50,7 @@ const html = `<!DOCTYPE html>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" />
     <link rel="stylesheet" href="/assets/${cssFile}" />
+    <script>${tsrStub}</script>
   </head>
   <body>
     <script type="module" src="/assets/${jsFile}"></script>
