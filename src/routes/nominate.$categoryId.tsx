@@ -189,6 +189,10 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
       setError("Please complete all fields before continuing.");
       return;
     }
+    if (step === 2 && nominator.email.trim().toLowerCase() === nominee.email.trim().toLowerCase()) {
+      setError("Your email address cannot be the same as the nominee's email address.");
+      return;
+    }
     setStep((s) => (s + 1) as Step);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }

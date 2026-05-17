@@ -45,7 +45,6 @@ const stats = [
   { num: "1", label: "Premier Awards Event" },
   { num: "8", label: "Award Categories" },
   { num: "2026", label: "Year of Excellence" },
-  { num: "∞", label: "Inspired Futures" },
 ];
 
 function Index() {
@@ -69,7 +68,7 @@ function Index() {
           >
             
             <h1 className="text-4xl font-bold leading-[1.1] sm:text-6xl lg:text-7xl text-black">
-              SALEA — Student Academic &amp; Leadership Excellence Awards {AWARD_THEME.yearsBadge}
+              SALEA — {AWARD_THEME.yearsBadge}
             </h1>
             <p className="mt-6 max-w-xl text-base sm:text-lg leading-relaxed text-muted-foreground">
               Recognising Excellence. Celebrating Leadership. Inspiring Greatness. 
