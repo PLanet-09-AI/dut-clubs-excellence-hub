@@ -33,7 +33,7 @@ export default function PhotoBackdrop() {
       </AnimatePresence>
       {/* Cinematic overlays */}
       <div className="absolute inset-0 bg-gradient-to-tr from-background via-background/40 to-transparent" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,oklch(0.10_0.06_265/0.6)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,oklch(0.92_0.03_250/0.3)_100%)]" />
       {/* Animated golden light beam */}
       <motion.div
         className="absolute -inset-x-10 top-0 h-full opacity-40 mix-blend-soft-light"

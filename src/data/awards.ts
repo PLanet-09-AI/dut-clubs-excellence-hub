@@ -17,11 +17,12 @@ export type AwardCategory = {
 };
 
 export const AWARD_THEME = {
-  title: "ENVISION2030 in Action",
-  subtitle: "Leadership, Innovation & Service",
-  recognitionPeriod: "1 July 2024 – 30 June 2025",
-  closingDate: "31 July 2025",
-  yearsBadge: "21 years · 2004–2025",
+  title: "SALEA 2026",
+  subtitle: "Recognising Excellence · Celebrating Leadership · Inspiring Greatness",
+  eventName: "Student Academic & Leadership Excellence Awards",
+  recognitionPeriod: "1 January 2025 – 30 April 2026",
+  closingDate: "31 May 2026",
+  yearsBadge: "Student Academic & Leadership Excellence Awards 2026",
 };
 
 export const AWARD_CATEGORIES: AwardCategory[] = [
@@ -29,26 +30,26 @@ export const AWARD_CATEGORIES: AwardCategory[] = [
     id: "dean",
     name: "Dean of Students Prestigious Award",
     short: "Dean's Prestigious",
-    tagline: "All-round excellence aligned to ENVISION2030.",
+    tagline: "All-round excellence in academics and leadership.",
     description:
-      "Recognises individuals who have demonstrated outstanding achievements across academic life, leadership, community engagement, innovation and personal growth — embodying DUT's strategic plan and values.",
+      "Recognises students who have demonstrated outstanding achievements across academic excellence, leadership, community engagement, innovation and personal growth — embodying the spirit of excellence and inspiring greatness.",
     recognises: [
       "Academic excellence with an aggregate of 75% or above",
       "Leadership in student-led initiatives & mentorship of peers",
       "Active community service and outreach contribution",
       "Innovative, creative solutions for the university or community",
-      "Alignment with DUT's mission, values and ENVISION2030",
+      "Exceptional character and integrity",
       "Demonstrated personal growth and self-improvement",
     ],
     questions: [
-      { id: "dean-a1", section: "Academic Excellence", prompt: "Upload your latest academic transcript / progress report (75%+ aggregate). Describe how the nominee pursues academic excellence.", evidence: ["2024 academic transcript (official, stamped)", "Certificate of merit / Dean's List", "Testimonials from lecturers and tutors"] },
+      { id: "dean-a1", section: "Academic Excellence", prompt: "Upload your latest academic transcript / progress report (75%+ aggregate). Describe how the nominee pursues academic excellence.", evidence: ["2025 academic transcript (official, stamped)", "Certificate of merit / Dean's List", "Testimonials from lecturers and tutors"] },
       { id: "dean-b1", section: "Leadership", prompt: "Describe your involvement in leadership roles in student-led initiatives. Share a project or initiative you started or led that positively impacted other students or the broader community.", wordLimit: 500, evidence: ["Recommendation letter", "Event poster", "Post-programme report", "Attendance registers, photos, testimonials"] },
       { id: "dean-b2", section: "Leadership", prompt: "How have you used your influence to positively impact your peers? Provide specific examples.", wordLimit: 500 },
       { id: "dean-c1", section: "Community Engagement", prompt: "Describe the community service / outreach programmes you have been involved in (aim and objectives).", wordLimit: 500, evidence: ["Signed testimonials", "Event schedule & topics", "Attendance registers", "Photos / videos", "Certificate of participation"] },
       { id: "dean-c2", section: "Community Engagement", prompt: "How have your contributions improved the campus environment or the surrounding community?", wordLimit: 500 },
       { id: "dean-c3", section: "Community Engagement", prompt: "In what ways have you demonstrated a commitment to civic engagement or social responsibility?", wordLimit: 500 },
       { id: "dean-d1", section: "Innovation & Creativity", prompt: "Share an innovative plan/project you developed to enhance current processes at DUT or in your community.", wordLimit: 500, evidence: ["Signed testimonial", "Attendance registers", "Photos / video", "Prototype or project report"] },
-      { id: "dean-f1", section: "Commitment to University Values", prompt: "Describe how your actions align with DUT's values and principles in ENVISION2030.", wordLimit: 500 },
+      { id: "dean-f1", section: "Commitment to Values", prompt: "Describe how your actions demonstrate excellence, integrity and leadership in the spirit of SALEA 2026.", wordLimit: 500 },
       { id: "dean-f2", section: "Commitment to University Values", prompt: "In what ways have you promoted a positive campus culture? List at least three DUT initiatives that highlight the Living Values Framework." },
       { id: "dean-g1", section: "Personal Growth", prompt: "Describe your journey of personal growth and self-improvement during your time at DUT, including challenges overcome.", wordLimit: 500, evidence: ["Reflection essay", "Certificates"] },
     ],
@@ -69,7 +70,7 @@ export const AWARD_CATEGORIES: AwardCategory[] = [
       { id: "sport-1", section: "Demonstrated Sportsmanship", prompt: "Describe specific incidents or consistent behaviours that demonstrate the nominee's integrity, fairness, respect for opponents and positive attitude. Outline track record and placements.", wordLimit: 300, evidence: ["Testimonial from coach / team manager", "Match reports", "Academic records"] },
       { id: "sport-2", section: "Leadership in Sport", prompt: "Outline the nominee's / team's leadership roles in sports teams, clubs or sporting events.", wordLimit: 300, evidence: ["Testimonial from coach / league organiser", "Team captaincy records"] },
       { id: "sport-3", section: "Impact on Team & Community Culture", prompt: "Describe how the nominee has fostered unity, teamwork and sports culture within DUT or the community.", wordLimit: 300, evidence: ["Testimonials from teammates", "Post programme reports", "Photos of team-building", "3 reflective essays (≤500 words each)"] },
-      { id: "sport-4", section: "Alignment with ENVISION2030", prompt: "Reflect on how the nominee's behaviour and impact in sport aligns with DUT's core values and principles.", wordLimit: 300, evidence: ["Endorsement letter from Sport Officer / coach / SRC"] },
+      { id: "sport-4", section: "Leadership & Impact", prompt: "Reflect on how the nominee has demonstrated exceptional leadership and positive impact on their sport and peers.", wordLimit: 300, evidence: ["Endorsement letter from Sport Officer / coach / SRC"] },
     ],
   },
   {
@@ -95,21 +96,21 @@ export const AWARD_CATEGORIES: AwardCategory[] = [
   },
   {
     id: "society",
-    name: "Exemplary Society / Club / Structure Award",
+    name: "Exemplary Society/Club/Structure Award",
     short: "Exemplary Society",
-    tagline: "Clubs that move the campus forward.",
+    tagline: "Organizations that lead with excellence.",
     description:
-      "Recognises student clubs, societies or student-led structures that have shown extraordinary dedication, participation and influence within the DUT community — including activism, culture, arts and volunteering.",
+      "Recognises student clubs, societies or student-led structures that have demonstrated extraordinary dedication and influence — celebrating their contributions to academic excellence and leadership on campus.",
     recognises: [
-      "Conceptualised initiatives aligned with ENVISION2030",
-      "Initiatives enhancing student life & community involvement",
+      "Initiatives promoting academic excellence and leadership",
+      "Initiatives enhancing student life and community involvement",
       "Cultivating an inclusive and vibrant community",
-      "Creative, out-of-the-box approaches",
-      "Collaboration with other organisations / academic departments",
+      "Creative, innovative approaches",
+      "Collaboration with other organisations and academic departments",
       "Aggregate of 65% individuals / 60% group",
     ],
     questions: [
-      { id: "soc-1", section: "ENVISION2030 Alignment", prompt: "Describe how the nominee/group has driven activities aligned with ENVISION2030. List at least three key campus projects led, outlining impact.", wordLimit: 500, evidence: ["Narrative report", "Photos, posters or programme draft"] },
+      { id: "soc-1", section: "Excellence in Leadership", prompt: "Describe how the nominee/group has driven activities demonstrating academic excellence and leadership. List at least three key initiatives led, outlining impact.", wordLimit: 500, evidence: ["Narrative report", "Photos, posters or programme draft"] },
       { id: "soc-2", section: "Impactful Initiatives", prompt: "Provide evidence of impactful initiatives that have enhanced DUT student life. Specify outputs and outcomes.", wordLimit: 500, evidence: ["Testimonials", "Attendance registers & evaluations", "Event outcome reports", "Photos & videos"] },
       { id: "soc-3", section: "Inclusivity & Vibrancy", prompt: "Explain how the nominee has demonstrated commitment to cultivating an inclusive, vibrant DUT community.", wordLimit: 500, evidence: ["Narrative with proof of vibrancy", "Photos / videos from inclusive events"] },
       { id: "soc-4", section: "Creative Approaches", prompt: "Outline specific instances where the nominee used creative and unique approaches to achieve their objectives.", wordLimit: 500, evidence: ["Narrative", "Multimedia (graphics, videos)", "Reports"] },
@@ -121,7 +122,7 @@ export const AWARD_CATEGORIES: AwardCategory[] = [
     id: "residence",
     name: "Outstanding Residence Life Award",
     short: "Residence Life",
-    tagline: "Where home becomes a community of growth.",
+    tagline: "Where home becomes a community of excellence.",
     description:
       "Recognises a residence with the most impactful residence-life initiatives — high attendance, discipline, peer-to-peer support and a nurturing environment.",
     recognises: [
@@ -164,17 +165,17 @@ export const AWARD_CATEGORIES: AwardCategory[] = [
     short: "Emerging Leader",
     tagline: "Future leaders, already shining.",
     description:
-      "Honours a remarkable first-year / sophomore student who exemplifies transformational leadership envisioned in ENVISION2030 — proactive, resilient, people-centred and committed to lifelong learning.",
+      "Honours a remarkable first-year student who exemplifies transformational leadership and academic excellence — proactive, resilient, people-centred and committed to celebrating greatness in others.",
     recognises: [
       "Aggregate of 65% in recent progress report",
-      "Early evidence of leadership potential aligned with the LVF",
+      "Early evidence of leadership potential and character",
       "Continuous learning and development mindset",
-      "Currently in sophomore or first year",
+      "Currently in first year of study",
     ],
     questions: [
       { id: "em-0", section: "Registration", prompt: "Upload proof of registration.", evidence: ["Proof of registration"] },
       { id: "em-1", section: "Leadership Roles", prompt: "Describe leadership roles taken in any student organisations, co/extra-curricular activities or community service. Responsibilities and impact.", wordLimit: 300, evidence: ["Certificates of participation / leadership", "Photos / videos", "Testimonial from lecturer / peer / project leader"] },
-      { id: "em-2", section: "Living Values", prompt: "How have you demonstrated the DUT Living Values? Provide examples of incidents, experiences or opportunities.", wordLimit: 500, evidence: ["Reflective essay", "Reference letter from lecturer / mentor / peer"] },
+      { id: "em-2", section: "Character & Values", prompt: "How have you demonstrated integrity and outstanding character? Provide examples of incidents, experiences or opportunities where you've made a positive difference.", wordLimit: 500, evidence: ["Reflective essay", "Reference letter from lecturer / mentor / peer"] },
       { id: "em-3", section: "Positive Difference", prompt: "How have you made a positive difference in the lives of other students or within the DUT community? Share specific moments or initiatives.", wordLimit: 300, evidence: ["Testimonials from peers / staff", "Photos or reports from outreach", "Letters of collaboration"] },
     ],
   },

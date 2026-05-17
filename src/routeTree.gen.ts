@@ -10,18 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WinnersRouteImport } from './routes/winners'
-import { Route as NominateRouteImport } from './routes/nominate'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as NominateCategoryIdRouteImport } from './routes/nominate.$categoryId'
 
 const WinnersRoute = WinnersRouteImport.update({
   id: '/winners',
   path: '/winners',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NominateRoute = NominateRouteImport.update({
-  id: '/nominate',
-  path: '/nominate',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -34,39 +29,44 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NominateCategoryIdRoute = NominateCategoryIdRouteImport.update({
+  id: '/nominate/$categoryId',
+  path: '/nominate/$categoryId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/nominate': typeof NominateRoute
   '/winners': typeof WinnersRoute
+  '/nominate/$categoryId': typeof NominateCategoryIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/nominate': typeof NominateRoute
   '/winners': typeof WinnersRoute
+  '/nominate/$categoryId': typeof NominateCategoryIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/nominate': typeof NominateRoute
   '/winners': typeof WinnersRoute
+  '/nominate/$categoryId': typeof NominateCategoryIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/nominate' | '/winners'
+  fullPaths: '/' | '/admin' | '/winners' | '/nominate/$categoryId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/nominate' | '/winners'
-  id: '__root__' | '/' | '/admin' | '/nominate' | '/winners'
+  to: '/' | '/admin' | '/winners' | '/nominate/$categoryId'
+  id: '__root__' | '/' | '/admin' | '/winners' | '/nominate/$categoryId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
-  NominateRoute: typeof NominateRoute
   WinnersRoute: typeof WinnersRoute
+  NominateCategoryIdRoute: typeof NominateCategoryIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -76,13 +76,6 @@ declare module '@tanstack/react-router' {
       path: '/winners'
       fullPath: '/winners'
       preLoaderRoute: typeof WinnersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/nominate': {
-      id: '/nominate'
-      path: '/nominate'
-      fullPath: '/nominate'
-      preLoaderRoute: typeof NominateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -99,15 +92,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/nominate/$categoryId': {
+      id: '/nominate/$categoryId'
+      path: '/nominate/$categoryId'
+      fullPath: '/nominate/$categoryId'
+      preLoaderRoute: typeof NominateCategoryIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
-  NominateRoute: NominateRoute,
   WinnersRoute: WinnersRoute,
+  NominateCategoryIdRoute: NominateCategoryIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

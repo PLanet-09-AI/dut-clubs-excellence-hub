@@ -16,8 +16,8 @@ function Particles({ count = 1200, color = "#f5c542", size = 0.04, spread = 30 }
 
   useFrame((state) => {
     if (ref.current) {
-      ref.current.rotation.y = state.clock.elapsedTime * 0.04;
-      ref.current.rotation.x = state.clock.elapsedTime * 0.02;
+      ref.current.rotation.y = state.clock.elapsedTime * 0.01;
+      ref.current.rotation.x = state.clock.elapsedTime * 0.005;
     }
   });
 
@@ -35,8 +35,8 @@ function Rings() {
   const g = useRef<THREE.Group>(null);
   useFrame((s) => {
     if (g.current) {
-      g.current.rotation.x = s.clock.elapsedTime * 0.08;
-      g.current.rotation.y = s.clock.elapsedTime * 0.12;
+      g.current.rotation.x = s.clock.elapsedTime * 0.02;
+      g.current.rotation.y = s.clock.elapsedTime * 0.03;
     }
   });
   return (
@@ -54,7 +54,7 @@ function Rings() {
 function Beam({ x = 0, color = "#f5c542" }: { x?: number; color?: string }) {
   const m = useRef<THREE.Mesh>(null);
   useFrame((s) => {
-    if (m.current) m.current.rotation.z = Math.sin(s.clock.elapsedTime * 0.5 + x) * 0.2;
+    if (m.current) m.current.rotation.z = Math.sin(s.clock.elapsedTime * 0.15 + x) * 0.1;
   });
   return (
     <mesh ref={m} position={[x, 0, -4]}>

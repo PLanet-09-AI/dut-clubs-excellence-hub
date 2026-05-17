@@ -1,7 +1,31 @@
-import { Canvas, useFrame } from "@react-three/fiber";
-import { Float, Environment, Sparkles, MeshDistortMaterial, Stars } from "@react-three/drei";
+import { Canvas, useFrame, extend } from "@react-three/fiber";
+import { Float, Sparkles, Stars, shaderMaterial } from "@react-three/drei";
 import { useRef, Suspense } from "react";
 import * as THREE from "three";
+
+// Custom distort material — no HDR/environment needed, no external fetch
+const BlobMaterial = shaderMaterial(
+  { uTime: 0, uColor: new THREE.Color("#1a2a5e") },
+  /* glsl */`
+    uniform float uTime;
+    varying vec3 vNormal;
+    void main() {
+      vNormal = normal;
+      float noise = sin(position.x * 3.0 + uTime) * cos(position.y * 3.0 + uTime) * 0.18;
+      vec3 displaced = position + normal * noise;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+    }
+  `,
+  /* glsl */`
+    uniform vec3 uColor;
+    varying vec3 vNormal;
+    void main() {
+      float light = dot(normalize(vNormal), normalize(vec3(1.0, 2.0, 3.0))) * 0.5 + 0.5;
+      gl_FragColor = vec4(uColor * light, 0.88);
+    }
+  `
+);
+extend({ BlobMaterial });
 
 function Trophy() {
   const group = useRef<THREE.Group>(null);
@@ -60,12 +84,19 @@ function FloatingMedal({ position, delay = 0 }: { position: [number, number, num
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare module "@react-three/fiber" { interface ThreeElements { blobMaterial: any } }
+
 function Blob({ position, color }: { position: [number, number, number]; color: string }) {
+  const matRef = useRef<any>(null);
+  useFrame(({ clock }) => {
+    if (matRef.current) matRef.current.uTime = clock.elapsedTime * 0.6;
+  });
   return (
     <Float speed={1.2} rotationIntensity={1} floatIntensity={2}>
       <mesh position={position}>
-        <sphereGeometry args={[0.9, 64, 64]} />
-        <MeshDistortMaterial color={color} distort={0.5} speed={2} roughness={0.2} metalness={0.6} />
+        <sphereGeometry args={[0.9, 48, 48]} />
+        <blobMaterial ref={matRef} uColor={new THREE.Color(color)} transparent />
       </mesh>
     </Float>
   );
@@ -97,8 +128,6 @@ export default function AwardScene() {
 
         <Blob position={[-3, -1.5, -3]} color="#1a2a5e" />
         <Blob position={[3.2, 1.8, -3.5]} color="#f5c542" />
-
-        <Environment preset="city" />
       </Suspense>
     </Canvas>
   );
