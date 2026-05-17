@@ -54,13 +54,7 @@ function Index() {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-hero text-foreground">
-      {/* Ambient 3D background */}
-      <div className="pointer-events-none fixed inset-0 z-0 opacity-70">
-        <Suspense fallback={null}>
-          <BackgroundScene />
-        </Suspense>
-      </div>
-      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,oklch(0.92_0.03_250/0.3)_70%,oklch(0.90_0.04_260)_100%)]" />
+
 
       <SiteNav />
 
@@ -98,6 +92,8 @@ function Index() {
             <div className="mt-12 grid gap-3 text-sm sm:grid-cols-2">
               <InfoChip icon={Calendar} title="Recognition Period" value={AWARD_THEME.recognitionPeriod} />
               <InfoChip icon={Sparkles} title="Nominations Close" value={AWARD_THEME.closingDate} />
+              <InfoChip icon={MapPin} title="Venue" value="Durban ICC · Hall 3" />
+              <InfoChip icon={Users} title="Dress · Time" value="Black-tie · 19:00" />
             </div>
           </motion.div>
 
