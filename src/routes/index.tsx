@@ -109,7 +109,7 @@ function Index() {
 
       {/* Stats */}
       <section className="relative z-10 mx-auto max-w-7xl px-6 py-20">
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-primary/20 bg-primary/10 md:grid-cols-4">
+        <div className="grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-primary/20 bg-primary/10">
           {stats.map((s, i) => (
             <motion.div
               key={i}
