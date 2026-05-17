@@ -117,7 +117,7 @@ function Index() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              className="bg-card p-8 text-center"
+              className="bg-white p-8 text-center"
             >
               <p className="text-gradient-gold font-serif text-5xl font-bold">{s.num}</p>
               <p className="mt-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">{s.label}</p>
@@ -148,7 +148,7 @@ function Index() {
                 { t: "Nominator", d: "The person — peer, staff or self — who submits the nomination." },
                 { t: "Self-nomination", d: "Permitted and encouraged when supported by a credible Portfolio of Evidence." },
               ].map((d) => (
-                <div key={d.t} className="rounded-xl border border-primary/20 bg-card/40 p-4">
+                <div key={d.t} className="rounded-xl border border-primary/20 bg-white p-4">
                   <p className="text-xs uppercase tracking-wider text-primary">{d.t}</p>
                   <p className="mt-1 text-sm text-foreground/80">{d.d}</p>
                 </div>
@@ -185,7 +185,7 @@ function Index() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ delay: i * 0.06, duration: 0.5 }}
-                className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-sm transition cursor-pointer ${
+                className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-white transition cursor-pointer ${
                   isExpanded
                     ? "border-primary/60 shadow-gold"
                     : "border-primary/20 hover:border-primary/50 hover:shadow-gold"
@@ -223,7 +223,7 @@ function Index() {
                       className="overflow-hidden"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="border-t border-primary/20 bg-primary/5 px-6 py-4">
+                      <div className="border-t border-primary/20 bg-gray-50 px-6 py-4">
                         <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
                           Full Criteria
                         </p>
