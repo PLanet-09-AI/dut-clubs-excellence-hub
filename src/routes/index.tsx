@@ -210,6 +210,19 @@ function Index() {
                   </div>
                   <h3 className="text-xl font-bold leading-snug">{c.name}</h3>
                   <p className="mt-3 text-base leading-relaxed text-muted-foreground">{c.tagline}</p>
+
+                  {/* Tap-to-expand hint — only visible when card is collapsed */}
+                  {!isExpanded && (
+                    <div className="mt-4 flex items-center gap-1.5">
+                      <span className="relative flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold opacity-75" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-gold" />
+                      </span>
+                      <span className="text-[11px] font-medium uppercase tracking-widest text-primary/70">
+                        Tap to nominate
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Expanded content */}
