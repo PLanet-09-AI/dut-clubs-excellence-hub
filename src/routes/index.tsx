@@ -77,9 +77,7 @@ function Index() {
               <Sparkles className="h-3 w-3" /> {AWARD_THEME.yearsBadge}
             </div>
             <h1 className="text-4xl font-bold leading-[1.1] sm:text-6xl lg:text-7xl">
-              <span className="text-gradient-gold">SALEA 2026</span> <br />
-              Student Academic &amp; <br className="hidden sm:block" />
-              Leadership Excellence.
+              <span className="text-gradient-gold">SALEA 2026</span>
             </h1>
             <p className="mt-6 max-w-xl text-base sm:text-lg leading-relaxed text-muted-foreground">
               Recognising Excellence. Celebrating Leadership. Inspiring Greatness. 
@@ -100,8 +98,6 @@ function Index() {
             <div className="mt-12 grid gap-3 text-sm sm:grid-cols-2">
               <InfoChip icon={Calendar} title="Recognition Period" value={AWARD_THEME.recognitionPeriod} />
               <InfoChip icon={Sparkles} title="Nominations Close" value={AWARD_THEME.closingDate} />
-              <InfoChip icon={MapPin} title="Venue" value="Durban ICC · Hall 3" />
-              <InfoChip icon={Users} title="Dress · Time" value="Black-tie · 19:00" />
             </div>
           </motion.div>
 
@@ -110,7 +106,7 @@ function Index() {
 
         {/* Marquee */}
         <div className="relative overflow-hidden border-y border-primary/20 bg-primary/5 py-6">
-          <div className="flex animate-[shimmer-text_24s_linear_infinite] gap-16 whitespace-nowrap font-serif text-3xl text-black">
+          <div className="flex gap-16 whitespace-nowrap font-serif text-3xl text-black" style={{animation:'marquee 24s linear infinite'}}>
             {Array.from({ length: 6 }).map((_, i) => (
               <span key={i}>EXCELLENCE · LEADERSHIP · SERVICE · COURAGE · LEGACY · DUT 2026 · </span>
             ))}
