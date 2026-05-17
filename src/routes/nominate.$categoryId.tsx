@@ -88,10 +88,9 @@ function NominatePage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-hero text-foreground">
-      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,oklch(0.90_0.04_260)_0%,transparent_60%)]" />
+    <div className="relative min-h-screen bg-gray-50 text-foreground">
       <SiteNav />
-      <main className="relative z-10 mx-auto max-w-3xl px-6 py-12">
+      <main className="relative z-10 mx-auto max-w-3xl px-4 py-12 sm:px-6">
         <NominationForm category={category} onBack={() => navigate({ to: "/", hash: "categories" })} />
       </main>
     </div>
@@ -247,16 +246,16 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
       {/* Breadcrumb */}
       <button
         onClick={onBack}
-        className="mb-8 flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
+        className="mb-6 flex items-center gap-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" /> Back to Award Categories
       </button>
 
-      {/* Page header */}
-      <div className="mb-8">
-        <p className="text-xs uppercase tracking-[0.25em] text-primary">{category.short ?? category.id}</p>
-        <h1 className="mt-1 font-serif text-3xl font-bold sm:text-4xl">{category.name}</h1>
-        <p className="mt-2 text-muted-foreground">{category.tagline}</p>
+      {/* Page header — white card */}
+      <div className="mb-6 rounded-2xl border border-gray-200 bg-white px-8 py-6 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-primary">{category.short ?? category.id}</p>
+        <h1 className="mt-1 font-serif text-3xl font-bold text-black sm:text-4xl">{category.name}</h1>
+        <p className="mt-2 text-gray-500">{category.tagline}</p>
       </div>
 
       {/* Draft restored banner */}
@@ -265,7 +264,7 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
-          className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm"
+          className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 text-sm shadow-sm"
         >
           <span className="text-foreground">
             <span className="font-medium">Draft restored.</span>{" "}
@@ -293,28 +292,30 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
         </motion.div>
       )}
 
-      {/* Step progress */}
-      <div className="mb-4 flex gap-4">
-        {([1, 2, 3] as Step[]).map((s) => (
-          <div key={s} className="flex-1">
-            <div
-              className={`h-1.5 rounded-full transition-colors duration-300 ${
-                step > s ? "bg-primary" : step === s ? "bg-primary/60" : "bg-primary/15"
-              }`}
-            />
-            <p
-              className={`mt-2 text-[11px] uppercase tracking-wider transition-colors ${
-                step === s ? "text-primary font-semibold" : "text-muted-foreground"
-              }`}
-            >
-              {STEP_LABELS[s - 1]}
-            </p>
-          </div>
-        ))}
+      {/* Step progress — white card */}
+      <div className="mb-4 rounded-2xl border border-gray-200 bg-white px-6 py-5 shadow-sm">
+        <div className="flex gap-4">
+          {([1, 2, 3] as Step[]).map((s) => (
+            <div key={s} className="flex-1">
+              <div
+                className={`h-1.5 rounded-full transition-colors duration-300 ${
+                  step > s ? "bg-primary" : step === s ? "bg-primary/60" : "bg-gray-200"
+                }`}
+              />
+              <p
+                className={`mt-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+                  step === s ? "text-primary" : step > s ? "text-gray-400" : "text-gray-300"
+                }`}
+              >
+                {STEP_LABELS[s - 1]}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Autosave status bar */}
-      <div className="mb-6 flex items-center justify-between text-xs text-muted-foreground">
+      <div className="mb-4 flex items-center justify-between rounded-xl border border-gray-100 bg-white px-4 py-2.5 text-xs text-gray-500 shadow-sm">
         <span className="flex items-center gap-1.5">
           {status === "saving" && (
             <><Loader2 className="h-3 w-3 animate-spin" /> Saving…</>
@@ -342,7 +343,7 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
       </div>
 
       {/* Step content */}
-      <div className="rounded-2xl border border-primary/20 bg-card/60 p-6 backdrop-blur-sm sm:p-8">
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
         <AnimatePresence mode="wait">
           {step === 1 && (
             <StepNominee
