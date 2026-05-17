@@ -67,11 +67,9 @@ function Index() {
             transition={{ duration: 0.9, ease: "easeOut" }}
             className="relative"
           >
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-xs uppercase tracking-[0.25em] text-primary">
-              <Sparkles className="h-3 w-3" /> {AWARD_THEME.yearsBadge}
-            </div>
-            <h1 className="text-4xl font-bold leading-[1.1] sm:text-6xl lg:text-7xl">
-              <span className="text-gradient-gold">SALEA 2026</span>
+            
+            <h1 className="text-4xl font-bold leading-[1.1] sm:text-6xl lg:text-7xl text-black">
+              SALEA — Student Academic &amp; Leadership Excellence Awards {AWARD_THEME.yearsBadge}
             </h1>
             <p className="mt-6 max-w-xl text-base sm:text-lg leading-relaxed text-muted-foreground">
               Recognising Excellence. Celebrating Leadership. Inspiring Greatness. 
