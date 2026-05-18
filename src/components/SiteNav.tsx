@@ -8,7 +8,7 @@ import {
   SheetTrigger,
   SheetHeader,
 } from "@/components/ui/sheet";
-const logo = "/dut-registry.png";
+const logo = "/logo.png";
 
 export default function SiteNav() {
   const [isOpen, setIsOpen] = useState(false);
