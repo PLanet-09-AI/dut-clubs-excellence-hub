@@ -76,9 +76,6 @@ function Index() {
             </p>
 
             <div className="mt-10 flex flex-col sm:flex-row gap-4 lg:hidden">
-               <Link to="/" hash="categories">
-                <Button className="w-full sm:w-auto h-12 bg-gold text-primary-foreground px-8">Nominate Now</Button>
-               </Link>
                <Link to="/winners">
                 <Button variant="outline" className="w-full sm:w-auto h-12 border-primary/20">View Winners</Button>
                </Link>
@@ -86,11 +83,11 @@ function Index() {
 
 
 
-            <div className="mt-12 grid gap-3 text-sm sm:grid-cols-2">
+            <div className="mt-12 grid gap-4 sm:grid-cols-2">
               <InfoChip icon={Calendar} title="Recognition Period" value={AWARD_THEME.recognitionPeriod} />
               <InfoChip icon={Sparkles} title="Nominations Close" value={AWARD_THEME.closingDate} />
               <InfoChip icon={MapPin} title="Venue" value="Durban ICC · Hall 3" />
-              <InfoChip icon={Users} title="Dress · Time" value="Black-tie · 19:00" />
+              <InfoChip icon={Users} title="Dress Code · Time" value="Black-tie · 19:00" />
             </div>
           </motion.div>
 
@@ -108,8 +105,8 @@ function Index() {
       </section>
 
       {/* Stats */}
-      <section className="relative z-10 mx-auto max-w-7xl px-6 py-20">
-        <div className="grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-primary/20 bg-primary/10">
+      <section className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-20">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-px sm:overflow-hidden sm:rounded-2xl sm:border sm:border-primary/20 sm:bg-primary/10">
           {stats.map((s, i) => (
             <motion.div
               key={i}
@@ -117,10 +114,10 @@ function Index() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              className="bg-white p-8 text-center"
+              className="flex items-center gap-4 rounded-2xl border border-primary/20 bg-white px-6 py-5 sm:block sm:rounded-none sm:border-0 sm:p-8 sm:text-center"
             >
-              <p className="text-gradient-gold font-serif text-5xl font-bold">{s.num}</p>
-              <p className="mt-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">{s.label}</p>
+              <p className="text-gradient-gold font-serif text-4xl font-bold sm:text-5xl">{s.num}</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground sm:mt-2">{s.label}</p>
             </motion.div>
           ))}
         </div>
@@ -331,11 +328,13 @@ function Index() {
 
 function InfoChip({ icon: Icon, title, value }: { icon: typeof Award; title: string; value: string }) {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-primary/15 bg-background/30 p-3">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-      <div>
-        <p className="text-xs uppercase tracking-wider text-primary">{title}</p>
-        <p className="text-foreground">{value}</p>
+    <div className="group flex items-center gap-4 rounded-2xl border border-primary/20 bg-white/60 p-4 shadow-sm backdrop-blur-sm transition hover:border-primary/40 hover:shadow-md">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold shadow-gold transition group-hover:scale-110">
+        <Icon className="h-5 w-5 text-primary-foreground" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/70">{title}</p>
+        <p className="mt-0.5 truncate font-semibold text-foreground">{value}</p>
       </div>
     </div>
   );
