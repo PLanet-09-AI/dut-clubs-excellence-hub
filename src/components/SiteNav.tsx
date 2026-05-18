@@ -8,7 +8,7 @@ import {
   SheetTrigger,
   SheetHeader,
 } from "@/components/ui/sheet";
-const logo = "/logo.png";
+const logo = "/dut-registry.png";
 
 export default function SiteNav() {
   const [isOpen, setIsOpen] = useState(false);
@@ -41,9 +41,9 @@ export default function SiteNav() {
             <img src={logo} alt="DUT Logo" className="h-full w-auto object-contain" />
           </div>
           <div className="hidden sm:block">
-            <p className="text-sm font-semibold tracking-wider text-primary leading-tight">STUDENT SERVICES</p>
+            <p className="text-sm font-semibold tracking-wider text-primary leading-tight">Student Academic &amp; Leadership Excellence Awards</p>
             <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-              DUT Excellence Awards
+              SALEA 2026 · Durban University of Technology
             </p>
           </div>
         </Link>

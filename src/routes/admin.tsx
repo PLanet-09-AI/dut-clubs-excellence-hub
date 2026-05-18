@@ -316,19 +316,49 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   function exportCsv() {
     const rows = nominations.filter((n) => n.status === "shortlisted");
     if (rows.length === 0) return;
-    const header = ["Category", "Nominee", "Student #", "Faculty", "Year", "Email", "Nominator", "Relationship", "Submitted"];
+
+    // Build a master ordered list of all question IDs + prompts across all exported rows
+    const questionMap = new Map<string, string>(); // id → prompt
+    for (const r of rows) {
+      const catData = AWARD_CATEGORIES.find((c) => c.id === r.categoryId);
+      if (catData) {
+        for (const q of catData.questions) {
+          if (!questionMap.has(q.id)) questionMap.set(q.id, q.prompt);
+        }
+      } else if (r.answers) {
+        for (const k of Object.keys(r.answers)) {
+          if (!questionMap.has(k)) questionMap.set(k, k);
+        }
+      }
+    }
+    const questionIds = Array.from(questionMap.keys());
+
+    const baseHeaders = ["Category", "Nominee", "Student #", "Faculty", "Year", "Email", "Nominator", "Relationship", "Submitted"];
+    // Alternate prompt/answer columns so reviewers see the question beside the answer
+    const qHeaders = questionIds.flatMap((id) => [questionMap.get(id) ?? id, `Answer`]);
+    const header = [...baseHeaders, ...qHeaders];
+
+    const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
     const csv = [
-      header.join(","),
+      header.map(escape).join(","),
       ...rows.map((r) => {
         const date = r.createdAt && typeof r.createdAt === "object" && r.createdAt.toDate
           ? r.createdAt.toDate().toISOString()
           : String(r.createdAt ?? "");
-        return [r.categoryName ?? r.categoryId, r.nomineeName, r.studentNumber, r.faculty, r.yearOfStudy, r.nomineeEmail, r.nominatorName, r.nominatorRelationship, date]
-          .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
-          .join(",");
+        const base = [r.categoryName ?? r.categoryId, r.nomineeName, r.studentNumber, r.faculty, r.yearOfStudy, r.nomineeEmail, r.nominatorName, r.nominatorRelationship, date];
+        const answers = questionIds.flatMap((id) => {
+          const catData = AWARD_CATEGORIES.find((c) => c.id === r.categoryId);
+          const prompt = catData?.questions.find((q) => q.id === id)?.prompt ?? questionMap.get(id) ?? id;
+          const answer = r.answers?.[id] ?? "";
+          // Only include if this question belongs to this category
+          const belongsToCategory = catData?.questions.some((q) => q.id === id) ?? false;
+          return belongsToCategory ? [prompt, answer] : ["", ""];
+        });
+        return [...base, ...answers].map(escape).join(",");
       }),
     ].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
