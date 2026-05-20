@@ -86,8 +86,8 @@ function Index() {
             <div className="mt-12 grid gap-4 sm:grid-cols-2">
               <InfoChip icon={Calendar} title="Recognition Period" value={AWARD_THEME.recognitionPeriod} />
               <InfoChip icon={Sparkles} title="Nominations Close" value={AWARD_THEME.closingDate} />
-              <InfoChip icon={MapPin} title="Venue" value="Durban ICC · Hall 3" />
-              <InfoChip icon={Users} title="Dress Code · Time" value="Black-tie · 19:00" />
+              <InfoChip icon={MapPin} title="Venue" value={AWARD_THEME.venue} />
+              <InfoChip icon={Users} title="Patron" value={AWARD_THEME.patron} />
             </div>
           </motion.div>
 

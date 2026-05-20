@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Lock, LogOut, Download, CheckCircle2, XCircle, Clock, Trash2, ChevronDown, FileText, Mail, Search, Filter, X as XIcon } from "lucide-react";
+import { Lock, LogOut, Download, CheckCircle2, XCircle, Clock, Trash2, ChevronDown, FileText, Mail, Search, Filter, X as XIcon, Star, Users2 } from "lucide-react";
 import {
   collection,
   onSnapshot,
@@ -8,6 +8,7 @@ import {
   updateDoc,
   deleteDoc,
   setDoc,
+  getDoc,
   serverTimestamp,
   query,
   orderBy,
@@ -58,14 +59,26 @@ function AdminPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [role, setRole] = useState<"admin" | "judge">("admin");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const unsub = subscribeToAuthState((user) => setAuthed(!!user));
+    const unsub = subscribeToAuthState(async (user) => {
+      if (user) {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const data = snap.data();
+        if (data?.role === "judge") {
+          navigate({ to: "/judge" });
+          return;
+        }
+      }
+      setAuthed(!!user);
+    });
     return unsub;
-  }, []);
+  }, [navigate]);
 
   function switchMode(m: "signin" | "register") {
     setMode(m);
@@ -73,6 +86,7 @@ function AdminPage() {
     setResetSent(false);
     setPassword("");
     setConfirm("");
+    setRole("admin");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -87,7 +101,16 @@ function AdminPage() {
       if (mode === "signin") {
         await signIn(email, password);
       } else {
-        await registerUser(email, password);
+        const cred = await registerUser(email, password);
+        await setDoc(doc(db, "users", cred.user.uid), {
+          email: cred.user.email,
+          role,
+          createdAt: serverTimestamp(),
+        });
+        if (role === "judge") {
+          navigate({ to: "/judge" });
+          return;
+        }
       }
     } catch (ex: unknown) {
       const code = (ex as { code?: string }).code ?? "";
@@ -185,16 +208,36 @@ function AdminPage() {
                 />
               </div>
               {mode === "register" && (
-                <div>
-                  <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">Confirm password</Label>
-                  <Input
-                    type="password"
-                    value={confirm}
-                    onChange={(e) => setConfirm(e.target.value)}
-                    autoComplete="new-password"
-                    required
-                  />
-                </div>
+                <>
+                  <div>
+                    <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">Confirm password</Label>
+                    <Input
+                      type="password"
+                      value={confirm}
+                      onChange={(e) => setConfirm(e.target.value)}
+                      autoComplete="new-password"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">Account role</Label>
+                    <div className="flex overflow-hidden rounded-xl border border-primary/20 bg-muted/40">
+                      {(["admin", "judge"] as const).map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setRole(r)}
+                          className={`flex-1 py-2 text-sm font-medium capitalize transition ${role === r ? "bg-gold text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      {role === "judge" ? "Judges can review and score shortlisted nominations." : "Admins can manage nominations and categories."}
+                    </p>
+                  </div>
+                </>
               )}
               {err && <p className="text-sm text-destructive">{err}</p>}
               {resetSent && <p className="text-sm text-green-600">Password reset email sent — check your inbox.</p>}
@@ -228,6 +271,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [detailNom, setDetailNom] = useState<Nomination | null>(null);
   const [extraCategories, setExtraCategories] = useState<{ id: string; name: string; tagline: string }[]>([]);
   const [newCat, setNewCat] = useState({ name: "", tagline: "" });
+  const [judgeScores, setJudgeScores] = useState<Array<{
+    id: string;
+    nominationId: string;
+    judgeUid: string;
+    judgeEmail: string;
+    nomineeName: string;
+    categoryName: string;
+    score: number;
+    comment: string;
+    updatedAt: { toDate?: () => Date } | null;
+  }>>([])
 
   // All categories = static + admin-added (from Firestore)
   const allCategories = useMemo(() => [
@@ -249,6 +303,15 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "admin_categories"), (snap) => {
       setExtraCategories(snap.docs.map((d) => ({ id: d.id, ...d.data() } as { id: string; name: string; tagline: string })));
+    });
+    return () => unsub();
+  }, []);
+
+  // Real-time Firestore listener — all judge scores (admin supervision)
+  useEffect(() => {
+    const q = query(collection(db, "judge_scores"), orderBy("updatedAt", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setJudgeScores(snap.docs.map((d) => ({ id: d.id, ...d.data() } as typeof judgeScores[number])));
     });
     return () => unsub();
   }, []);
@@ -467,11 +530,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </p>
       )}
 
-      {/* Tabs: Nominations | Categories */}
+      {/* Tabs: Nominations | Categories | Judge Activity */}
       <Tabs defaultValue="nominations">
         <TabsList className="bg-card/60">
           <TabsTrigger value="nominations">Nominations</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="judges" className="gap-1.5">
+            <Users2 className="h-3.5 w-3.5" /> Judge Activity
+            {judgeScores.length > 0 && (
+              <span className="ml-1 rounded-full bg-gold px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">{judgeScores.length}</span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="nominations" className="mt-6">
@@ -573,6 +642,46 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── Judge Activity tab ─── */}
+        <TabsContent value="judges" className="mt-6">
+          {judgeScores.length === 0 ? (
+            <Card className="p-12 text-center text-muted-foreground">
+              No judge scores submitted yet.
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                All judge evaluations in real time — sorted newest first. Each entry is timestamped.
+              </p>
+              {judgeScores.map((s) => (
+                <div key={s.id} className="rounded-2xl border border-primary/15 bg-white px-5 py-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-sm">{s.nomineeName}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{s.categoryName}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-0.5 rounded-full bg-gold/10 px-3 py-1 font-bold text-yellow-700">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star key={i} className={`h-4 w-4 ${i < s.score ? "fill-yellow-500 text-yellow-500" : "fill-muted text-muted-foreground/20"}`} />
+                        ))}
+                        <span className="ml-1 text-sm">{s.score}/5</span>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+                    <span><span className="font-medium text-foreground/70">Judge</span> {s.judgeEmail}</span>
+                    <span><span className="font-medium text-foreground/70">Submitted</span> {s.updatedAt && typeof s.updatedAt === "object" && s.updatedAt.toDate ? s.updatedAt.toDate().toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" }) : "—"}</span>
+                  </div>
+                  {s.comment && (
+                    <p className="mt-2 rounded-lg bg-muted/50 px-3 py-2 text-sm italic text-foreground/80">"{s.comment}"</p>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </TabsContent>

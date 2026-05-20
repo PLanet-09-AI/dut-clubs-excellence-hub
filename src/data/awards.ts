@@ -21,7 +21,12 @@ export const AWARD_THEME = {
   subtitle: "Recognising Excellence · Celebrating Leadership · Inspiring Greatness",
   eventName: "Student Academic & Leadership Excellence Awards",
   recognitionPeriod: "1 January 2025 – 30 April 2026",
-  closingDate: "31 May 2026",
+  closingDate: "31 July 2026",
+  /** ISO date strings for judge scoring window */
+  scoringOpenDate: "2026-08-01",   // day after nominations close
+  scoringDeadline: "2026-08-15",   // judges must submit by this date
+  venue: "TBC",
+  patron: "VC to Dean",
   yearsBadge: "Student Academic & Leadership Excellence Awards 2026",
 };
 
