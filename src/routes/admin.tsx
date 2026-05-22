@@ -55,6 +55,7 @@ export const Route = createFileRoute("/admin")({
 
 function AdminPage() {
   const [authed, setAuthed] = useState(false);
+  const [userRole, setUserRole] = useState<"admin" | "judge" | null>(null);
   const [mode, setMode] = useState<"signin" | "register">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -70,11 +71,15 @@ function AdminPage() {
       if (user) {
         const snap = await getDoc(doc(db, "users", user.uid));
         const data = snap.data();
-        if (data?.role === "judge") {
-          navigate({ to: "/judge" });
+        if (data?.role === "admin" || data?.role === "judge") {
+          setUserRole(data.role);
+          setAuthed(true);
           return;
         }
+        await firebaseSignOut();
+        setErr("Your account does not have admin panel access.");
       }
+      setUserRole(null);
       setAuthed(!!user);
     });
     return unsub;
@@ -107,10 +112,6 @@ function AdminPage() {
           role,
           createdAt: serverTimestamp(),
         });
-        if (role === "judge") {
-          navigate({ to: "/judge" });
-          return;
-        }
       }
     } catch (ex: unknown) {
       const code = (ex as { code?: string }).code ?? "";
@@ -266,14 +267,15 @@ function AdminPage() {
             </form>
           </div>
         ) : (
-          <Dashboard onLogout={logout} />
+          <Dashboard onLogout={logout} role={userRole ?? "admin"} />
         )}
       </main>
     </div>
   );
 }
 
-function Dashboard({ onLogout }: { onLogout: () => void }) {
+function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "judge" }) {
+  const canManage = role === "admin";
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("__all__");
   const [statusFilter, setStatusFilter] = useState<"all" | NominationStatus>("all");
@@ -375,12 +377,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   }, [nominations, selectedCategory, statusFilter, search]);
 
   async function update(id: string, status: NominationStatus) {
+    if (!canManage) return;
     await updateDoc(doc(db, "nominations", id), { status, updatedAt: serverTimestamp() });
     // Refresh detail panel if open
     setDetailNom((prev) => prev?.id === id ? { ...prev, status } : prev);
   }
 
   async function remove(id: string) {
+    if (!canManage) return;
     if (!confirm("Delete this nomination? This cannot be undone.")) return;
     await deleteDoc(doc(db, "nominations", id));
     setDetailNom((prev) => prev?.id === id ? null : prev);
@@ -459,17 +463,25 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-primary">SALEA 2026</p>
-          <h1 className="font-serif text-3xl font-bold sm:text-4xl">Administration Panel</h1>
+          <h1 className="font-serif text-3xl font-bold sm:text-4xl">{canManage ? "Administration Panel" : "Review Panel"}</h1>
         </div>
         <div className="flex gap-2">
-          <Button onClick={exportCsv} disabled={stats.shortlisted === 0} variant="outline" className="border-primary/40 text-primary">
-            <Download className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Export shortlisted</span> ({stats.shortlisted})
-          </Button>
+          {canManage && (
+            <Button onClick={exportCsv} disabled={stats.shortlisted === 0} variant="outline" className="border-primary/40 text-primary">
+              <Download className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Export shortlisted</span> ({stats.shortlisted})
+            </Button>
+          )}
           <Button variant="outline" onClick={onLogout} className="border-primary/40 bg-primary/5 text-primary">
             <LogOut className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Sign out</span>
           </Button>
         </div>
       </div>
+
+      {!canManage && (
+        <Card className="border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          Judge access mode: you can view nominations and use in-app PDF preview. Admin actions are disabled.
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -544,13 +556,15 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       <Tabs defaultValue="nominations">
         <TabsList className="bg-card/60">
           <TabsTrigger value="nominations">Nominations</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="judges" className="gap-1.5">
-            <Users2 className="h-3.5 w-3.5" /> Judge Activity
-            {judgeScores.length > 0 && (
-              <span className="ml-1 rounded-full bg-gold px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">{judgeScores.length}</span>
-            )}
-          </TabsTrigger>
+          {canManage && <TabsTrigger value="categories">Categories</TabsTrigger>}
+          {canManage && (
+            <TabsTrigger value="judges" className="gap-1.5">
+              <Users2 className="h-3.5 w-3.5" /> Judge Activity
+              {judgeScores.length > 0 && (
+                <span className="ml-1 rounded-full bg-gold px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">{judgeScores.length}</span>
+              )}
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="nominations" className="mt-6">
@@ -607,7 +621,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           )}
         </TabsContent>
 
-        <TabsContent value="categories" className="mt-6 space-y-6">
+        {canManage && <TabsContent value="categories" className="mt-6 space-y-6">
           {/* Add custom category form */}
           <Card className="p-6">
             <h3 className="font-serif text-lg font-bold mb-1">Add custom category</h3>
@@ -654,10 +668,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               </div>
             </div>
           )}
-        </TabsContent>
+        </TabsContent>}
 
         {/* ── Judge Activity tab ─── */}
-        <TabsContent value="judges" className="mt-6">
+        {canManage && <TabsContent value="judges" className="mt-6">
           {judgeScores.length === 0 ? (
             <Card className="p-12 text-center text-muted-foreground">
               No judge scores submitted yet.
@@ -694,18 +708,19 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               ))}
             </div>
           )}
-        </TabsContent>
+        </TabsContent>}
       </Tabs>
 
       {/* Detail slide-over */}
       <Sheet open={!!detailNom} onOpenChange={(open) => { if (!open) setDetailNom(null); }}>
-        <SheetContent side="right" className="w-full max-w-lg overflow-y-auto p-0 sm:max-w-3xl lg:max-w-6xl">
+        <SheetContent side="right" className="w-screen max-w-none overflow-y-auto p-0">
           {detailNom && (
             <NominationDetail
               nom={detailNom}
               onUpdate={update}
               onDelete={remove}
               formatDate={formatDate}
+              canManage={canManage}
             />
           )}
         </SheetContent>
@@ -766,11 +781,13 @@ function NominationDetail({
   onUpdate,
   onDelete,
   formatDate,
+  canManage,
 }: {
   nom: Nomination;
   onUpdate: (id: string, s: NominationStatus) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   formatDate: (ts: Nomination["createdAt"]) => string;
+  canManage: boolean;
 }) {
   const catData = AWARD_CATEGORIES.find((c) => c.id === nom.categoryId);
   const totalFiles = nom.uploads
@@ -850,7 +867,14 @@ function NominationDetail({
     setPreviewPath(path);
     setPreviewPage(1);
     setPreviewZoom(110);
-    setMobilePreviewOpen(true);
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      setMobilePreviewOpen(true);
+    }
+  }
+
+  function closePreview() {
+    setPreviewPath(null);
+    setMobilePreviewOpen(false);
   }
 
   function goToPdf(offset: -1 | 1) {
@@ -892,6 +916,26 @@ function NominationDetail({
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewPage((p) => Math.max(1, p - 1))}
+              disabled={!activePreview || previewPage <= 1}
+              aria-label="Previous PDF page"
+            >
+              Page -
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewPage((p) => p + 1)}
+              disabled={!activePreview}
+              aria-label="Next PDF page"
+            >
+              Page +
+            </Button>
           </div>
           <div className="flex items-center gap-1">
             <Button
@@ -927,11 +971,21 @@ function NominationDetail({
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={closePreview}
+              disabled={!activePreview}
+              aria-label="Close PDF preview"
+            >
+              <XIcon className="h-4 w-4" />
+            </Button>
           </div>
         </div>
         <div className="flex items-center justify-between px-4 py-2 text-[11px] text-muted-foreground">
           <span>{activePreview ? activePreview.name : "No PDF selected"}</span>
-          {activePreview && <span>{activePreviewIndex + 1} / {pdfFiles.length}</span>}
+          {activePreview && <span>PDF {activePreviewIndex + 1} / {pdfFiles.length} · Page {previewPage}</span>}
         </div>
         <div className="min-h-0 flex-1 px-3 pb-3">
           {activePreview ? (
@@ -1017,11 +1071,17 @@ function NominationDetail({
                                   const isPdf = /\.pdf($|\?)/i.test(file.name) || /\.pdf($|\?)/i.test(file.url);
                                   return (
                                     <div key={file.path} className="flex flex-wrap items-center gap-2 py-1">
-                                      <a
-                                        href={file.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex min-w-0 items-center gap-1.5 text-xs text-primary hover:underline"
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (isPdf) {
+                                            openPreview(file.path);
+                                            return;
+                                          }
+                                          window.open(file.url, "_blank", "noopener,noreferrer");
+                                        }}
+                                        className="inline-flex min-w-0 items-center gap-1.5 text-left text-xs text-primary hover:underline"
+                                        aria-label={isPdf ? `Preview PDF ${file.name}` : `Open file ${file.name}`}
                                       >
                                         <FileText className="h-3 w-3 shrink-0" />
                                         <span className="truncate">{file.name}</span>
@@ -1030,7 +1090,7 @@ function NominationDetail({
                                             ? `${(file.size / 1024).toFixed(0)} KB`
                                             : `${(file.size / (1024 * 1024)).toFixed(1)} MB`})
                                         </span>
-                                      </a>
+                                      </button>
                                       {isPdf && (
                                         <Button
                                           type="button"
@@ -1075,31 +1135,37 @@ function NominationDetail({
 
         {/* Action footer */}
         <div className="flex flex-wrap gap-2 border-t border-primary/15 bg-white px-6 py-4">
-          <Button
-            size="sm"
-            onClick={() => onUpdate(nom.id, "shortlisted")}
-            disabled={nom.status === "shortlisted"}
-            className="flex-1 bg-gold text-primary-foreground"
-          >
-            <CheckCircle2 className="mr-1.5 h-4 w-4" /> Shortlist
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onUpdate(nom.id, "rejected")}
-            disabled={nom.status === "rejected"}
-            className="flex-1"
-          >
-            <XCircle className="mr-1.5 h-4 w-4" /> Reject
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => onDelete(nom.id)}
-            className="text-destructive hover:bg-destructive/10"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {canManage ? (
+            <>
+              <Button
+                size="sm"
+                onClick={() => onUpdate(nom.id, "shortlisted")}
+                disabled={nom.status === "shortlisted"}
+                className="flex-1 bg-gold text-primary-foreground"
+              >
+                <CheckCircle2 className="mr-1.5 h-4 w-4" /> Shortlist
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onUpdate(nom.id, "rejected")}
+                disabled={nom.status === "rejected"}
+                className="flex-1"
+              >
+                <XCircle className="mr-1.5 h-4 w-4" /> Reject
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onDelete(nom.id)}
+                className="text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">Read-only mode: PDF preview and evidence review are enabled; status changes are admin-only.</p>
+          )}
         </div>
       </div>
 
@@ -1120,6 +1186,12 @@ function NominationDetail({
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={() => goToPdf(1)} disabled={activePreviewIndex < 0 || activePreviewIndex >= pdfFiles.length - 1} aria-label="Next PDF">
                   <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setPreviewPage((p) => Math.max(1, p - 1))} disabled={previewPage <= 1} aria-label="Previous PDF page">
+                  Page -
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setPreviewPage((p) => p + 1)} aria-label="Next PDF page">
+                  Page +
                 </Button>
               </div>
               <div className="flex items-center gap-1">
