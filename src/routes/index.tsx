@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { lazy, Suspense, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Award, Sparkles, Calendar, MapPin, Users, Trophy, Heart, Briefcase, Home, Globe, GraduationCap, ChevronDown, ChevronRight } from "lucide-react";
+import { Award, Sparkles, Calendar, MapPin, Users, Trophy, Heart, Briefcase, Home, Globe, GraduationCap, ChevronDown, ChevronRight, ShieldCheck, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SiteNav from "@/components/SiteNav";
 import EventProgram from "@/components/EventProgram";
@@ -87,7 +87,7 @@ function Index() {
               <InfoChip icon={Calendar} title="Recognition Period" value={AWARD_THEME.recognitionPeriod} />
               <InfoChip icon={Sparkles} title="Nominations Close" value={AWARD_THEME.closingDate} />
               <InfoChip icon={MapPin} title="Venue" value={AWARD_THEME.venue} />
-              <InfoChip icon={Users} title="Patron" value={AWARD_THEME.patron} />
+              <InfoChip icon={Users} title={AWARD_THEME.openingAddressTitle} value={AWARD_THEME.openingAddressRemarks} />
             </div>
           </motion.div>
 
@@ -120,6 +120,45 @@ function Index() {
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground sm:mt-2">{s.label}</p>
             </motion.div>
           ))}
+        </div>
+      </section>
+
+      {/* Access portals */}
+      <section className="relative z-10 mx-auto max-w-7xl px-6 pb-6">
+        <div className="rounded-3xl border border-primary/20 bg-white/70 p-6 backdrop-blur sm:p-8">
+          <div className="mb-6">
+            <p className="text-xs uppercase tracking-[0.25em] text-primary">Secure Access</p>
+            <h2 className="mt-2 text-2xl font-bold sm:text-3xl">Login Portals</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Administrators manage nominations and oversight. Judges review shortlisted nominations and submit ratings.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-primary/20 bg-card p-5">
+              <div className="mb-3 flex items-center gap-2 text-primary">
+                <ShieldCheck className="h-5 w-5" />
+                <p className="font-semibold">Admin Login</p>
+              </div>
+              <p className="mb-4 text-sm text-muted-foreground">
+                Sign in to approve nominations, manage categories, and supervise judge activity.
+              </p>
+              <Link to="/admin">
+                <Button className="w-full bg-gold text-primary-foreground">Go to Admin Panel</Button>
+              </Link>
+            </div>
+            <div className="rounded-2xl border border-primary/20 bg-card p-5">
+              <div className="mb-3 flex items-center gap-2 text-primary">
+                <Star className="h-5 w-5" />
+                <p className="font-semibold">Judge Login</p>
+              </div>
+              <p className="mb-4 text-sm text-muted-foreground">
+                Sign in to score shortlisted nominations and add judging comments.
+              </p>
+              <Link to="/judge">
+                <Button variant="outline" className="w-full border-primary/30">Go to Judge Panel</Button>
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 

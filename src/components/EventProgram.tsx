@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 const schedule = [
   { time: "18:00", title: "Sparkling Reception", desc: "Foyer · Champagne, canapés, photo wall" },
   { time: "18:45", title: "Guests Seated", desc: "Hall 3 · Ushers will guide you" },
-  { time: "19:00", title: "Welcome & Opening Address", desc: "Vice-Chancellor's remarks" },
+  { time: "19:00", title: "Welcome & Opening Address", desc: "Dean's remarks" },
   { time: "19:15", title: "Cultural Opening — DUT Choir", desc: "Performance of the institutional anthem" },
   { time: "19:30", title: "Awards: Academic Excellence", desc: "Honouring scholarly achievement" },
   { time: "19:55", title: "Awards: Community Impact", desc: "For service that uplifts our communities" },

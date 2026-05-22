@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Lock, LogOut, Download, CheckCircle2, XCircle, Clock, Trash2, ChevronDown, FileText, Mail, Search, Filter, X as XIcon, Star, Users2 } from "lucide-react";
+import { Lock, LogOut, Download, CheckCircle2, XCircle, Clock, Trash2, ChevronDown, FileText, Mail, Search, Filter, X as XIcon, Star, Users2, Eye, ExternalLink, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   collection,
   onSnapshot,
@@ -235,6 +235,16 @@ function AdminPage() {
                     </div>
                     <p className="mt-1.5 text-xs text-muted-foreground">
                       {role === "judge" ? "Judges can review and score shortlisted nominations." : "Admins can manage nominations and categories."}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-3 text-xs text-foreground/85">
+                    <p className="font-semibold text-primary">Create Judge Account Helper</p>
+                    <p className="mt-1 text-muted-foreground">
+                      To create judge access, choose <strong>judge</strong> as account role, then register with the judge's email and password.
+                      The account will be redirected to the Judge Panel after successful registration.
+                    </p>
+                    <p className="mt-1 text-muted-foreground">
+                      Tip: use role <strong>admin</strong> only for Student Services management accounts.
                     </p>
                   </div>
                 </>
@@ -689,7 +699,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
       {/* Detail slide-over */}
       <Sheet open={!!detailNom} onOpenChange={(open) => { if (!open) setDetailNom(null); }}>
-        <SheetContent side="right" className="w-full max-w-lg overflow-y-auto p-0 sm:max-w-xl">
+        <SheetContent side="right" className="w-full max-w-lg overflow-y-auto p-0 sm:max-w-3xl lg:max-w-6xl">
           {detailNom && (
             <NominationDetail
               nom={detailNom}
@@ -767,133 +777,374 @@ function NominationDetail({
     ? Object.values(nom.uploads).flatMap((slots) => Object.values(slots)).flat().length
     : 0;
 
+  const evidenceFiles = useMemo(() => {
+    type EvidenceFile = {
+      questionId: string;
+      evidenceLabel: string;
+      file: { name: string; url: string; size: number; path: string };
+    };
+    const files: EvidenceFile[] = [];
+    if (!catData?.questions) return files;
+    for (const q of catData.questions) {
+      for (let idx = 0; idx < (q.evidence?.length ?? 0); idx++) {
+        const slotFiles = nom.uploads?.[q.id]?.[`e${idx}`] ?? [];
+        for (const file of slotFiles) {
+          files.push({
+            questionId: q.id,
+            evidenceLabel: q.evidence?.[idx] ?? "Evidence",
+            file,
+          });
+        }
+      }
+    }
+    return files;
+  }, [catData, nom.uploads]);
+
+  const pdfFiles = useMemo(
+    () => evidenceFiles.filter(({ file }) => /\.pdf($|\?)/i.test(file.name) || /\.pdf($|\?)/i.test(file.url)),
+    [evidenceFiles],
+  );
+
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
+  const [previewZoom, setPreviewZoom] = useState(110);
+  const [previewPage, setPreviewPage] = useState(1);
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
+
+  useEffect(() => {
+    if (pdfFiles.length === 0) {
+      setPreviewPath(null);
+      setMobilePreviewOpen(false);
+      return;
+    }
+    const exists = pdfFiles.some(({ file }) => file.path === previewPath);
+    if (!exists) {
+      setPreviewPath(pdfFiles[0].file.path);
+      setPreviewPage(1);
+      setPreviewZoom(110);
+    }
+  }, [pdfFiles, previewPath]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMobilePreviewOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const activePreview = useMemo(
+    () => pdfFiles.find(({ file }) => file.path === previewPath)?.file ?? null,
+    [pdfFiles, previewPath],
+  );
+
+  const activePreviewIndex = useMemo(
+    () => (activePreview ? pdfFiles.findIndex(({ file }) => file.path === activePreview.path) : -1),
+    [activePreview, pdfFiles],
+  );
+
+  const activePreviewUrl = activePreview
+    ? `${activePreview.url}#page=${previewPage}&zoom=${previewZoom}`
+    : "";
+
+  function openPreview(path: string) {
+    setPreviewPath(path);
+    setPreviewPage(1);
+    setPreviewZoom(110);
+    setMobilePreviewOpen(true);
+  }
+
+  function goToPdf(offset: -1 | 1) {
+    if (activePreviewIndex < 0) return;
+    const next = activePreviewIndex + offset;
+    if (next < 0 || next >= pdfFiles.length) return;
+    setPreviewPath(pdfFiles[next].file.path);
+    setPreviewPage(1);
+    setPreviewZoom(110);
+  }
+
   return (
-    <div className="flex h-full flex-col">
-      {/* Detail header */}
-      <div className="border-b border-primary/15 bg-white px-6 py-5">
-        <SheetHeader>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <StatusBadge status={nom.status} />
-            <Badge variant="outline" className="border-primary/30 text-primary text-xs">
-              {nom.categoryName ?? nom.categoryId}
-            </Badge>
+    <div className="flex h-full">
+      {/* Desktop preview pane (left) */}
+      <aside className="hidden w-[44%] border-r border-primary/15 bg-muted/20 lg:flex lg:flex-col">
+        <div className="border-b border-primary/15 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary">PDF Preview</p>
+          <p className="text-[11px] text-muted-foreground">In-app evidence preview with keyboard-friendly controls.</p>
+        </div>
+        <div className="flex items-center justify-between gap-2 border-b border-primary/10 px-3 py-2">
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => goToPdf(-1)}
+              disabled={activePreviewIndex <= 0}
+              aria-label="Previous PDF"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => goToPdf(1)}
+              disabled={activePreviewIndex < 0 || activePreviewIndex >= pdfFiles.length - 1}
+              aria-label="Next PDF"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-          <SheetTitle className="font-serif text-2xl text-left">{nom.nomineeName}</SheetTitle>
-          <SheetDescription className="text-left text-sm text-muted-foreground">
-            {nom.nomineeEmail} · #{nom.studentNumber}
-          </SheetDescription>
-        </SheetHeader>
-      </div>
-
-      {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-
-        {/* Key info grid */}
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          {[
-            ["Faculty", nom.faculty],
-            ["Year", nom.yearOfStudy],
-            ["Student #", nom.studentNumber],
-            ["Submitted", formatDate(nom.createdAt)],
-          ].map(([k, v]) => (
-            <div key={k} className="rounded-xl border border-primary/15 bg-gray-50 p-3">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{k}</p>
-              <p className="mt-0.5 font-semibold text-foreground">{v ?? "—"}</p>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewZoom((z) => Math.max(60, z - 10))}
+              disabled={!activePreview}
+              aria-label="Zoom out PDF"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewZoom((z) => Math.min(220, z + 10))}
+              disabled={!activePreview}
+              aria-label="Zoom in PDF"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPreviewZoom(110);
+                setPreviewPage(1);
+              }}
+              disabled={!activePreview}
+              aria-label="Reset PDF view"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        <div className="flex items-center justify-between px-4 py-2 text-[11px] text-muted-foreground">
+          <span>{activePreview ? activePreview.name : "No PDF selected"}</span>
+          {activePreview && <span>{activePreviewIndex + 1} / {pdfFiles.length}</span>}
+        </div>
+        <div className="min-h-0 flex-1 px-3 pb-3">
+          {activePreview ? (
+            <iframe
+              key={activePreview.path}
+              src={activePreviewUrl}
+              title={`PDF preview for ${activePreview.name}`}
+              className="h-full w-full rounded-lg border border-primary/20 bg-white"
+            />
+          ) : (
+            <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center text-xs text-muted-foreground">
+              Select a PDF from the evidence list to preview it here.
             </div>
-          ))}
+          )}
+        </div>
+      </aside>
+
+      {/* Right content */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Detail header */}
+        <div className="border-b border-primary/15 bg-white px-6 py-5">
+          <SheetHeader>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <StatusBadge status={nom.status} />
+              <Badge variant="outline" className="border-primary/30 text-primary text-xs">
+                {nom.categoryName ?? nom.categoryId}
+              </Badge>
+              <Badge variant="outline" className="text-xs">{totalFiles} file{totalFiles !== 1 ? "s" : ""}</Badge>
+            </div>
+            <SheetTitle className="font-serif text-2xl text-left">{nom.nomineeName}</SheetTitle>
+            <SheetDescription className="text-left text-sm text-muted-foreground">
+              {nom.nomineeEmail} · #{nom.studentNumber}
+            </SheetDescription>
+          </SheetHeader>
         </div>
 
-        {/* Nominator */}
-        <div className="rounded-xl border border-primary/15 bg-gray-50 p-4 space-y-0.5 text-sm">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Nominated by</p>
-          <p className="font-semibold">{nom.nominatorName}</p>
-          <p className="text-muted-foreground">{nom.nominatorEmail}</p>
-          {nom.nominatorRelationship && <p className="text-muted-foreground">{nom.nominatorRelationship}</p>}
-        </div>
+        {/* Scrollable body */}
+        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+          {/* Key info grid */}
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            {[
+              ["Faculty", nom.faculty],
+              ["Year", nom.yearOfStudy],
+              ["Student #", nom.studentNumber],
+              ["Submitted", formatDate(nom.createdAt)],
+            ].map(([k, v]) => (
+              <div key={k} className="rounded-xl border border-primary/15 bg-gray-50 p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{k}</p>
+                <p className="mt-0.5 font-semibold text-foreground">{v ?? "—"}</p>
+              </div>
+            ))}
+          </div>
 
-        {/* Answers */}
-        {nom.answers && Object.keys(nom.answers).length > 0 && (
-          <div>
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-primary">Answers &amp; Evidence</p>
-            <div className="space-y-4">
-              {catData
-                ? catData.questions.map((q) =>
-                    nom.answers[q.id] || nom.uploads?.[q.id] ? (
-                      <div key={q.id} className="rounded-xl border border-primary/10 bg-white p-4 shadow-sm">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-primary mb-0.5">{q.section}</p>
-                        <p className="text-xs text-muted-foreground italic mb-2">{q.prompt}</p>
-                        {nom.answers[q.id] && (
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{nom.answers[q.id]}</p>
-                        )}
-                        {q.evidence?.map((label, idx) => {
-                          const slotFiles = nom.uploads?.[q.id]?.[`e${idx}`] ?? [];
-                          if (!slotFiles.length) return null;
-                          return (
-                            <div key={idx} className="mt-3">
-                              <p className="text-[10px] font-medium text-muted-foreground mb-1">{label}</p>
-                              {slotFiles.map((file) => (
-                                <a
-                                  key={file.path}
-                                  href={file.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  download
-                                  className="flex items-center gap-1.5 text-xs text-primary hover:underline py-0.5"
-                                >
-                                  <FileText className="h-3 w-3 shrink-0" />
-                                  {file.name}
-                                  <span className="text-[10px] text-muted-foreground ml-1">
-                                    ({file.size < 1024 * 1024
-                                      ? `${(file.size / 1024).toFixed(0)} KB`
-                                      : `${(file.size / (1024 * 1024)).toFixed(1)} MB`})
-                                  </span>
-                                </a>
-                              ))}
-                            </div>
-                          );
-                        })}
+          {/* Nominator */}
+          <div className="space-y-0.5 rounded-xl border border-primary/15 bg-gray-50 p-4 text-sm">
+            <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Nominated by</p>
+            <p className="font-semibold">{nom.nominatorName}</p>
+            <p className="text-muted-foreground">{nom.nominatorEmail}</p>
+            {nom.nominatorRelationship && <p className="text-muted-foreground">{nom.nominatorRelationship}</p>}
+          </div>
+
+          {/* Answers */}
+          {nom.answers && Object.keys(nom.answers).length > 0 && (
+            <div>
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-primary">Answers &amp; Evidence</p>
+              <div className="space-y-4">
+                {catData
+                  ? catData.questions.map((q) =>
+                      nom.answers[q.id] || nom.uploads?.[q.id] ? (
+                        <div key={q.id} className="rounded-xl border border-primary/10 bg-white p-4 shadow-sm">
+                          <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">{q.section}</p>
+                          <p className="mb-2 text-xs italic text-muted-foreground">{q.prompt}</p>
+                          {nom.answers[q.id] && (
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed">{nom.answers[q.id]}</p>
+                          )}
+                          {q.evidence?.map((label, idx) => {
+                            const slotFiles = nom.uploads?.[q.id]?.[`e${idx}`] ?? [];
+                            if (!slotFiles.length) return null;
+                            return (
+                              <div key={idx} className="mt-3">
+                                <p className="mb-1 text-[10px] font-medium text-muted-foreground">{label}</p>
+                                {slotFiles.map((file) => {
+                                  const isPdf = /\.pdf($|\?)/i.test(file.name) || /\.pdf($|\?)/i.test(file.url);
+                                  return (
+                                    <div key={file.path} className="flex flex-wrap items-center gap-2 py-1">
+                                      <a
+                                        href={file.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex min-w-0 items-center gap-1.5 text-xs text-primary hover:underline"
+                                      >
+                                        <FileText className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">{file.name}</span>
+                                        <span className="ml-1 text-[10px] text-muted-foreground">
+                                          ({file.size < 1024 * 1024
+                                            ? `${(file.size / 1024).toFixed(0)} KB`
+                                            : `${(file.size / (1024 * 1024)).toFixed(1)} MB`})
+                                        </span>
+                                      </a>
+                                      {isPdf && (
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 px-2 text-[11px]"
+                                          onClick={() => openPreview(file.path)}
+                                          aria-label={`Preview PDF ${file.name}`}
+                                        >
+                                          <Eye className="mr-1 h-3.5 w-3.5" /> Preview
+                                        </Button>
+                                      )}
+                                      <a href={file.url} download>
+                                        <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-[11px]">
+                                          <Download className="mr-1 h-3.5 w-3.5" /> Download
+                                        </Button>
+                                      </a>
+                                      <a href={file.url} target="_blank" rel="noopener noreferrer">
+                                        <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-[11px]">
+                                          <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
+                                        </Button>
+                                      </a>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null
+                    )
+                  : Object.entries(nom.answers).map(([k, v]) => (
+                      <div key={k} className="rounded-xl border border-primary/10 bg-white p-4 shadow-sm">
+                        <p className="mb-1 text-xs font-semibold text-muted-foreground">{k}</p>
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed">{v}</p>
                       </div>
-                    ) : null
-                  )
-                : Object.entries(nom.answers).map(([k, v]) => (
-                    <div key={k} className="rounded-xl border border-primary/10 bg-white p-4 shadow-sm">
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">{k}</p>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{v}</p>
-                    </div>
-                  ))}
+                    ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Action footer */}
+        <div className="flex flex-wrap gap-2 border-t border-primary/15 bg-white px-6 py-4">
+          <Button
+            size="sm"
+            onClick={() => onUpdate(nom.id, "shortlisted")}
+            disabled={nom.status === "shortlisted"}
+            className="flex-1 bg-gold text-primary-foreground"
+          >
+            <CheckCircle2 className="mr-1.5 h-4 w-4" /> Shortlist
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onUpdate(nom.id, "rejected")}
+            disabled={nom.status === "rejected"}
+            className="flex-1"
+          >
+            <XCircle className="mr-1.5 h-4 w-4" /> Reject
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => onDelete(nom.id)}
+            className="text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      {/* Action footer */}
-      <div className="border-t border-primary/15 bg-white px-6 py-4 flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          onClick={() => onUpdate(nom.id, "shortlisted")}
-          disabled={nom.status === "shortlisted"}
-          className="bg-gold text-primary-foreground flex-1"
-        >
-          <CheckCircle2 className="mr-1.5 h-4 w-4" /> Shortlist
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => onUpdate(nom.id, "rejected")}
-          disabled={nom.status === "rejected"}
-          className="flex-1"
-        >
-          <XCircle className="mr-1.5 h-4 w-4" /> Reject
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => onDelete(nom.id)}
-          className="text-destructive hover:bg-destructive/10"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
+      {/* Mobile PDF overlay */}
+      {mobilePreviewOpen && activePreview && (
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm lg:hidden" role="dialog" aria-modal="true" aria-label="PDF Preview">
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between gap-2 border-b border-primary/15 px-4 py-3">
+              <p className="truncate text-xs font-semibold uppercase tracking-wider text-primary">{activePreview.name}</p>
+              <Button type="button" size="sm" variant="outline" onClick={() => setMobilePreviewOpen(false)} aria-label="Close PDF preview">
+                <XIcon className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center justify-between gap-2 border-b border-primary/10 px-3 py-2">
+              <div className="flex items-center gap-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => goToPdf(-1)} disabled={activePreviewIndex <= 0} aria-label="Previous PDF">
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => goToPdf(1)} disabled={activePreviewIndex < 0 || activePreviewIndex >= pdfFiles.length - 1} aria-label="Next PDF">
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => setPreviewZoom((z) => Math.max(60, z - 10))} aria-label="Zoom out PDF">
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setPreviewZoom((z) => Math.min(220, z + 10))} aria-label="Zoom in PDF">
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => { setPreviewZoom(110); setPreviewPage(1); }} aria-label="Reset PDF view">
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 p-3">
+              <iframe
+                key={`mobile-${activePreview.path}`}
+                src={activePreviewUrl}
+                title={`PDF preview for ${activePreview.name}`}
+                className="h-full w-full rounded-lg border border-primary/20 bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
