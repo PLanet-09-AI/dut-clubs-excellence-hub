@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   query,
   orderBy,
+  where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { signIn, signOut as firebaseSignOut, subscribeToAuthState, resetPassword, registerUser } from "@/lib/auth-firebase";
@@ -303,13 +304,19 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
 
   // Real-time Firestore listener — nominations
   useEffect(() => {
-    const q = query(collection(db, "nominations"), orderBy("createdAt", "desc"));
+    const q = canManage
+      ? query(collection(db, "nominations"), orderBy("createdAt", "desc"))
+      : query(
+          collection(db, "nominations"),
+          where("status", "==", "shortlisted"),
+          orderBy("createdAt", "desc"),
+        );
     const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Nomination));
       setNominations(docs);
     });
     return () => unsub();
-  }, []);
+  }, [canManage]);
 
   // Real-time Firestore listener — custom categories
   useEffect(() => {
