@@ -47,6 +47,15 @@ type Nomination = {
   status: NominationStatus;
 };
 
+type PreviewKind = "pdf" | "office";
+
+function getPreviewKind(fileName: string, fileUrl: string): PreviewKind | null {
+  const target = `${fileName} ${fileUrl}`;
+  if (/\.pdf($|\?)/i.test(target)) return "pdf";
+  if (/\.(doc|docx|ppt|pptx|pps|ppsx|xls|xlsx)($|\?)/i.test(target)) return "office";
+  return null;
+}
+
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
   head: () => ({
@@ -495,7 +504,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
 
       {!canManage && (
         <Card className="border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-          Judge access mode: you can view nominations and use in-app PDF preview. Admin actions are disabled.
+          Judge access mode: you can view nominations and use in-app document preview. Admin actions are disabled.
         </Card>
       )}
 
@@ -833,8 +842,12 @@ function NominationDetail({
     return files;
   }, [catData, nom.uploads]);
 
-  const pdfFiles = useMemo(
-    () => evidenceFiles.filter(({ file }) => /\.pdf($|\?)/i.test(file.name) || /\.pdf($|\?)/i.test(file.url)),
+  const previewableFiles = useMemo(
+    () =>
+      evidenceFiles.flatMap((entry) => {
+        const kind = getPreviewKind(entry.file.name, entry.file.url);
+        return kind ? [{ ...entry, kind }] : [];
+      }),
     [evidenceFiles],
   );
 
@@ -844,18 +857,18 @@ function NominationDetail({
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
 
   useEffect(() => {
-    if (pdfFiles.length === 0) {
+    if (previewableFiles.length === 0) {
       setPreviewPath(null);
       setMobilePreviewOpen(false);
       return;
     }
-    const exists = pdfFiles.some(({ file }) => file.path === previewPath);
+    const exists = previewableFiles.some(({ file }) => file.path === previewPath);
     if (!exists) {
-      setPreviewPath(pdfFiles[0].file.path);
+      setPreviewPath(previewableFiles[0].file.path);
       setPreviewPage(1);
       setPreviewZoom(110);
     }
-  }, [pdfFiles, previewPath]);
+  }, [previewableFiles, previewPath]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -866,22 +879,24 @@ function NominationDetail({
   }, []);
 
   const activePreview = useMemo(
-    () => pdfFiles.find(({ file }) => file.path === previewPath)?.file ?? null,
-    [pdfFiles, previewPath],
+    () => previewableFiles.find(({ file }) => file.path === previewPath)?.file ?? null,
+    [previewableFiles, previewPath],
   );
 
   const activePreviewMeta = useMemo(
-    () => pdfFiles.find(({ file }) => file.path === previewPath) ?? null,
-    [pdfFiles, previewPath],
+    () => previewableFiles.find(({ file }) => file.path === previewPath) ?? null,
+    [previewableFiles, previewPath],
   );
 
   const activePreviewIndex = useMemo(
-    () => (activePreview ? pdfFiles.findIndex(({ file }) => file.path === activePreview.path) : -1),
-    [activePreview, pdfFiles],
+    () => (activePreview ? previewableFiles.findIndex(({ file }) => file.path === activePreview.path) : -1),
+    [activePreview, previewableFiles],
   );
 
   const activePreviewUrl = activePreview
-    ? `${activePreview.url}#page=${previewPage}&zoom=${previewZoom}`
+    ? activePreviewMeta?.kind === "pdf"
+      ? `${activePreview.url}#page=${previewPage}&zoom=${previewZoom}`
+      : `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(activePreview.url)}`
     : "";
 
   function openPreview(path: string) {
@@ -898,11 +913,11 @@ function NominationDetail({
     setMobilePreviewOpen(false);
   }
 
-  function goToPdf(offset: -1 | 1) {
+  function goToPreviewFile(offset: -1 | 1) {
     if (activePreviewIndex < 0) return;
     const next = activePreviewIndex + offset;
-    if (next < 0 || next >= pdfFiles.length) return;
-    setPreviewPath(pdfFiles[next].file.path);
+    if (next < 0 || next >= previewableFiles.length) return;
+    setPreviewPath(previewableFiles[next].file.path);
     setPreviewPage(1);
     setPreviewZoom(110);
   }
@@ -912,27 +927,27 @@ function NominationDetail({
       {/* Desktop preview pane (left) */}
       <aside className="hidden h-full flex-1 border-r border-primary/15 bg-muted/20 lg:flex lg:min-w-[56vw] lg:flex-col xl:min-w-[60vw]">
         <div className="border-b border-primary/15 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary">PDF Preview</p>
-          <p className="text-[11px] text-muted-foreground">In-app evidence preview with keyboard-friendly controls.</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary">Document Preview</p>
+          <p className="text-[11px] text-muted-foreground">Preview PDFs and Office files in-app with keyboard-friendly controls.</p>
         </div>
         <div className="border-b border-primary/10 px-4 py-3">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="desktop-pdf-selector">
-            Select PDF
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="desktop-preview-selector">
+            Select document
           </label>
           <select
-            id="desktop-pdf-selector"
+            id="desktop-preview-selector"
             value={previewPath ?? ""}
             onChange={(e) => openPreview(e.target.value)}
             className="w-full rounded-lg border border-primary/20 bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary"
-            disabled={pdfFiles.length === 0}
-            aria-label="Select a PDF to preview"
+            disabled={previewableFiles.length === 0}
+            aria-label="Select a document to preview"
           >
-            {pdfFiles.length === 0 ? (
-              <option value="">No PDFs available</option>
+            {previewableFiles.length === 0 ? (
+              <option value="">No previewable files available</option>
             ) : (
-              pdfFiles.map(({ file, evidenceLabel }, index) => (
+              previewableFiles.map(({ file, evidenceLabel, kind }, index) => (
                 <option key={file.path} value={file.path}>
-                  {index + 1}. {evidenceLabel} - {file.name}
+                  {index + 1}. {evidenceLabel} - {file.name} ({kind.toUpperCase()})
                 </option>
               ))
             )}
@@ -949,9 +964,9 @@ function NominationDetail({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => goToPdf(-1)}
+              onClick={() => goToPreviewFile(-1)}
               disabled={activePreviewIndex <= 0}
-              aria-label="Previous PDF"
+              aria-label="Previous preview file"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -959,9 +974,9 @@ function NominationDetail({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => goToPdf(1)}
-              disabled={activePreviewIndex < 0 || activePreviewIndex >= pdfFiles.length - 1}
-              aria-label="Next PDF"
+              onClick={() => goToPreviewFile(1)}
+              disabled={activePreviewIndex < 0 || activePreviewIndex >= previewableFiles.length - 1}
+              aria-label="Next preview file"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -970,7 +985,7 @@ function NominationDetail({
               variant="outline"
               size="sm"
               onClick={() => setPreviewPage((p) => Math.max(1, p - 1))}
-              disabled={!activePreview || previewPage <= 1}
+              disabled={!activePreview || activePreviewMeta?.kind !== "pdf" || previewPage <= 1}
               aria-label="Previous PDF page"
             >
               Page -
@@ -980,7 +995,7 @@ function NominationDetail({
               variant="outline"
               size="sm"
               onClick={() => setPreviewPage((p) => p + 1)}
-              disabled={!activePreview}
+              disabled={!activePreview || activePreviewMeta?.kind !== "pdf"}
               aria-label="Next PDF page"
             >
               Page +
@@ -1026,27 +1041,32 @@ function NominationDetail({
               size="sm"
               onClick={closePreview}
               disabled={!activePreview}
-              aria-label="Close PDF preview"
+              aria-label="Close document preview"
             >
               <XIcon className="h-4 w-4" />
             </Button>
           </div>
         </div>
         <div className="flex items-center justify-between px-4 py-2 text-[11px] text-muted-foreground">
-          <span>{activePreview ? activePreview.name : "No PDF selected"}</span>
-          {activePreview && <span>PDF {activePreviewIndex + 1} / {pdfFiles.length} · Page {previewPage}</span>}
+          <span>{activePreview ? activePreview.name : "No document selected"}</span>
+          {activePreview && (
+            <span>
+              {activePreviewMeta?.kind?.toUpperCase()} {activePreviewIndex + 1} / {previewableFiles.length}
+              {activePreviewMeta?.kind === "pdf" ? ` · Page ${previewPage}` : ""}
+            </span>
+          )}
         </div>
         <div className="min-h-0 flex-1 px-3 pb-3">
           {activePreview ? (
             <iframe
               key={activePreview.path}
               src={activePreviewUrl}
-              title={`PDF preview for ${activePreview.name}`}
+              title={`Document preview for ${activePreview.name}`}
               className="h-full w-full rounded-lg border border-primary/20 bg-white"
             />
           ) : (
             <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center text-xs text-muted-foreground">
-              Select a PDF from the evidence list to preview it here.
+              Select a previewable file from the evidence list to preview it here.
             </div>
           )}
         </div>
@@ -1075,19 +1095,19 @@ function NominationDetail({
               size="sm"
               className="bg-gold text-primary-foreground"
               onClick={() => {
-                if (pdfFiles.length > 0) {
-                  openPreview(pdfFiles[0].file.path);
+                if (previewableFiles.length > 0) {
+                  openPreview(previewableFiles[0].file.path);
                 }
               }}
-              disabled={pdfFiles.length === 0}
-              aria-label="Preview first available PDF"
+              disabled={previewableFiles.length === 0}
+              aria-label="Preview first available document"
             >
-              <Eye className="mr-1.5 h-4 w-4" /> Preview PDF
+              <Eye className="mr-1.5 h-4 w-4" /> Preview File
             </Button>
             <p className="text-xs text-muted-foreground">
-              {pdfFiles.length > 0
-                ? `${pdfFiles.length} PDF${pdfFiles.length !== 1 ? "s" : ""} available for preview.`
-                : "No PDF uploaded for this nominee yet. Preview works only for PDF files."}
+              {previewableFiles.length > 0
+                ? `${previewableFiles.length} previewable file${previewableFiles.length !== 1 ? "s" : ""} available.`
+                : "No previewable file uploaded for this nominee yet. PDF, Word, PowerPoint, and Excel files are supported."}
             </p>
           </div>
         </div>
@@ -1138,20 +1158,21 @@ function NominationDetail({
                               <div key={idx} className="mt-3">
                                 <p className="mb-1 text-[10px] font-medium text-muted-foreground">{label}</p>
                                 {slotFiles.map((file) => {
-                                  const isPdf = /\.pdf($|\?)/i.test(file.name) || /\.pdf($|\?)/i.test(file.url);
+                                  const previewKind = getPreviewKind(file.name, file.url);
+                                  const isPreviewable = previewKind !== null;
                                   return (
                                     <div key={file.path} className="flex flex-wrap items-center gap-2 py-1">
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          if (isPdf) {
+                                          if (isPreviewable) {
                                             openPreview(file.path);
                                             return;
                                           }
                                           window.open(file.url, "_blank", "noopener,noreferrer");
                                         }}
                                         className="inline-flex min-w-0 items-center gap-1.5 text-left text-xs text-primary hover:underline"
-                                        aria-label={isPdf ? `Preview PDF ${file.name}` : `Open file ${file.name}`}
+                                        aria-label={isPreviewable ? `Preview file ${file.name}` : `Open file ${file.name}`}
                                       >
                                         <FileText className="h-3 w-3 shrink-0" />
                                         <span className="truncate">{file.name}</span>
@@ -1161,14 +1182,14 @@ function NominationDetail({
                                             : `${(file.size / (1024 * 1024)).toFixed(1)} MB`})
                                         </span>
                                       </button>
-                                      {isPdf && (
+                                      {isPreviewable && (
                                         <Button
                                           type="button"
                                           size="sm"
                                           variant="outline"
                                           className="h-7 px-2 text-[11px]"
                                           onClick={() => openPreview(file.path)}
-                                          aria-label={`Preview PDF ${file.name}`}
+                                          aria-label={`Preview file ${file.name}`}
                                         >
                                           <Eye className="mr-1 h-3.5 w-3.5" /> Preview
                                         </Button>
@@ -1234,33 +1255,33 @@ function NominationDetail({
               </Button>
             </>
           ) : (
-            <p className="text-xs text-muted-foreground">Read-only mode: PDF preview and evidence review are enabled; status changes are admin-only.</p>
+            <p className="text-xs text-muted-foreground">Read-only mode: document preview and evidence review are enabled; status changes are admin-only.</p>
           )}
         </div>
       </div>
 
       {/* Mobile PDF overlay */}
       {mobilePreviewOpen && activePreview && (
-        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm lg:hidden" role="dialog" aria-modal="true" aria-label="PDF Preview">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm lg:hidden" role="dialog" aria-modal="true" aria-label="Document Preview">
           <div className="flex h-full flex-col">
             <div className="flex items-center justify-between gap-2 border-b border-primary/15 px-4 py-3">
               <p className="truncate text-xs font-semibold uppercase tracking-wider text-primary">{activePreview.name}</p>
-              <Button type="button" size="sm" variant="outline" onClick={() => setMobilePreviewOpen(false)} aria-label="Close PDF preview">
+              <Button type="button" size="sm" variant="outline" onClick={() => setMobilePreviewOpen(false)} aria-label="Close document preview">
                 <XIcon className="h-4 w-4" />
               </Button>
             </div>
             <div className="flex items-center justify-between gap-2 border-b border-primary/10 px-3 py-2">
               <div className="flex items-center gap-1">
-                <Button type="button" variant="outline" size="sm" onClick={() => goToPdf(-1)} disabled={activePreviewIndex <= 0} aria-label="Previous PDF">
+                <Button type="button" variant="outline" size="sm" onClick={() => goToPreviewFile(-1)} disabled={activePreviewIndex <= 0} aria-label="Previous preview file">
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => goToPdf(1)} disabled={activePreviewIndex < 0 || activePreviewIndex >= pdfFiles.length - 1} aria-label="Next PDF">
+                <Button type="button" variant="outline" size="sm" onClick={() => goToPreviewFile(1)} disabled={activePreviewIndex < 0 || activePreviewIndex >= previewableFiles.length - 1} aria-label="Next preview file">
                   <ChevronRight className="h-4 w-4" />
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => setPreviewPage((p) => Math.max(1, p - 1))} disabled={previewPage <= 1} aria-label="Previous PDF page">
+                <Button type="button" variant="outline" size="sm" onClick={() => setPreviewPage((p) => Math.max(1, p - 1))} disabled={activePreviewMeta?.kind !== "pdf" || previewPage <= 1} aria-label="Previous PDF page">
                   Page -
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => setPreviewPage((p) => p + 1)} aria-label="Next PDF page">
+                <Button type="button" variant="outline" size="sm" onClick={() => setPreviewPage((p) => p + 1)} disabled={activePreviewMeta?.kind !== "pdf"} aria-label="Next PDF page">
                   Page +
                 </Button>
               </div>
@@ -1277,23 +1298,23 @@ function NominationDetail({
               </div>
             </div>
             <div className="border-b border-primary/10 px-3 py-3">
-              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="mobile-pdf-selector">
-                Select PDF
+              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="mobile-preview-selector">
+                Select document
               </label>
               <select
-                id="mobile-pdf-selector"
+                id="mobile-preview-selector"
                 value={previewPath ?? ""}
                 onChange={(e) => openPreview(e.target.value)}
                 className="w-full rounded-lg border border-primary/20 bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary"
-                disabled={pdfFiles.length === 0}
-                aria-label="Select a PDF to preview"
+                disabled={previewableFiles.length === 0}
+                aria-label="Select a document to preview"
               >
-                {pdfFiles.length === 0 ? (
-                  <option value="">No PDFs available</option>
+                {previewableFiles.length === 0 ? (
+                  <option value="">No previewable files available</option>
                 ) : (
-                  pdfFiles.map(({ file, evidenceLabel }, index) => (
+                  previewableFiles.map(({ file, evidenceLabel, kind }, index) => (
                     <option key={file.path} value={file.path}>
-                      {index + 1}. {evidenceLabel} - {file.name}
+                      {index + 1}. {evidenceLabel} - {file.name} ({kind.toUpperCase()})
                     </option>
                   ))
                 )}
@@ -1303,7 +1324,7 @@ function NominationDetail({
               <iframe
                 key={`mobile-${activePreview.path}`}
                 src={activePreviewUrl}
-                title={`PDF preview for ${activePreview.name}`}
+                title={`Document preview for ${activePreview.name}`}
                 className="h-full w-full rounded-lg border border-primary/20 bg-white"
               />
             </div>
