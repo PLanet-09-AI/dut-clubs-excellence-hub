@@ -713,7 +713,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
 
       {/* Detail slide-over */}
       <Sheet open={!!detailNom} onOpenChange={(open) => { if (!open) setDetailNom(null); }}>
-        <SheetContent side="right" className="w-screen max-w-none overflow-y-auto p-0">
+        <SheetContent side="right" className="h-screen w-screen max-w-none overflow-hidden p-0 sm:max-w-none">
           {detailNom && (
             <NominationDetail
               nom={detailNom}
@@ -887,9 +887,9 @@ function NominationDetail({
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full w-full">
       {/* Desktop preview pane (left) */}
-      <aside className="hidden w-[44%] border-r border-primary/15 bg-muted/20 lg:flex lg:flex-col">
+      <aside className="hidden h-full flex-1 border-r border-primary/15 bg-muted/20 lg:flex lg:min-w-[56vw] lg:flex-col xl:min-w-[60vw]">
         <div className="border-b border-primary/15 px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-primary">PDF Preview</p>
           <p className="text-[11px] text-muted-foreground">In-app evidence preview with keyboard-friendly controls.</p>
@@ -1004,7 +1004,7 @@ function NominationDetail({
       </aside>
 
       {/* Right content */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex h-full min-w-0 w-full flex-col lg:w-[40vw] lg:min-w-[420px] xl:w-[36vw]">
         {/* Detail header */}
         <div className="border-b border-primary/15 bg-white px-6 py-5">
           <SheetHeader>
