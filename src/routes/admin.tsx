@@ -861,6 +861,11 @@ function NominationDetail({
     [pdfFiles, previewPath],
   );
 
+  const activePreviewMeta = useMemo(
+    () => pdfFiles.find(({ file }) => file.path === previewPath) ?? null,
+    [pdfFiles, previewPath],
+  );
+
   const activePreviewIndex = useMemo(
     () => (activePreview ? pdfFiles.findIndex(({ file }) => file.path === activePreview.path) : -1),
     [activePreview, pdfFiles],
@@ -900,6 +905,34 @@ function NominationDetail({
         <div className="border-b border-primary/15 px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-primary">PDF Preview</p>
           <p className="text-[11px] text-muted-foreground">In-app evidence preview with keyboard-friendly controls.</p>
+        </div>
+        <div className="border-b border-primary/10 px-4 py-3">
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="desktop-pdf-selector">
+            Select PDF
+          </label>
+          <select
+            id="desktop-pdf-selector"
+            value={previewPath ?? ""}
+            onChange={(e) => openPreview(e.target.value)}
+            className="w-full rounded-lg border border-primary/20 bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary"
+            disabled={pdfFiles.length === 0}
+            aria-label="Select a PDF to preview"
+          >
+            {pdfFiles.length === 0 ? (
+              <option value="">No PDFs available</option>
+            ) : (
+              pdfFiles.map(({ file, evidenceLabel }, index) => (
+                <option key={file.path} value={file.path}>
+                  {index + 1}. {evidenceLabel} - {file.name}
+                </option>
+              ))
+            )}
+          </select>
+          {activePreviewMeta && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Current selection: <span className="font-medium text-foreground">{activePreviewMeta.evidenceLabel}</span>
+            </p>
+          )}
         </div>
         <div className="flex items-center justify-between gap-2 border-b border-primary/10 px-3 py-2">
           <div className="flex items-center gap-1">
@@ -1212,6 +1245,29 @@ function NominationDetail({
                   <RotateCcw className="h-4 w-4" />
                 </Button>
               </div>
+            </div>
+            <div className="border-b border-primary/10 px-3 py-3">
+              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="mobile-pdf-selector">
+                Select PDF
+              </label>
+              <select
+                id="mobile-pdf-selector"
+                value={previewPath ?? ""}
+                onChange={(e) => openPreview(e.target.value)}
+                className="w-full rounded-lg border border-primary/20 bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary"
+                disabled={pdfFiles.length === 0}
+                aria-label="Select a PDF to preview"
+              >
+                {pdfFiles.length === 0 ? (
+                  <option value="">No PDFs available</option>
+                ) : (
+                  pdfFiles.map(({ file, evidenceLabel }, index) => (
+                    <option key={file.path} value={file.path}>
+                      {index + 1}. {evidenceLabel} - {file.name}
+                    </option>
+                  ))
+                )}
+              </select>
             </div>
             <div className="min-h-0 flex-1 p-3">
               <iframe
