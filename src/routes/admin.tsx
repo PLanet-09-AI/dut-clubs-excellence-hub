@@ -309,10 +309,19 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       : query(
           collection(db, "nominations"),
           where("status", "==", "shortlisted"),
-          orderBy("createdAt", "desc"),
         );
     const unsub = onSnapshot(q, (snap) => {
-      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Nomination));
+      const docs = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as Nomination))
+        .sort((a, b) => {
+          const aTime = a.createdAt && typeof a.createdAt === "object" && a.createdAt.toDate
+            ? a.createdAt.toDate().getTime()
+            : 0;
+          const bTime = b.createdAt && typeof b.createdAt === "object" && b.createdAt.toDate
+            ? b.createdAt.toDate().getTime()
+            : 0;
+          return bTime - aTime;
+        });
       setNominations(docs);
     });
     return () => unsub();
@@ -1060,6 +1069,27 @@ function NominationDetail({
               {nom.nomineeEmail} · #{nom.studentNumber}
             </SheetDescription>
           </SheetHeader>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              className="bg-gold text-primary-foreground"
+              onClick={() => {
+                if (pdfFiles.length > 0) {
+                  openPreview(pdfFiles[0].file.path);
+                }
+              }}
+              disabled={pdfFiles.length === 0}
+              aria-label="Preview first available PDF"
+            >
+              <Eye className="mr-1.5 h-4 w-4" /> Preview PDF
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              {pdfFiles.length > 0
+                ? `${pdfFiles.length} PDF${pdfFiles.length !== 1 ? "s" : ""} available for preview.`
+                : "No PDF uploaded for this nominee yet. Preview works only for PDF files."}
+            </p>
+          </div>
         </div>
 
         {/* Scrollable body */}

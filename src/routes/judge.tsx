@@ -235,10 +235,21 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
     const q = query(
       collection(db, "nominations"),
       where("status", "==", "shortlisted"),
-      orderBy("createdAt", "desc"),
     );
     const unsub = onSnapshot(q, (snap) => {
-      setNominations(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Nomination)));
+      setNominations(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as Nomination))
+          .sort((a, b) => {
+            const aTime = a.createdAt && typeof a.createdAt === "object" && a.createdAt.toDate
+              ? a.createdAt.toDate().getTime()
+              : 0;
+            const bTime = b.createdAt && typeof b.createdAt === "object" && b.createdAt.toDate
+              ? b.createdAt.toDate().getTime()
+              : 0;
+            return bTime - aTime;
+          }),
+      );
     });
     return () => unsub();
   }, []);
