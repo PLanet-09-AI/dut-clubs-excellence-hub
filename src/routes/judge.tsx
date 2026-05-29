@@ -1,6 +1,27 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
-import { Lock, LogOut, Star, ChevronRight, ChevronLeft, Mail, Search, FileText, MessageSquare, CheckCircle2, Trophy, Clock, AlertTriangle, Eye, ExternalLink, ZoomIn, ZoomOut, RotateCcw, Download, X as XIcon } from "lucide-react";
+import {
+  Lock,
+  LogOut,
+  Star,
+  ChevronRight,
+  ChevronLeft,
+  Mail,
+  Search,
+  FileText,
+  MessageSquare,
+  CheckCircle2,
+  Trophy,
+  Clock,
+  AlertTriangle,
+  Eye,
+  ExternalLink,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Download,
+  X as XIcon,
+} from "lucide-react";
 import {
   collection,
   onSnapshot,
@@ -21,7 +42,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 
 type Nomination = {
@@ -38,17 +65,67 @@ type Nomination = {
   nominatorEmail: string;
   nominatorRelationship: string;
   answers: Record<string, string>;
-  uploads?: Record<string, Record<string, { name: string; url: string; size: number; path: string }[]>>;
+  uploads?: Record<
+    string,
+    Record<
+      string,
+      {
+        name: string;
+        url: string;
+        size: number;
+        path: string;
+        previewPdfUrl?: string;
+        previewPdfPath?: string;
+      }[]
+    >
+  >;
   status: "pending" | "shortlisted" | "rejected";
 };
 
 type PreviewKind = "pdf" | "office";
 
-function getPreviewKind(fileName: string, fileUrl: string): PreviewKind | null {
+function getPreviewKind(
+  fileName: string,
+  fileUrl: string,
+  previewPdfUrl?: string,
+): PreviewKind | null {
+  if (previewPdfUrl) return "pdf";
   const target = `${fileName} ${fileUrl}`;
   if (/\.pdf($|\?)/i.test(target)) return "pdf";
   if (/\.(doc|docx|ppt|pptx|pps|ppsx|xls|xlsx)($|\?)/i.test(target)) return "office";
   return null;
+}
+
+function isOfficeEmbeddableUrl(fileUrl: string): boolean {
+  if (!fileUrl) return false;
+
+  try {
+    const parsed = new URL(fileUrl);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "0.0.0.0" ||
+      host.endsWith(".local")
+    ) {
+      return false;
+    }
+
+    // Block private IPv4 ranges that Office Online cannot reach.
+    if (
+      /^10\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+    ) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 type JudgeScore = {
@@ -111,7 +188,17 @@ function StarPicker({
         </button>
       ))}
       <span className="ml-2 self-center text-sm font-bold text-foreground">
-        {value === 0 ? "No rating" : value === 1 ? "Poor" : value === 2 ? "Fair" : value === 3 ? "Good" : value === 4 ? "Very good" : "Exceptional"}
+        {value === 0
+          ? "No rating"
+          : value === 1
+            ? "Poor"
+            : value === 2
+              ? "Fair"
+              : value === 3
+                ? "Good"
+                : value === 4
+                  ? "Very good"
+                  : "Exceptional"}
       </span>
     </div>
   );
@@ -164,7 +251,11 @@ function JudgePage() {
       await signIn(email, password);
     } catch (ex: unknown) {
       const code = (ex as { code?: string }).code ?? "";
-      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+      if (
+        code === "auth/invalid-credential" ||
+        code === "auth/wrong-password" ||
+        code === "auth/user-not-found"
+      ) {
         setErr("Incorrect email or password.");
       } else if (code === "auth/too-many-requests") {
         setErr("Too many attempts. Please try again later.");
@@ -200,18 +291,40 @@ function JudgePage() {
             </p>
             <form onSubmit={handleSignIn} className="mt-6 space-y-4">
               <div>
-                <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">Email address</Label>
+                <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">
+                  Email address
+                </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-9" autoFocus autoComplete="email" required />
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-9"
+                    autoFocus
+                    autoComplete="email"
+                    required
+                  />
                 </div>
               </div>
               <div>
-                <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">Password</Label>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+                <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">
+                  Password
+                </Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
               </div>
               {err && <p className="text-sm text-destructive">{err}</p>}
-              <Button type="submit" disabled={loading} className="w-full bg-gold text-primary-foreground">
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gold text-primary-foreground"
+              >
                 {loading ? "Signing in…" : "Sign in"}
               </Button>
             </form>
@@ -242,21 +355,20 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
 
   // Only shortlisted nominations
   useEffect(() => {
-    const q = query(
-      collection(db, "nominations"),
-      where("status", "==", "shortlisted"),
-    );
+    const q = query(collection(db, "nominations"), where("status", "==", "shortlisted"));
     const unsub = onSnapshot(q, (snap) => {
       setNominations(
         snap.docs
-          .map((d) => ({ id: d.id, ...d.data() } as Nomination))
+          .map((d) => ({ id: d.id, ...d.data() }) as Nomination)
           .sort((a, b) => {
-            const aTime = a.createdAt && typeof a.createdAt === "object" && a.createdAt.toDate
-              ? a.createdAt.toDate().getTime()
-              : 0;
-            const bTime = b.createdAt && typeof b.createdAt === "object" && b.createdAt.toDate
-              ? b.createdAt.toDate().getTime()
-              : 0;
+            const aTime =
+              a.createdAt && typeof a.createdAt === "object" && a.createdAt.toDate
+                ? a.createdAt.toDate().getTime()
+                : 0;
+            const bTime =
+              b.createdAt && typeof b.createdAt === "object" && b.createdAt.toDate
+                ? b.createdAt.toDate().getTime()
+                : 0;
             return bTime - aTime;
           }),
       );
@@ -290,7 +402,9 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
       if (selectedCategory !== "__all__" && n.categoryId !== selectedCategory) return false;
       if (search.trim()) {
         const s = search.toLowerCase();
-        return n.nomineeName?.toLowerCase().includes(s) || n.studentNumber?.toLowerCase().includes(s);
+        return (
+          n.nomineeName?.toLowerCase().includes(s) || n.studentNumber?.toLowerCase().includes(s)
+        );
       }
       return true;
     });
@@ -319,18 +433,30 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
       });
       setMyScores((prev) => ({
         ...prev,
-        [detail.id]: { nominationId: detail.id, judgeUid: uid, judgeEmail, nomineeName: detail.nomineeName, categoryName: detail.categoryName, score: scoreInput, comment: commentInput, updatedAt: null },
+        [detail.id]: {
+          nominationId: detail.id,
+          judgeUid: uid,
+          judgeEmail,
+          nomineeName: detail.nomineeName,
+          categoryName: detail.categoryName,
+          score: scoreInput,
+          comment: commentInput,
+          updatedAt: null,
+        },
       }));
     } finally {
       setSaving(false);
     }
   }
 
-  const stats = useMemo(() => ({
-    total: nominations.length,
-    scored: nominations.filter((n) => !!myScores[n.id]).length,
-    pending: nominations.filter((n) => !myScores[n.id]).length,
-  }), [nominations, myScores]);
+  const stats = useMemo(
+    () => ({
+      total: nominations.length,
+      scored: nominations.filter((n) => !!myScores[n.id]).length,
+      pending: nominations.filter((n) => !myScores[n.id]).length,
+    }),
+    [nominations, myScores],
+  );
 
   return (
     <div>
@@ -343,7 +469,11 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
             Signed in as <span className="font-medium text-foreground">{judgeEmail}</span>
           </p>
         </div>
-        <Button variant="outline" onClick={onLogout} className="gap-2 border-primary/40 text-primary">
+        <Button
+          variant="outline"
+          onClick={onLogout}
+          className="gap-2 border-primary/40 text-primary"
+        >
           <LogOut className="h-4 w-4" /> Sign out
         </Button>
       </div>
@@ -352,20 +482,53 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
       {scoringStatus === "before" && (
         <div className="mt-6 flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <Clock className="h-5 w-5 shrink-0" />
-          <span>Scoring opens on <strong>{OPEN_DATE.toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}</strong>. Nominations close 31 July 2026 — check back then.</span>
+          <span>
+            Scoring opens on{" "}
+            <strong>
+              {OPEN_DATE.toLocaleDateString("en-ZA", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </strong>
+            . Nominations close 31 July 2026 — check back then.
+          </span>
         </div>
       )}
       {scoringStatus === "closed" && (
         <div className="mt-6 flex items-center gap-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
           <AlertTriangle className="h-5 w-5 shrink-0" />
-          <span>The scoring period closed on <strong>{CLOSE_DATE.toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}</strong>. No further scores can be submitted.</span>
+          <span>
+            The scoring period closed on{" "}
+            <strong>
+              {CLOSE_DATE.toLocaleDateString("en-ZA", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </strong>
+            . No further scores can be submitted.
+          </span>
         </div>
       )}
       {scoringStatus === "open" && (
         <div className="mt-6 flex items-center gap-3 rounded-xl border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800">
           <CheckCircle2 className="h-5 w-5 shrink-0" />
-          <span>Scoring is open. Deadline: <strong>{CLOSE_DATE.toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}</strong>.</span>
-          <Link to="/leaderboard" className="ml-auto flex shrink-0 items-center gap-1 font-semibold underline-offset-2 hover:underline">
+          <span>
+            Scoring is open. Deadline:{" "}
+            <strong>
+              {CLOSE_DATE.toLocaleDateString("en-ZA", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </strong>
+            .
+          </span>
+          <Link
+            to="/leaderboard"
+            className="ml-auto flex shrink-0 items-center gap-1 font-semibold underline-offset-2 hover:underline"
+          >
             <Trophy className="h-4 w-4" /> Leaderboard
           </Link>
         </div>
@@ -389,42 +552,68 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
       <div className="mt-8 flex flex-wrap gap-3">
         <div className="relative min-w-52 flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search nominee or student #…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          <Input
+            placeholder="Search nominee or student #…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
         </div>
-        <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="rounded-md border border-input bg-background px-3 py-2 text-sm">
+        <select
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+        >
           <option value="__all__">All categories</option>
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
         </select>
       </div>
 
       {/* List */}
       <div className="mt-4 space-y-2">
         {filtered.length === 0 && (
-          <p className="py-12 text-center text-sm text-muted-foreground">No shortlisted nominations yet.</p>
+          <p className="py-12 text-center text-sm text-muted-foreground">
+            No shortlisted nominations yet.
+          </p>
         )}
         {filtered.map((nom) => {
           const scored = myScores[nom.id];
           return (
-            <Card key={nom.id} className="flex cursor-pointer items-center justify-between p-4 transition-colors hover:bg-accent/30" onClick={() => openDetail(nom)}>
+            <Card
+              key={nom.id}
+              className="flex cursor-pointer items-center justify-between p-4 transition-colors hover:bg-accent/30"
+              onClick={() => openDetail(nom)}
+            >
               <div className="flex items-center gap-3">
                 <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10">
                   <FileText className="h-4 w-4 text-primary" />
                 </div>
                 <div>
                   <p className="font-medium">{nom.nomineeName}</p>
-                  <p className="text-xs text-muted-foreground">{nom.categoryName} · {nom.faculty} · Year {nom.yearOfStudy}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {nom.categoryName} · {nom.faculty} · Year {nom.yearOfStudy}
+                  </p>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {scored ? (
                   <Badge className="gap-1 border-green-400/30 bg-green-500/10 text-green-700">
                     {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} className={`h-3 w-3 ${i < scored.score ? "fill-green-600 text-green-600" : "fill-muted text-muted-foreground/20"}`} />
+                      <Star
+                        key={i}
+                        className={`h-3 w-3 ${i < scored.score ? "fill-green-600 text-green-600" : "fill-muted text-muted-foreground/20"}`}
+                      />
                     ))}
                     <span className="ml-0.5">{scored.score}/5</span>
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="border-amber-400/40 text-amber-600">Awaiting score</Badge>
+                  <Badge variant="outline" className="border-amber-400/40 text-amber-600">
+                    Awaiting score
+                  </Badge>
                 )}
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
@@ -435,7 +624,10 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
 
       {/* Detail sheet */}
       <Sheet open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
-        <SheetContent side="right" className="h-screen w-screen max-w-none overflow-hidden p-0 sm:max-w-none">
+        <SheetContent
+          side="right"
+          className="h-screen w-screen max-w-none overflow-hidden p-0 sm:max-w-none"
+        >
           {detail && (
             <JudgeNominationDetail
               nom={detail}
@@ -495,8 +687,14 @@ function JudgeNominationDetail({
       for (let idx = 0; idx < (q.evidence?.length ?? 0); idx++) {
         const slotFiles = nom.uploads?.[q.id]?.[`e${idx}`] ?? [];
         for (const file of slotFiles) {
-          const kind = getPreviewKind(file.name, file.url);
-          if (kind) files.push({ questionId: q.id, evidenceLabel: q.evidence?.[idx] ?? "Evidence", file, kind });
+          const kind = getPreviewKind(file.name, file.url, file.previewPdfUrl);
+          if (kind)
+            files.push({
+              questionId: q.id,
+              evidenceLabel: q.evidence?.[idx] ?? "Evidence",
+              file,
+              kind,
+            });
         }
       }
     }
@@ -507,29 +705,67 @@ function JudgeNominationDetail({
   const [previewZoom, setPreviewZoom] = useState(110);
   const [previewPage, setPreviewPage] = useState(1);
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
+  const [officePreviewError, setOfficePreviewError] = useState(false);
 
   useEffect(() => {
-    if (evidenceFiles.length === 0) { setPreviewPath(null); setMobilePreviewOpen(false); return; }
+    if (evidenceFiles.length === 0) {
+      setPreviewPath(null);
+      setMobilePreviewOpen(false);
+      return;
+    }
     const exists = evidenceFiles.some(({ file }) => file.path === previewPath);
-    if (!exists) { setPreviewPath(evidenceFiles[0].file.path); setPreviewPage(1); setPreviewZoom(110); }
+    if (!exists) {
+      setPreviewPath(evidenceFiles[0].file.path);
+      setPreviewPage(1);
+      setPreviewZoom(110);
+    }
   }, [evidenceFiles, previewPath]);
 
   useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) { if (e.key === "Escape") setMobilePreviewOpen(false); }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMobilePreviewOpen(false);
+    }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const activePreview = useMemo(() => evidenceFiles.find(({ file }) => file.path === previewPath) ?? null, [evidenceFiles, previewPath]);
-  const activePreviewIndex = useMemo(() => (activePreview ? evidenceFiles.findIndex(({ file }) => file.path === activePreview.file.path) : -1), [activePreview, evidenceFiles]);
+  const activePreview = useMemo(
+    () => evidenceFiles.find(({ file }) => file.path === previewPath) ?? null,
+    [evidenceFiles, previewPath],
+  );
+  const activePreviewIndex = useMemo(
+    () =>
+      activePreview
+        ? evidenceFiles.findIndex(({ file }) => file.path === activePreview.file.path)
+        : -1,
+    [activePreview, evidenceFiles],
+  );
+  const canEmbedOfficePreview = !!(
+    activePreview &&
+    activePreview.kind === "office" &&
+    isOfficeEmbeddableUrl(activePreview.file.url)
+  );
+  const shouldEmbedOffice =
+    !!activePreview &&
+    activePreview.kind === "office" &&
+    canEmbedOfficePreview &&
+    !officePreviewError;
   const activePreviewUrl = activePreview
     ? activePreview.kind === "pdf"
-      ? `${activePreview.file.url}#page=${previewPage}&zoom=${previewZoom}`
-      : `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(activePreview.file.url)}`
+      ? `${activePreview.file.previewPdfUrl ?? activePreview.file.url}#page=${previewPage}&zoom=${previewZoom}`
+      : shouldEmbedOffice
+        ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(activePreview.file.url)}`
+        : activePreview.file.url
     : "";
 
+  useEffect(() => {
+    setOfficePreviewError(false);
+  }, [previewPath]);
+
   function openPreview(path: string) {
-    setPreviewPath(path); setPreviewPage(1); setPreviewZoom(110);
+    setPreviewPath(path);
+    setPreviewPage(1);
+    setPreviewZoom(110);
     if (typeof window !== "undefined" && window.innerWidth < 1024) setMobilePreviewOpen(true);
   }
 
@@ -537,12 +773,17 @@ function JudgeNominationDetail({
     if (activePreviewIndex < 0) return;
     const next = activePreviewIndex + offset;
     if (next < 0 || next >= evidenceFiles.length) return;
-    setPreviewPath(evidenceFiles[next].file.path); setPreviewPage(1); setPreviewZoom(110);
+    setPreviewPath(evidenceFiles[next].file.path);
+    setPreviewPage(1);
+    setPreviewZoom(110);
   }
 
   function formatDate(ts: Nomination["createdAt"]) {
     if (!ts) return "—";
-    if (typeof ts === "object" && ts.toDate) return ts.toDate().toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" });
+    if (typeof ts === "object" && ts.toDate)
+      return ts
+        .toDate()
+        .toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" });
     return String(ts);
   }
 
@@ -551,11 +792,18 @@ function JudgeNominationDetail({
       {/* Desktop document preview pane (left) */}
       <aside className="hidden h-full flex-1 border-r border-primary/15 bg-muted/20 lg:flex lg:min-w-[56vw] lg:flex-col xl:min-w-[60vw]">
         <div className="border-b border-primary/15 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary">Document Preview</p>
-          <p className="text-[11px] text-muted-foreground">Preview PDFs and Office files in-app with keyboard-friendly controls.</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+            Document Preview
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Preview PDFs and Office files in-app with keyboard-friendly controls.
+          </p>
         </div>
         <div className="border-b border-primary/10 px-4 py-3">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="judge-preview-selector">
+          <label
+            className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+            htmlFor="judge-preview-selector"
+          >
             Select document
           </label>
           <select
@@ -578,38 +826,156 @@ function JudgeNominationDetail({
           </select>
           {activePreview && (
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Current selection: <span className="font-medium text-foreground">{activePreview.evidenceLabel}</span>
+              Current selection:{" "}
+              <span className="font-medium text-foreground">{activePreview.evidenceLabel}</span>
             </p>
           )}
         </div>
         <div className="flex items-center justify-between gap-2 border-b border-primary/10 px-3 py-2">
           <div className="flex items-center gap-1">
-            <Button type="button" variant="outline" size="sm" onClick={() => goToFile(-1)} disabled={activePreviewIndex <= 0} aria-label="Previous file"><ChevronLeft className="h-4 w-4" /></Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => goToFile(1)} disabled={activePreviewIndex < 0 || activePreviewIndex >= evidenceFiles.length - 1} aria-label="Next file"><ChevronRight className="h-4 w-4" /></Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => setPreviewPage((p) => Math.max(1, p - 1))} disabled={!activePreview || activePreview.kind !== "pdf" || previewPage <= 1} aria-label="Previous page">Page -</Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => setPreviewPage((p) => p + 1)} disabled={!activePreview || activePreview.kind !== "pdf"} aria-label="Next page">Page +</Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => goToFile(-1)}
+              disabled={activePreviewIndex <= 0}
+              aria-label="Previous file"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => goToFile(1)}
+              disabled={activePreviewIndex < 0 || activePreviewIndex >= evidenceFiles.length - 1}
+              aria-label="Next file"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewPage((p) => Math.max(1, p - 1))}
+              disabled={!activePreview || activePreview.kind !== "pdf" || previewPage <= 1}
+              aria-label="Previous page"
+            >
+              Page -
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewPage((p) => p + 1)}
+              disabled={!activePreview || activePreview.kind !== "pdf"}
+              aria-label="Next page"
+            >
+              Page +
+            </Button>
           </div>
           <div className="flex items-center gap-1">
-            <Button type="button" variant="outline" size="sm" onClick={() => setPreviewZoom((z) => Math.max(60, z - 10))} disabled={!activePreview} aria-label="Zoom out"><ZoomOut className="h-4 w-4" /></Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => setPreviewZoom((z) => Math.min(220, z + 10))} disabled={!activePreview} aria-label="Zoom in"><ZoomIn className="h-4 w-4" /></Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => { setPreviewZoom(110); setPreviewPage(1); }} disabled={!activePreview} aria-label="Reset view"><RotateCcw className="h-4 w-4" /></Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => setPreviewPath(null)} disabled={!activePreview} aria-label="Close preview"><XIcon className="h-4 w-4" /></Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewZoom((z) => Math.max(60, z - 10))}
+              disabled={!activePreview}
+              aria-label="Zoom out"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewZoom((z) => Math.min(220, z + 10))}
+              disabled={!activePreview}
+              aria-label="Zoom in"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPreviewZoom(110);
+                setPreviewPage(1);
+              }}
+              disabled={!activePreview}
+              aria-label="Reset view"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewPath(null)}
+              disabled={!activePreview}
+              aria-label="Close preview"
+            >
+              <XIcon className="h-4 w-4" />
+            </Button>
           </div>
         </div>
         <div className="flex items-center justify-between px-4 py-2 text-[11px] text-muted-foreground">
           <span>{activePreview ? activePreview.file.name : "No document selected"}</span>
           {activePreview && (
-            <span>{activePreview.kind.toUpperCase()} {activePreviewIndex + 1} / {evidenceFiles.length}{activePreview.kind === "pdf" ? ` · Page ${previewPage}` : ""}</span>
+            <span>
+              {activePreview.kind.toUpperCase()} {activePreviewIndex + 1} / {evidenceFiles.length}
+              {activePreview.kind === "pdf" ? ` · Page ${previewPage}` : ""}
+            </span>
           )}
         </div>
         <div className="min-h-0 flex-1 px-3 pb-3">
           {activePreview ? (
-            <iframe
-              key={activePreview.file.path}
-              src={activePreviewUrl}
-              title={`Document preview for ${activePreview.file.name}`}
-              className="h-full w-full rounded-lg border border-primary/20 bg-white"
-            />
+            activePreview.kind === "office" && !shouldEmbedOffice ? (
+              <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
+                <div className="max-w-sm space-y-3">
+                  <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
+                  <p className="text-xs text-amber-800">
+                    This Office file cannot be embedded in the in-app viewer. Open or download the
+                    file instead.
+                  </p>
+                  <div className="flex items-center justify-center gap-2">
+                    <a href={activePreview.file.url} target="_blank" rel="noopener noreferrer">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-3 text-xs"
+                      >
+                        <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
+                      </Button>
+                    </a>
+                    <a href={activePreview.file.url} download>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-3 text-xs"
+                      >
+                        <Download className="mr-1 h-3.5 w-3.5" /> Download
+                      </Button>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <iframe
+                key={activePreview.file.path}
+                src={activePreviewUrl}
+                title={`Document preview for ${activePreview.file.name}`}
+                className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                onError={() => {
+                  if (activePreview.kind === "office") {
+                    setOfficePreviewError(true);
+                  }
+                }}
+              />
+            )
           ) : (
             <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center text-xs text-muted-foreground">
               Select a previewable file from the evidence list to preview it here.
@@ -624,9 +990,13 @@ function JudgeNominationDetail({
         <div className="border-b border-primary/15 bg-white px-6 py-5">
           <SheetHeader>
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="border-primary/30 text-primary text-xs">{nom.categoryName ?? nom.categoryId}</Badge>
+              <Badge variant="outline" className="border-primary/30 text-primary text-xs">
+                {nom.categoryName ?? nom.categoryId}
+              </Badge>
               {evidenceFiles.length > 0 && (
-                <Badge variant="outline" className="text-xs">{evidenceFiles.length} previewable file{evidenceFiles.length !== 1 ? "s" : ""}</Badge>
+                <Badge variant="outline" className="text-xs">
+                  {evidenceFiles.length} previewable file{evidenceFiles.length !== 1 ? "s" : ""}
+                </Badge>
               )}
             </div>
             <SheetTitle className="font-serif text-2xl text-left">{nom.nomineeName}</SheetTitle>
@@ -645,7 +1015,10 @@ function JudgeNominationDetail({
               >
                 <Eye className="mr-1.5 h-4 w-4" /> Preview File
               </Button>
-              <p className="text-xs text-muted-foreground">{evidenceFiles.length} previewable file{evidenceFiles.length !== 1 ? "s" : ""} available.</p>
+              <p className="text-xs text-muted-foreground">
+                {evidenceFiles.length} previewable file{evidenceFiles.length !== 1 ? "s" : ""}{" "}
+                available.
+              </p>
             </div>
           )}
         </div>
@@ -669,58 +1042,108 @@ function JudgeNominationDetail({
 
           {/* Nominator */}
           <div className="space-y-0.5 rounded-xl border border-primary/15 bg-gray-50 p-4 text-sm">
-            <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Nominated by</p>
+            <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+              Nominated by
+            </p>
             <p className="font-semibold">{nom.nominatorName}</p>
             <p className="text-muted-foreground">{nom.nominatorEmail}</p>
-            {nom.nominatorRelationship && <p className="text-muted-foreground">{nom.nominatorRelationship}</p>}
+            {nom.nominatorRelationship && (
+              <p className="text-muted-foreground">{nom.nominatorRelationship}</p>
+            )}
           </div>
 
           {/* Answers + evidence */}
           {nom.answers && Object.keys(nom.answers).length > 0 && (
             <div>
-              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-primary">Answers &amp; Evidence</p>
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-primary">
+                Answers &amp; Evidence
+              </p>
               <div className="space-y-4">
                 {catData
                   ? catData.questions.map((q) =>
                       nom.answers[q.id] || nom.uploads?.[q.id] ? (
-                        <div key={q.id} className="rounded-xl border border-primary/10 bg-white p-4 shadow-sm">
-                          <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">{q.section}</p>
+                        <div
+                          key={q.id}
+                          className="rounded-xl border border-primary/10 bg-white p-4 shadow-sm"
+                        >
+                          <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                            {q.section}
+                          </p>
                           <p className="mb-2 text-xs italic text-muted-foreground">{q.prompt}</p>
-                          {nom.answers[q.id] && <p className="whitespace-pre-wrap text-sm leading-relaxed">{nom.answers[q.id]}</p>}
+                          {nom.answers[q.id] && (
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                              {nom.answers[q.id]}
+                            </p>
+                          )}
                           {q.evidence?.map((label, idx) => {
                             const slotFiles = nom.uploads?.[q.id]?.[`e${idx}`] ?? [];
                             if (!slotFiles.length) return null;
                             return (
                               <div key={idx} className="mt-3">
-                                <p className="mb-1 text-[10px] font-medium text-muted-foreground">{label}</p>
+                                <p className="mb-1 text-[10px] font-medium text-muted-foreground">
+                                  {label}
+                                </p>
                                 {slotFiles.map((file) => {
-                                  const kind = getPreviewKind(file.name, file.url);
+                                  const kind = getPreviewKind(
+                                    file.name,
+                                    file.url,
+                                    file.previewPdfUrl,
+                                  );
                                   return (
-                                    <div key={file.path} className="flex flex-wrap items-center gap-2 py-1">
+                                    <div
+                                      key={file.path}
+                                      className="flex flex-wrap items-center gap-2 py-1"
+                                    >
                                       <button
                                         type="button"
-                                        onClick={() => kind ? openPreview(file.path) : window.open(file.url, "_blank", "noopener,noreferrer")}
+                                        onClick={() =>
+                                          kind
+                                            ? openPreview(file.path)
+                                            : window.open(file.url, "_blank", "noopener,noreferrer")
+                                        }
                                         className="inline-flex min-w-0 items-center gap-1.5 text-left text-xs text-primary hover:underline"
-                                        aria-label={kind ? `Preview ${file.name}` : `Open ${file.name}`}
+                                        aria-label={
+                                          kind ? `Preview ${file.name}` : `Open ${file.name}`
+                                        }
                                       >
                                         <FileText className="h-3 w-3 shrink-0" />
                                         <span className="truncate">{file.name}</span>
                                         <span className="ml-1 text-[10px] text-muted-foreground">
-                                          ({file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`})
+                                          (
+                                          {file.size < 1024 * 1024
+                                            ? `${(file.size / 1024).toFixed(0)} KB`
+                                            : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
+                                          )
                                         </span>
                                       </button>
                                       {kind && (
-                                        <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => openPreview(file.path)}>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 px-2 text-[11px]"
+                                          onClick={() => openPreview(file.path)}
+                                        >
                                           <Eye className="mr-1 h-3.5 w-3.5" /> Preview
                                         </Button>
                                       )}
                                       <a href={file.url} download>
-                                        <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-[11px]">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-7 px-2 text-[11px]"
+                                        >
                                           <Download className="mr-1 h-3.5 w-3.5" /> Download
                                         </Button>
                                       </a>
                                       <a href={file.url} target="_blank" rel="noopener noreferrer">
-                                        <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-[11px]">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-7 px-2 text-[11px]"
+                                        >
                                           <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
                                         </Button>
                                       </a>
@@ -731,10 +1154,13 @@ function JudgeNominationDetail({
                             );
                           })}
                         </div>
-                      ) : null
+                      ) : null,
                     )
                   : Object.entries(nom.answers).map(([k, v]) => (
-                      <div key={k} className="rounded-xl border border-primary/10 bg-white p-4 shadow-sm">
+                      <div
+                        key={k}
+                        className="rounded-xl border border-primary/10 bg-white p-4 shadow-sm"
+                      >
                         <p className="mb-1 text-xs font-semibold text-muted-foreground">{k}</p>
                         <p className="whitespace-pre-wrap text-sm leading-relaxed">{v}</p>
                       </div>
@@ -749,50 +1175,202 @@ function JudgeNominationDetail({
               <MessageSquare className="h-4 w-4 text-primary" /> Your Evaluation
             </p>
             {!scoringOpen && (
-              <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${scoringStatus === "before" ? "border border-amber-200 bg-amber-50 text-amber-700" : "border border-red-200 bg-red-50 text-red-700"}`}>
-                {scoringStatus === "before" ? <Clock className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-                {scoringStatus === "before" ? `Scoring opens ${OPEN_DATE.toLocaleDateString("en-ZA")}` : "Scoring period has closed — no edits allowed"}
+              <div
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${scoringStatus === "before" ? "border border-amber-200 bg-amber-50 text-amber-700" : "border border-red-200 bg-red-50 text-red-700"}`}
+              >
+                {scoringStatus === "before" ? (
+                  <Clock className="h-4 w-4" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4" />
+                )}
+                {scoringStatus === "before"
+                  ? `Scoring opens ${OPEN_DATE.toLocaleDateString("en-ZA")}`
+                  : "Scoring period has closed — no edits allowed"}
               </div>
             )}
             <div>
-              <Label className="mb-3 block text-xs uppercase tracking-wider text-muted-foreground">Star Rating (0 – 5)</Label>
+              <Label className="mb-3 block text-xs uppercase tracking-wider text-muted-foreground">
+                Star Rating (0 – 5)
+              </Label>
               <StarPicker value={scoreInput} onChange={setScoreInput} disabled={!scoringOpen} />
             </div>
             <div>
-              <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">Comments &amp; justification</Label>
-              <Textarea value={commentInput} onChange={(e) => setCommentInput(e.target.value)} placeholder="Provide your evaluation reasoning. This will be visible to admin." rows={5} disabled={!scoringOpen} />
+              <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">
+                Comments &amp; justification
+              </Label>
+              <Textarea
+                value={commentInput}
+                onChange={(e) => setCommentInput(e.target.value)}
+                placeholder="Provide your evaluation reasoning. This will be visible to admin."
+                rows={5}
+                disabled={!scoringOpen}
+              />
             </div>
-            <Button onClick={onSave} disabled={saving || !scoringOpen || scoreInput === 0} className="w-full bg-gold text-primary-foreground disabled:opacity-50">
-              {saving ? "Saving…" : <><CheckCircle2 className="mr-2 h-4 w-4" />{hasScore ? "Update score" : "Submit score"}</>}
+            <Button
+              onClick={onSave}
+              disabled={saving || !scoringOpen || scoreInput === 0}
+              className="w-full bg-gold text-primary-foreground disabled:opacity-50"
+            >
+              {saving ? (
+                "Saving…"
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  {hasScore ? "Update score" : "Submit score"}
+                </>
+              )}
             </Button>
-            {scoreInput === 0 && scoringOpen && <p className="text-center text-xs text-amber-600">Select at least 1 star to submit.</p>}
-            {hasScore && <p className="text-center text-xs text-muted-foreground">Score recorded — admin can see your submission and timestamp.</p>}
+            {scoreInput === 0 && scoringOpen && (
+              <p className="text-center text-xs text-amber-600">
+                Select at least 1 star to submit.
+              </p>
+            )}
+            {hasScore && (
+              <p className="text-center text-xs text-muted-foreground">
+                Score recorded — admin can see your submission and timestamp.
+              </p>
+            )}
           </div>
         </div>
 
         {/* Mobile preview overlay */}
         {mobilePreviewOpen && activePreview && (
-          <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm lg:hidden" role="dialog" aria-modal="true" aria-label="Document Preview">
+          <div
+            className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm lg:hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Document Preview"
+          >
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between gap-2 border-b border-primary/15 px-4 py-3">
-                <p className="truncate text-xs font-semibold uppercase tracking-wider text-primary">{activePreview.file.name}</p>
-                <Button type="button" size="sm" variant="outline" onClick={() => setMobilePreviewOpen(false)} aria-label="Close document preview"><XIcon className="h-4 w-4" /></Button>
+                <p className="truncate text-xs font-semibold uppercase tracking-wider text-primary">
+                  {activePreview.file.name}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setMobilePreviewOpen(false)}
+                  aria-label="Close document preview"
+                >
+                  <XIcon className="h-4 w-4" />
+                </Button>
               </div>
               <div className="flex items-center justify-between gap-2 border-b border-primary/10 px-3 py-2">
                 <div className="flex items-center gap-1">
-                  <Button type="button" variant="outline" size="sm" onClick={() => goToFile(-1)} disabled={activePreviewIndex <= 0}><ChevronLeft className="h-4 w-4" /></Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => goToFile(1)} disabled={activePreviewIndex >= evidenceFiles.length - 1}><ChevronRight className="h-4 w-4" /></Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setPreviewPage((p) => Math.max(1, p - 1))} disabled={activePreview.kind !== "pdf" || previewPage <= 1}>Page -</Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setPreviewPage((p) => p + 1)} disabled={activePreview.kind !== "pdf"}>Page +</Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToFile(-1)}
+                    disabled={activePreviewIndex <= 0}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToFile(1)}
+                    disabled={activePreviewIndex >= evidenceFiles.length - 1}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPreviewPage((p) => Math.max(1, p - 1))}
+                    disabled={activePreview.kind !== "pdf" || previewPage <= 1}
+                  >
+                    Page -
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPreviewPage((p) => p + 1)}
+                    disabled={activePreview.kind !== "pdf"}
+                  >
+                    Page +
+                  </Button>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setPreviewZoom((z) => Math.max(60, z - 10))}><ZoomOut className="h-4 w-4" /></Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setPreviewZoom((z) => Math.min(220, z + 10))}><ZoomIn className="h-4 w-4" /></Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => { setPreviewZoom(110); setPreviewPage(1); }}><RotateCcw className="h-4 w-4" /></Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPreviewZoom((z) => Math.max(60, z - 10))}
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPreviewZoom((z) => Math.min(220, z + 10))}
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setPreviewZoom(110);
+                      setPreviewPage(1);
+                    }}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
               <div className="min-h-0 flex-1 p-2">
-                <iframe key={activePreview.file.path} src={activePreviewUrl} title={`Preview: ${activePreview.file.name}`} className="h-full w-full rounded-lg border border-primary/20 bg-white" />
+                {activePreview.kind === "office" && !shouldEmbedOffice ? (
+                  <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
+                    <div className="max-w-sm space-y-3">
+                      <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
+                      <p className="text-xs text-amber-800">
+                        This Office file cannot be embedded in the in-app viewer. Open or download
+                        the file instead.
+                      </p>
+                      <div className="flex items-center justify-center gap-2">
+                        <a href={activePreview.file.url} target="_blank" rel="noopener noreferrer">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-3 text-xs"
+                          >
+                            <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
+                          </Button>
+                        </a>
+                        <a href={activePreview.file.url} download>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-3 text-xs"
+                          >
+                            <Download className="mr-1 h-3.5 w-3.5" /> Download
+                          </Button>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <iframe
+                    key={activePreview.file.path}
+                    src={activePreviewUrl}
+                    title={`Preview: ${activePreview.file.name}`}
+                    className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                    onError={() => {
+                      if (activePreview.kind === "office") {
+                        setOfficePreviewError(true);
+                      }
+                    }}
+                  />
+                )}
               </div>
             </div>
           </div>
