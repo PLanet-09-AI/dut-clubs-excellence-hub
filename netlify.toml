@@ -5,6 +5,16 @@
 [build.environment]
   NODE_VERSION = "20"
 
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Route /api/office-to-pdf → Netlify function (must come before the catch-all)
+[[redirects]]
+  from = "/api/office-to-pdf"
+  to = "/.netlify/functions/office-to-pdf"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
