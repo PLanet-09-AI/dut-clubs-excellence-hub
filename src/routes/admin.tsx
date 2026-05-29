@@ -49,10 +49,29 @@ type Nomination = {
 
 type PreviewKind = "pdf" | "office";
 
+function hasFileExtension(value: string, extensionPattern: RegExp): boolean {
+  if (!value) return false;
+
+  const normalized = (() => {
+    try {
+      const parsed = new URL(value);
+      return decodeURIComponent(parsed.pathname);
+    } catch {
+      return decodeURIComponent(value);
+    }
+  })();
+
+  return extensionPattern.test(normalized);
+}
+
 function getPreviewKind(fileName: string, fileUrl: string): PreviewKind | null {
-  const target = `${fileName} ${fileUrl}`;
-  if (/\.pdf($|\?)/i.test(target)) return "pdf";
-  if (/\.(doc|docx|ppt|pptx|pps|ppsx|xls|xlsx)($|\?)/i.test(target)) return "office";
+  if (hasFileExtension(fileName, /\.pdf$/i) || hasFileExtension(fileUrl, /\.pdf$/i)) return "pdf";
+  if (
+    hasFileExtension(fileName, /\.(doc|docx|ppt|pptx|pps|ppsx|xls|xlsx)$/i) ||
+    hasFileExtension(fileUrl, /\.(doc|docx|ppt|pptx|pps|ppsx|xls|xlsx)$/i)
+  ) {
+    return "office";
+  }
   return null;
 }
 

@@ -20,8 +20,7 @@ export const AWARD_THEME = {
   title: "SALEA 2026",
   subtitle: "Recognising Excellence · Celebrating Leadership · Inspiring Greatness",
   eventName: "Student Academic & Leadership Excellence Awards",
-  recognitionPeriod: "1 July 2025 – 30 June 2025",
-  nominationWindow: "01 July till 31 July 2026",
+  recognitionPeriod: "1 January 2025 – 30 April 2026",
   closingDate: "31 July 2026",
   /** ISO date strings for judge scoring window */
   scoringOpenDate: "2026-08-01", // day after nominations close
