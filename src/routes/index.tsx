@@ -372,7 +372,7 @@ function InfoChip({ icon: Icon, title, value }: { icon: typeof Award; title: str
         <Icon className="h-5 w-5 text-primary-foreground" />
       </div>
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/70">{title}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-black">{title}</p>
         <p className="mt-0.5 truncate font-semibold text-foreground">{value}</p>
       </div>
     </div>
