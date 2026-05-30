@@ -53,7 +53,31 @@ type InProgressUpload = {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ACCEPTED = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*";
+const ACCEPTED = [
+  // PDF
+  "application/pdf",
+  ".pdf",
+  // Word
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".doc",
+  ".docx",
+  // Excel
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".xls",
+  ".xlsx",
+  // PowerPoint
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+  ".ppt",
+  ".pptx",
+  ".pps",
+  ".ppsx",
+  // Images
+  "image/*",
+].join(",");
 const MAX_MB = 10;
 const MAX_BYTES = MAX_MB * 1024 * 1024;
 const OFFICE_FILE_PATTERN = /\.(doc|docx|ppt|pptx|pps|ppsx|xls|xlsx)$/i;
