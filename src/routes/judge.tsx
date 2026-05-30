@@ -491,7 +491,7 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
                 year: "numeric",
               })}
             </strong>
-            . Nominations close 31 July 2026 — check back then.
+            . Nominations close 31 July 2026 (nomination window: 01 July 2026 - 31 July 2026) - check back then.
           </span>
         </div>
       )}
