@@ -706,6 +706,9 @@ function JudgeNominationDetail({
   const [previewPage, setPreviewPage] = useState(1);
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
   const [officePreviewError, setOfficePreviewError] = useState(false);
+  const [runtimePreviewPdfUrls, setRuntimePreviewPdfUrls] = useState<Record<string, string>>({});
+  const [runtimeConvertingPath, setRuntimeConvertingPath] = useState<string | null>(null);
+  const [runtimeConversionError, setRuntimeConversionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (evidenceFiles.length === 0) {
@@ -729,6 +732,14 @@ function JudgeNominationDetail({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      Object.values(runtimePreviewPdfUrls).forEach((blobUrl) => {
+        URL.revokeObjectURL(blobUrl);
+      });
+    };
+  }, [runtimePreviewPdfUrls]);
+
   const activePreview = useMemo(
     () => evidenceFiles.find(({ file }) => file.path === previewPath) ?? null,
     [evidenceFiles, previewPath],
@@ -740,19 +751,35 @@ function JudgeNominationDetail({
         : -1,
     [activePreview, evidenceFiles],
   );
+
+  const activeRuntimePdfUrl =
+    activePreview && activePreview.file.path
+      ? runtimePreviewPdfUrls[activePreview.file.path]
+      : undefined;
+
+  const activePdfUrl = activePreview?.file.previewPdfUrl ?? activeRuntimePdfUrl;
+
+  const resolvedKind: "pdf" | "office" | null =
+    activePreview && activePreview.kind === "office" && activePdfUrl
+      ? "pdf"
+      : activePreview?.kind ?? null;
+
   const canEmbedOfficePreview = !!(
     activePreview &&
     activePreview.kind === "office" &&
+    !activePdfUrl &&
     isOfficeEmbeddableUrl(activePreview.file.url)
   );
+
   const shouldEmbedOffice =
     !!activePreview &&
     activePreview.kind === "office" &&
+    !activePdfUrl &&
     canEmbedOfficePreview &&
     !officePreviewError;
   const activePreviewUrl = activePreview
-    ? activePreview.kind === "pdf"
-      ? `${activePreview.file.previewPdfUrl ?? activePreview.file.url}#page=${previewPage}&zoom=${previewZoom}`
+    ? resolvedKind === "pdf"
+      ? `${activePdfUrl ?? activePreview.file.url}#page=${previewPage}&zoom=${previewZoom}`
       : shouldEmbedOffice
         ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(activePreview.file.url)}`
         : activePreview.file.url
@@ -761,6 +788,68 @@ function JudgeNominationDetail({
   useEffect(() => {
     setOfficePreviewError(false);
   }, [previewPath]);
+
+  useEffect(() => {
+    const target = activePreview?.file;
+    const kind = activePreview?.kind;
+
+    if (!target || kind !== "office") {
+      setRuntimeConvertingPath(null);
+      setRuntimeConversionError(null);
+      return;
+    }
+
+    if (target.previewPdfUrl || runtimePreviewPdfUrls[target.path]) {
+      setRuntimeConvertingPath(null);
+      setRuntimeConversionError(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setRuntimeConvertingPath(target.path);
+        setRuntimeConversionError(null);
+
+        const response = await fetch("/api/office-to-pdf", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sourceUrl: target.url, fileName: target.name }),
+        });
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => "");
+          throw new Error(text || "Conversion failed");
+        }
+
+        const pdfBlob = await response.blob();
+        if (cancelled) return;
+
+        const objectUrl = URL.createObjectURL(pdfBlob);
+        setRuntimePreviewPdfUrls((prev) => {
+          const existing = prev[target.path];
+          if (existing) URL.revokeObjectURL(existing);
+          return { ...prev, [target.path]: objectUrl };
+        });
+      } catch (err) {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : "Failed to convert Office file";
+          setRuntimeConversionError(message);
+        }
+      } finally {
+        if (!cancelled) {
+          setRuntimeConvertingPath((current) =>
+            current === target.path ? null : current,
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activePreview?.file, activePreview?.kind, runtimePreviewPdfUrls]);
 
   function openPreview(path: string) {
     setPreviewPath(path);
@@ -925,19 +1014,29 @@ function JudgeNominationDetail({
           {activePreview && (
             <span>
               {activePreview.kind.toUpperCase()} {activePreviewIndex + 1} / {evidenceFiles.length}
-              {activePreview.kind === "pdf" ? ` · Page ${previewPage}` : ""}
+              {resolvedKind === "pdf" ? ` · Page ${previewPage}` : ""}
             </span>
           )}
         </div>
         <div className="min-h-0 flex-1 px-3 pb-3">
           {activePreview ? (
-            activePreview.kind === "office" && !shouldEmbedOffice ? (
+            runtimeConvertingPath === activePreview.file.path ? (
+              <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
+                <div className="max-w-sm space-y-2">
+                  <p className="text-sm font-semibold text-foreground">Converting document…</p>
+                  <p className="text-xs text-muted-foreground">
+                    Preparing a PDF preview for this Office file. This can take a few seconds.
+                  </p>
+                </div>
+              </div>
+            ) : activePreview.kind === "office" && !shouldEmbedOffice && !activePdfUrl ? (
               <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
                 <div className="max-w-sm space-y-3">
                   <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
                   <p className="text-xs text-amber-800">
-                    This Office file cannot be embedded in the in-app viewer. Open or download the
-                    file instead.
+                    {runtimeConversionError
+                      ? "Automatic conversion failed and this Office file cannot be embedded here. Open or download the file instead."
+                      : "This Office file cannot be embedded in the in-app viewer. Open or download the file instead."}
                   </p>
                   <div className="flex items-center justify-center gap-2">
                     <a href={activePreview.file.url} target="_blank" rel="noopener noreferrer">
@@ -1326,36 +1425,13 @@ function JudgeNominationDetail({
                 </div>
               </div>
               <div className="min-h-0 flex-1 p-2">
-                {activePreview.kind === "office" && !shouldEmbedOffice ? (
-                  <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
-                    <div className="max-w-sm space-y-3">
-                      <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
-                      <p className="text-xs text-amber-800">
-                        This Office file cannot be embedded in the in-app viewer. Open or download
-                        the file instead.
+                {runtimeConvertingPath === activePreview.file.path ? (
+                  <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
+                    <div className="max-w-sm space-y-2">
+                      <p className="text-sm font-semibold text-foreground">Converting document…</p>
+                      <p className="text-xs text-muted-foreground">
+                        Preparing a PDF preview for this Office file. This can take a few seconds.
                       </p>
-                      <div className="flex items-center justify-center gap-2">
-                        <a href={activePreview.file.url} target="_blank" rel="noopener noreferrer">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-3 text-xs"
-                          >
-                            <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
-                          </Button>
-                        </a>
-                        <a href={activePreview.file.url} download>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-3 text-xs"
-                          >
-                            <Download className="mr-1 h-3.5 w-3.5" /> Download
-                          </Button>
-                        </a>
-                      </div>
                     </div>
                   </div>
                 ) : (
@@ -1365,7 +1441,7 @@ function JudgeNominationDetail({
                     title={`Preview: ${activePreview.file.name}`}
                     className="h-full w-full rounded-lg border border-primary/20 bg-white"
                     onError={() => {
-                      if (activePreview.kind === "office") {
+                      if (resolvedKind === "office") {
                         setOfficePreviewError(true);
                       }
                     }}
