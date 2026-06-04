@@ -8,6 +8,9 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  # Increase timeout and memory for Chromium PDF rendering
+  timeout = 60
+  memory = 3008
 
 # Route /api/office-to-pdf → Netlify function (must come before the catch-all)
 [[redirects]]

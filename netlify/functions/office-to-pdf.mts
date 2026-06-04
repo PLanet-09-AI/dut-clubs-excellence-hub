@@ -197,31 +197,53 @@ async function htmlToPdf(bodyHtml: string, documentTitle: string): Promise<Buffe
 <body>${bodyHtml}</body>
 </html>`;
 
-  const executablePath = await chromium.executablePath();
-  const browser = await puppeteer.launch({
-    args: chromium.args,
-    defaultViewport: chromium.defaultViewport,
-    executablePath,
-    headless: chromium.headless,
-  });
-
   try {
-    const page = await browser.newPage();
-    await page.setContent(fullPage, { waitUntil: "domcontentloaded" });
-    const pdfBytes = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "15mm", bottom: "15mm", left: "15mm", right: "15mm" },
+    console.log("[htmlToPdf] Getting Chromium executable path...");
+    const executablePath = await chromium.executablePath();
+    console.log(`[htmlToPdf] Executable path: ${executablePath}`);
+    
+    console.log("[htmlToPdf] Launching Chromium browser...");
+    const browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath,
+      headless: chromium.headless,
     });
-    return Buffer.from(pdfBytes);
-  } finally {
-    await browser.close();
+    console.log("[htmlToPdf] Browser launched successfully");
+
+    try {
+      console.log("[htmlToPdf] Creating new page...");
+      const page = await browser.newPage();
+      
+      console.log("[htmlToPdf] Setting page content...");
+      await page.setContent(fullPage, { waitUntil: "domcontentloaded" });
+      
+      console.log("[htmlToPdf] Rendering PDF...");
+      const pdfBytes = await page.pdf({
+        format: "A4",
+        printBackground: true,
+        margin: { top: "15mm", bottom: "15mm", left: "15mm", right: "15mm" },
+      });
+      
+      console.log(`[htmlToPdf] PDF rendered: ${pdfBytes.length} bytes`);
+      return Buffer.from(pdfBytes);
+    } finally {
+      console.log("[htmlToPdf] Closing browser...");
+      await browser.close();
+      console.log("[htmlToPdf] Browser closed");
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[htmlToPdf] Error: ${msg}`);
+    throw err;
   }
 }
 
 // ─── handler ─────────────────────────────────────────────────────────────────
 
 export const handler: Handler = async (event: HandlerEvent) => {
+  console.log(`[office-to-pdf] Incoming ${event.httpMethod} request`);
+  
   if (event.httpMethod !== "POST") {
     return jsonError("Method not allowed.", 405);
   }
@@ -252,20 +274,26 @@ export const handler: Handler = async (event: HandlerEvent) => {
   // Download source file from Firebase Storage
   let fileBuffer: Buffer;
   try {
+    console.log(`[office-to-pdf] Downloading file: ${fileName}`);
     const response = await fetch(sourceUrl);
     if (!response.ok) {
-      return jsonError(`Failed to download source file (HTTP ${response.status}).`, 502);
+      const msg = `Failed to download source file (HTTP ${response.status}).`;
+      console.error(`[office-to-pdf] ${msg}`);
+      return jsonError(msg, 502);
     }
     fileBuffer = Buffer.from(await response.arrayBuffer());
+    console.log(`[office-to-pdf] Downloaded ${fileBuffer.length} bytes`);
   } catch (err) {
-    console.error("[office-to-pdf] Download error:", err);
-    return jsonError("Failed to download source file.", 502);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[office-to-pdf] Download error: ${msg}`);
+    return jsonError(`Failed to download source file: ${msg}`, 502);
   }
 
   // Parse document to HTML
   const extension = ext(fileName);
   let bodyHtml: string;
   try {
+    console.log(`[office-to-pdf] Parsing .${extension} file`);
     if (extension === "docx" || extension === "doc") {
       bodyHtml = await docxToHtml(fileBuffer);
     } else if (extension === "pptx" || extension === "ppsx") {
@@ -274,22 +302,35 @@ export const handler: Handler = async (event: HandlerEvent) => {
       // xls / xlsx
       bodyHtml = xlsxToHtml(fileBuffer);
     }
+    console.log(`[office-to-pdf] Parsed HTML: ${bodyHtml.length} characters`);
   } catch (err) {
-    console.error("[office-to-pdf] Parse error:", err);
-    return jsonError("Failed to parse document. The file may be corrupt or password-protected.", 422);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[office-to-pdf] Parse error (.${extension}): ${msg}`);
+    return jsonError(`Failed to parse document. The file may be corrupt or password-protected: ${msg}`, 422);
   }
 
   // Render HTML to PDF
   let pdfBuffer: Buffer;
   try {
     const title = fileName.replace(/\.[^.]+$/, "");
+    console.log(`[office-to-pdf] Starting PDF render (title: ${title})`);
+    console.log(`[office-to-pdf] Memory before render: ${process.memoryUsage().heapUsed / 1024 / 1024} MB`);
+    
     pdfBuffer = await htmlToPdf(bodyHtml, title);
+    
+    console.log(`[office-to-pdf] PDF rendered: ${pdfBuffer.length} bytes`);
+    console.log(`[office-to-pdf] Memory after render: ${process.memoryUsage().heapUsed / 1024 / 1024} MB`);
   } catch (err) {
-    console.error("[office-to-pdf] PDF render error:", err);
-    return jsonError("Failed to render PDF from document.", 500);
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : "";
+    console.error(`[office-to-pdf] PDF render error: ${msg}`);
+    console.error(`[office-to-pdf] Stack: ${stack}`);
+    console.error(`[office-to-pdf] Memory at error: ${process.memoryUsage().heapUsed / 1024 / 1024} MB`);
+    return jsonError(`Failed to render PDF: ${msg}`, 500);
   }
 
   const baseName = fileName.replace(/\.[^.]+$/, "");
+  console.log(`[office-to-pdf] Success: returning ${pdfBuffer.length} bytes as PDF`);
   return {
     statusCode: 200,
     headers: {
