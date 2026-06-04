@@ -13,6 +13,8 @@
 [functions."office-to-pdf"]
   timeout = 60
   memory = 3008
+  # Load these large modules from node_modules at runtime instead of bundling
+  external_node_modules = ["@sparticuz/chromium", "puppeteer-core"]
 
 # Route /api/office-to-pdf → Netlify function (must come before the catch-all)
 [[redirects]]

@@ -63,7 +63,7 @@ function xlsxToHtml(buffer: Buffer): string {
   if (workbook.SheetNames.length === 0) {
     return "<p><em>No sheets found in workbook.</em></p>";
   }
-  return workbook.SheetNames.map((sheetName) => {
+  return workbook.SheetNames.map((sheetName: string) => {
     const sheet = workbook.Sheets[sheetName];
     const tableHtml = XLSX.utils.sheet_to_html(sheet, { id: sheetName });
     return `<h2 style="margin-top:24px;">${sheetName}</h2>${tableHtml}`;
@@ -199,16 +199,28 @@ async function htmlToPdf(bodyHtml: string, documentTitle: string): Promise<Buffe
 
   try {
     console.log("[htmlToPdf] Getting Chromium executable path...");
-    const executablePath = await chromium.executablePath();
-    console.log(`[htmlToPdf] Executable path: ${executablePath}`);
+    let executablePath: string | undefined;
+    try {
+      executablePath = await chromium.executablePath();
+    } catch (err) {
+      console.warn("[htmlToPdf] Failed to get chromium path:", err);
+    }
+    console.log(`[htmlToPdf] Executable path: ${executablePath || "(using system default)"}`);
     
     console.log("[htmlToPdf] Launching Chromium browser...");
-    const browser = await puppeteer.launch({
+    const launchOptions: any = {
       args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath,
-      headless: chromium.headless,
-    });
+      defaultViewport: null,
+      headless: true,
+    };
+    
+    // Only set executablePath if we have a valid path
+    if (executablePath) {
+      launchOptions.executablePath = executablePath;
+    }
+    
+    console.log("[htmlToPdf] Launch options prepared:", Object.keys(launchOptions).join(", "));
+    const browser = await puppeteer.launch(launchOptions);
     console.log("[htmlToPdf] Browser launched successfully");
 
     try {
