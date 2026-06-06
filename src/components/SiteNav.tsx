@@ -132,6 +132,30 @@ export default function SiteNav() {
                   </Link>
 
                   <Link 
+                    to="/guide" 
+                    className="flex items-center gap-4 px-4 py-4 rounded-xl transition hover:bg-primary/5 hover:text-primary group"
+                    activeProps={{ className: "bg-primary/10 text-primary" }}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      <BookOpen className="h-5 w-5" />
+                    </div>
+                    <span className="text-lg font-semibold">Guide</span>
+                  </Link>
+
+                  <Link 
+                    to="/demo" 
+                    className="flex items-center gap-4 px-4 py-4 rounded-xl transition hover:bg-primary/5 hover:text-primary group"
+                    activeProps={{ className: "bg-primary/10 text-primary" }}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      <Play className="h-5 w-5" />
+                    </div>
+                    <span className="text-lg font-semibold">Demo</span>
+                  </Link>
+
+                  <Link 
                     to="/admin" 
                     className="flex items-center gap-4 px-4 py-4 rounded-xl transition hover:bg-primary/5 hover:text-primary group"
                     activeProps={{ className: "bg-primary/10 text-primary" }}
