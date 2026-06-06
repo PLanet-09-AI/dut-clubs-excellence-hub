@@ -1,13 +1,27 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Trophy, Star, Clock, AlertTriangle, ChevronLeft, Medal } from "lucide-react";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import {
+  Trophy,
+  Star,
+  Clock,
+  AlertTriangle,
+  ChevronLeft,
+  Medal,
+  Lock,
+  Mail,
+  ChevronDown,
+} from "lucide-react";
+import { collection, onSnapshot, query, orderBy, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { AWARD_THEME, AWARD_CATEGORIES } from "@/data/awards";
+import { signIn, signOut as firebaseSignOut, subscribeToAuthState } from "@/lib/auth-firebase";
+import { AWARD_THEME, AWARD_CATEGORIES, EVALUATION_CRITERIA } from "@/data/awards";
 import SiteNav from "@/components/SiteNav";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // ─── Scoring window ───────────────────────────────────────────────────────────
 const OPEN_DATE = new Date(AWARD_THEME.scoringOpenDate);
@@ -28,7 +42,8 @@ type JudgeScoreDoc = {
   nomineeName: string;
   categoryName: string;
   categoryId?: string;
-  score: number; // 0-5
+  score: number; // 0-5 overall (weighted average of criteriaScores)
+  criteriaScores?: Record<string, number>;
   comment: string;
   updatedAt: { toDate?: () => Date } | null;
 };
@@ -41,6 +56,8 @@ type NomineeEntry = {
   scores: number[];
   avgScore: number;
   judgeCount: number;
+  /** criterion id → running sum + count for averaging */
+  criteriaTotals: Record<string, { sum: number; count: number }>;
 };
 
 // ─── Route ────────────────────────────────────────────────────────────────────
@@ -72,6 +89,54 @@ function Stars({ value, max = 5 }: { value: number; max?: number }) {
   );
 }
 
+// ─── Per-criterion breakdown (collapsible) ────────────────────────────────────
+function CriteriaBreakdown({
+  totals,
+}: {
+  totals: Record<string, { sum: number; count: number }>;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const rows = EVALUATION_CRITERIA.map((c) => {
+    const t = totals[c.id];
+    const avg = t && t.count > 0 ? t.sum / t.count : 0;
+    return { id: c.id, label: c.label, avg, count: t?.count ?? 0, max: c.max ?? 5 };
+  });
+
+  const hasAny = rows.some((r) => r.count > 0);
+  if (!hasAny) return null;
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+      >
+        <ChevronDown
+          className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+        {open ? "Hide" : "Show"} per-criterion ratings
+      </button>
+      {open && (
+        <div className="mt-2 space-y-1.5 rounded-lg border border-primary/10 bg-muted/30 p-3">
+          {rows.map((r) => (
+            <div key={r.id} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                {r.label}
+              </span>
+              <Stars value={(r.avg / r.max) * 5} />
+              <span className="w-16 text-right text-[11px] font-semibold text-foreground">
+                {r.count > 0 ? `${r.avg.toFixed(1)}/${r.max}` : "—"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Rank medal ───────────────────────────────────────────────────────────────
 function RankBadge({ rank }: { rank: number }) {
   if (rank === 1)
@@ -99,8 +164,136 @@ function RankBadge({ rank }: { rank: number }) {
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Page (auth gate: judges & admin only) ────────────────────────────────────
 function LeaderboardPage() {
+  const [checking, setChecking] = useState(true);
+  const [authed, setAuthed] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsub = subscribeToAuthState(async (user) => {
+      if (user) {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const data = snap.data();
+        if (data?.role === "judge" || data?.role === "admin") {
+          setRole(data.role as string);
+          setAuthed(true);
+        } else {
+          await firebaseSignOut();
+          setAuthed(false);
+          setRole(null);
+          setErr("Your account does not have access to the leaderboard.");
+        }
+      } else {
+        setAuthed(false);
+        setRole(null);
+      }
+      setChecking(false);
+    });
+    return unsub;
+  }, [navigate]);
+
+  async function handleSignIn(e: React.FormEvent) {
+    e.preventDefault();
+    setErr("");
+    setLoading(true);
+    try {
+      await signIn(email, password);
+    } catch (ex: unknown) {
+      const code = (ex as { code?: string }).code ?? "";
+      if (
+        code === "auth/invalid-credential" ||
+        code === "auth/wrong-password" ||
+        code === "auth/user-not-found"
+      ) {
+        setErr("Incorrect email or password.");
+      } else if (code === "auth/too-many-requests") {
+        setErr("Too many attempts. Please try again later.");
+      } else {
+        setErr("Sign-in failed. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-hero">
+        <p className="animate-pulse text-sm text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
+
+  if (!authed) {
+    return (
+      <div className="relative min-h-screen overflow-x-hidden bg-hero">
+        <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,oklch(0.90_0.04_260)_0%,transparent_60%)]" />
+        <SiteNav />
+        <main className="relative z-10 mx-auto max-w-7xl px-6 pb-16 pt-28">
+          <div className="mx-auto mt-20 max-w-md rounded-3xl border border-primary/30 bg-card/60 p-10 backdrop-blur">
+            <div className="mx-auto mb-6 grid h-14 w-14 place-items-center rounded-full bg-gold shadow-gold">
+              <Lock className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <h1 className="text-center font-serif text-3xl font-bold">Restricted Leaderboard</h1>
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              The leaderboard is visible to judges and admins only. Sign in to continue.
+            </p>
+            <form onSubmit={handleSignIn} className="mt-6 space-y-4">
+              <div>
+                <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">
+                  Email address
+                </Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-9"
+                    autoFocus
+                    autoComplete="email"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">
+                  Password
+                </Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
+              {err && <p className="text-sm text-destructive">{err}</p>}
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gold text-primary-foreground"
+              >
+                {loading ? "Signing in…" : "Sign in"}
+              </Button>
+            </form>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return <LeaderboardContent role={role} />;
+}
+
+// ─── Leaderboard content (rendered once access is granted) ─────────────────────
+function LeaderboardContent({ role }: { role: string | null }) {
   const [allScores, setAllScores] = useState<JudgeScoreDoc[]>([]);
   const status = getScoringStatus();
 
@@ -131,12 +324,24 @@ function LeaderboardPage() {
           scores: [],
           avgScore: 0,
           judgeCount: 0,
+          criteriaTotals: {},
         });
       }
       const entry = nomineeMap.get(key)!;
       entry.scores.push(s.score);
       entry.avgScore = entry.scores.reduce((a, b) => a + b, 0) / entry.scores.length;
       entry.judgeCount = entry.scores.length;
+
+      // Accumulate per-criterion ratings for the breakdown view.
+      if (s.criteriaScores) {
+        for (const [critId, value] of Object.entries(s.criteriaScores)) {
+          if (typeof value !== "number" || value <= 0) continue;
+          const totals = entry.criteriaTotals[critId] ?? { sum: 0, count: 0 };
+          totals.sum += value;
+          totals.count += 1;
+          entry.criteriaTotals[critId] = totals;
+        }
+      }
     }
 
     // Group by categoryName → sort by avgScore desc
@@ -182,6 +387,11 @@ function LeaderboardPage() {
             <p className="mt-3 text-muted-foreground">
               Average star ratings across all judges, per category. Updates live as judges submit scores.
             </p>
+            <div className="mt-3">
+              <Badge variant="outline" className="border-primary/30 text-primary text-[11px]">
+                {role === "admin" ? "Admin view" : "Judge view"} · Restricted access
+              </Badge>
+            </div>
           </motion.div>
         </div>
 
@@ -286,6 +496,8 @@ function LeaderboardPage() {
                         <p className="mt-1 text-[11px] text-muted-foreground">
                           Rated by {nominee.judgeCount} judge{nominee.judgeCount !== 1 ? "s" : ""}
                         </p>
+
+                        <CriteriaBreakdown totals={nominee.criteriaTotals} />
                       </div>
                     </div>
                   );

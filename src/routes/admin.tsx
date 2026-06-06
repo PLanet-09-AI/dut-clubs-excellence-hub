@@ -39,6 +39,10 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
+  convertOfficeToPdfBlob,
+  OFFICE_FILE_PATTERN,
+} from "@/lib/office-to-pdf";
+import {
   signIn,
   signOut as firebaseSignOut,
   subscribeToAuthState,
@@ -120,8 +124,8 @@ function getPreviewKind(
   if (previewPdfUrl) return "pdf";
   if (hasFileExtension(fileName, /\.pdf$/i) || hasFileExtension(fileUrl, /\.pdf$/i)) return "pdf";
   if (
-    hasFileExtension(fileName, /\.(doc|docx|ppt|pptx|pps|ppsx|xls|xlsx)$/i) ||
-    hasFileExtension(fileUrl, /\.(doc|docx|ppt|pptx|pps|ppsx|xls|xlsx)$/i)
+    hasFileExtension(fileName, OFFICE_FILE_PATTERN) ||
+    hasFileExtension(fileUrl, OFFICE_FILE_PATTERN)
   ) {
     return "office";
   }
@@ -1324,18 +1328,7 @@ function NominationDetail({
         setRuntimeConvertingPath(target.path);
         setRuntimeConversionError(null);
 
-        const response = await fetch("/api/office-to-pdf", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sourceUrl: target.url, fileName: target.name }),
-        });
-
-        if (!response.ok) {
-          const text = await response.text().catch(() => "");
-          throw new Error(text || "Conversion failed");
-        }
-
-        const pdfBlob = await response.blob();
+        const pdfBlob = await convertOfficeToPdfBlob(target.url, target.name);
         if (cancelled) return;
 
         const objectUrl = URL.createObjectURL(pdfBlob);

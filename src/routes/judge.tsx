@@ -35,7 +35,12 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { signIn, signOut as firebaseSignOut, subscribeToAuthState } from "@/lib/auth-firebase";
-import { AWARD_THEME, AWARD_CATEGORIES } from "@/data/awards";
+import {
+  AWARD_THEME,
+  AWARD_CATEGORIES,
+  getCriteriaForCategory,
+  computeWeightedAverage,
+} from "@/data/awards";
 import SiteNav from "@/components/SiteNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,7 +139,9 @@ type JudgeScore = {
   judgeEmail: string;
   nomineeName: string;
   categoryName: string;
-  score: number; // 0-5 stars
+  score: number; // 0-5 overall (weighted average of criteriaScores)
+  /** Per-criterion star ratings keyed by criterion id */
+  criteriaScores?: Record<string, number>;
   comment: string;
   updatedAt: { toDate?: () => Date } | null;
 };
@@ -346,7 +353,7 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("__all__");
   const [detail, setDetail] = useState<Nomination | null>(null);
-  const [scoreInput, setScoreInput] = useState(0);
+  const [criteriaInput, setCriteriaInput] = useState<Record<string, number>>({});
   const [commentInput, setCommentInput] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -413,7 +420,7 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
   function openDetail(nom: Nomination) {
     setDetail(nom);
     const existing = myScores[nom.id];
-    setScoreInput(existing?.score ?? 0);
+    setCriteriaInput(existing?.criteriaScores ?? {});
     setCommentInput(existing?.comment ?? "");
   }
 
@@ -421,13 +428,17 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
     if (!detail || !uid) return;
     setSaving(true);
     try {
+      const criteria = getCriteriaForCategory(detail.categoryId);
+      const overall = computeWeightedAverage(criteriaInput, criteria);
       await setDoc(doc(db, "judge_scores", `${detail.id}_${uid}`), {
         nominationId: detail.id,
         judgeUid: uid,
         judgeEmail,
         nomineeName: detail.nomineeName,
         categoryName: detail.categoryName,
-        score: scoreInput,
+        categoryId: detail.categoryId,
+        score: overall,
+        criteriaScores: criteriaInput,
         comment: commentInput,
         updatedAt: serverTimestamp(),
       });
@@ -439,7 +450,8 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
           judgeEmail,
           nomineeName: detail.nomineeName,
           categoryName: detail.categoryName,
-          score: scoreInput,
+          score: overall,
+          criteriaScores: criteriaInput,
           comment: commentInput,
           updatedAt: null,
         },
@@ -605,10 +617,10 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
                     {Array.from({ length: 5 }).map((_, i) => (
                       <Star
                         key={i}
-                        className={`h-3 w-3 ${i < scored.score ? "fill-green-600 text-green-600" : "fill-muted text-muted-foreground/20"}`}
+                        className={`h-3 w-3 ${i < Math.round(scored.score) ? "fill-green-600 text-green-600" : "fill-muted text-muted-foreground/20"}`}
                       />
                     ))}
-                    <span className="ml-0.5">{scored.score}/5</span>
+                    <span className="ml-0.5">{scored.score.toFixed(1)}/5</span>
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="border-amber-400/40 text-amber-600">
@@ -631,8 +643,8 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
           {detail && (
             <JudgeNominationDetail
               nom={detail}
-              scoreInput={scoreInput}
-              setScoreInput={setScoreInput}
+              criteriaInput={criteriaInput}
+              setCriteriaInput={setCriteriaInput}
               commentInput={commentInput}
               setCommentInput={setCommentInput}
               saving={saving}
@@ -651,8 +663,8 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
 /* ── Judge Nomination Detail (two-pane: preview left, details+scoring right) ── */
 function JudgeNominationDetail({
   nom,
-  scoreInput,
-  setScoreInput,
+  criteriaInput,
+  setCriteriaInput,
   commentInput,
   setCommentInput,
   saving,
@@ -662,8 +674,8 @@ function JudgeNominationDetail({
   onSave,
 }: {
   nom: Nomination;
-  scoreInput: number;
-  setScoreInput: (v: number) => void;
+  criteriaInput: Record<string, number>;
+  setCriteriaInput: (v: Record<string, number>) => void;
   commentInput: string;
   setCommentInput: (v: string) => void;
   saving: boolean;
@@ -673,6 +685,9 @@ function JudgeNominationDetail({
   onSave: () => void;
 }) {
   const catData = AWARD_CATEGORIES.find((c) => c.id === nom.categoryId);
+  const criteria = getCriteriaForCategory(nom.categoryId);
+  const overallPreview = computeWeightedAverage(criteriaInput, criteria);
+  const ratedCount = criteria.filter((c) => (criteriaInput[c.id] ?? 0) > 0).length;
 
   const evidenceFiles = useMemo(() => {
     type EvidenceFile = {
@@ -1270,8 +1285,17 @@ function JudgeNominationDetail({
 
           {/* Scoring */}
           <div className="space-y-4 border-t pt-6">
-            <p className="flex items-center gap-2 font-semibold">
-              <MessageSquare className="h-4 w-4 text-primary" /> Your Evaluation
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-2 font-semibold">
+                <MessageSquare className="h-4 w-4 text-primary" /> Your Evaluation
+              </p>
+              <Badge variant="outline" className="border-primary/30 text-primary">
+                {overallPreview.toFixed(1)}/5 overall
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Rate each criterion below. The overall score is the weighted average of your
+              criterion ratings.
             </p>
             {!scoringOpen && (
               <div
@@ -1287,12 +1311,28 @@ function JudgeNominationDetail({
                   : "Scoring period has closed — no edits allowed"}
               </div>
             )}
-            <div>
-              <Label className="mb-3 block text-xs uppercase tracking-wider text-muted-foreground">
-                Star Rating (0 – 5)
-              </Label>
-              <StarPicker value={scoreInput} onChange={setScoreInput} disabled={!scoringOpen} />
+
+            {/* Per-criterion star pickers */}
+            <div className="space-y-4">
+              {criteria.map((c) => (
+                <div key={c.id} className="rounded-xl border border-primary/10 bg-gray-50 p-4">
+                  <Label className="block text-sm font-semibold text-foreground">{c.label}</Label>
+                  {c.description && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{c.description}</p>
+                  )}
+                  <div className="mt-3">
+                    <StarPicker
+                      value={criteriaInput[c.id] ?? 0}
+                      onChange={(v) =>
+                        setCriteriaInput({ ...criteriaInput, [c.id]: v })
+                      }
+                      disabled={!scoringOpen}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
+
             <div>
               <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">
                 Comments &amp; justification
@@ -1307,7 +1347,7 @@ function JudgeNominationDetail({
             </div>
             <Button
               onClick={onSave}
-              disabled={saving || !scoringOpen || scoreInput === 0}
+              disabled={saving || !scoringOpen || ratedCount === 0}
               className="w-full bg-gold text-primary-foreground disabled:opacity-50"
             >
               {saving ? (
@@ -1315,18 +1355,18 @@ function JudgeNominationDetail({
               ) : (
                 <>
                   <CheckCircle2 className="mr-2 h-4 w-4" />
-                  {hasScore ? "Update score" : "Submit score"}
+                  {hasScore ? "Update evaluation" : "Submit evaluation"}
                 </>
               )}
             </Button>
-            {scoreInput === 0 && scoringOpen && (
+            {ratedCount === 0 && scoringOpen && (
               <p className="text-center text-xs text-amber-600">
-                Select at least 1 star to submit.
+                Rate at least one criterion to submit.
               </p>
             )}
             {hasScore && (
               <p className="text-center text-xs text-muted-foreground">
-                Score recorded — admin can see your submission and timestamp.
+                Evaluation recorded — admin can see your per-criterion ratings and timestamp.
               </p>
             )}
           </div>

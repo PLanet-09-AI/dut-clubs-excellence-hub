@@ -16,6 +16,92 @@ export type AwardCategory = {
   questions: NominationQuestion[];
 };
 
+// ─── Judge evaluation criteria ────────────────────────────────────────────────
+// Judges rate each nominee against every criterion below (per-question rating).
+// The overall leaderboard score is the average of these criterion ratings.
+
+export type EvaluationCriterion = {
+  id: string;
+  /** Short label shown above the star picker */
+  label: string;
+  /** Optional helper text describing what to assess */
+  description?: string;
+  /** Maximum stars for this criterion (default 5) */
+  max?: number;
+  /** Weight used when averaging (default 1) */
+  weight?: number;
+};
+
+/**
+ * DUMMY / placeholder evaluation criteria.
+ *
+ * ⚠️ These are temporary stand-ins. The real evaluation questions are not yet
+ * available — when you receive them, replace each `label` / `description` below
+ * (and add/remove entries) and the judge panel + leaderboard update automatically.
+ *
+ * Keep the `id` values stable once judges start scoring, otherwise existing
+ * per-criterion scores will no longer line up with their criterion.
+ */
+export const EVALUATION_CRITERIA: EvaluationCriterion[] = [
+  {
+    id: "c1",
+    label: "Criterion 1 — Placeholder",
+    description: "Dummy criterion. Replace with the official evaluation question.",
+    max: 5,
+    weight: 1,
+  },
+  {
+    id: "c2",
+    label: "Criterion 2 — Placeholder",
+    description: "Dummy criterion. Replace with the official evaluation question.",
+    max: 5,
+    weight: 1,
+  },
+  {
+    id: "c3",
+    label: "Criterion 3 — Placeholder",
+    description: "Dummy criterion. Replace with the official evaluation question.",
+    max: 5,
+    weight: 1,
+  },
+  {
+    id: "c4",
+    label: "Criterion 4 — Placeholder",
+    description: "Dummy criterion. Replace with the official evaluation question.",
+    max: 5,
+    weight: 1,
+  },
+];
+
+/**
+ * Returns the evaluation criteria for a given category. Currently every category
+ * shares the same criteria, but this indirection lets you provide category-specific
+ * criteria later without touching the judge/leaderboard UI.
+ */
+export function getCriteriaForCategory(_categoryId?: string): EvaluationCriterion[] {
+  return EVALUATION_CRITERIA;
+}
+
+/** Weighted average (0–5 scale) of a set of per-criterion star ratings. */
+export function computeWeightedAverage(
+  criteriaScores: Record<string, number>,
+  criteria: EvaluationCriterion[] = EVALUATION_CRITERIA,
+): number {
+  let weightedSum = 0;
+  let weightTotal = 0;
+  for (const c of criteria) {
+    const raw = criteriaScores[c.id];
+    if (typeof raw !== "number" || raw <= 0) continue;
+    const max = c.max ?? 5;
+    const weight = c.weight ?? 1;
+    // Normalise each criterion onto a 0–5 scale before weighting.
+    const normalised = (raw / max) * 5;
+    weightedSum += normalised * weight;
+    weightTotal += weight;
+  }
+  return weightTotal === 0 ? 0 : weightedSum / weightTotal;
+}
+
 export const AWARD_THEME = {
   title: "SALEA 2026",
   subtitle: "Recognising Excellence · Celebrating Leadership · Inspiring Greatness",

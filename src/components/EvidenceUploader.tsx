@@ -19,6 +19,11 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 import { storage } from "@/lib/firebase";
+import {
+  convertOfficeToPdfBlob,
+  isOfficeFileName,
+  stripExtension,
+} from "@/lib/office-to-pdf";
 import { Upload, X, FileText, AlertCircle, Paperclip } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -80,31 +85,6 @@ const ACCEPTED = [
 ].join(",");
 const MAX_MB = 10;
 const MAX_BYTES = MAX_MB * 1024 * 1024;
-const OFFICE_FILE_PATTERN = /\.(doc|docx|ppt|pptx|pps|ppsx|xls|xlsx)$/i;
-
-function stripExtension(name: string): string {
-  const dot = name.lastIndexOf(".");
-  return dot > 0 ? name.slice(0, dot) : name;
-}
-
-function isOfficeFileName(name: string): boolean {
-  return OFFICE_FILE_PATTERN.test(name);
-}
-
-async function convertOfficeToPdfBlob(sourceUrl: string, fileName: string): Promise<Blob> {
-  const response = await fetch("/api/office-to-pdf", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ sourceUrl, fileName }),
-  });
-
-  if (!response.ok) {
-    const message = await response.text().catch(() => "");
-    throw new Error(message || "Office-to-PDF conversion failed.");
-  }
-
-  return await response.blob();
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
