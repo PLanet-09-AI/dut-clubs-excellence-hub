@@ -54,7 +54,8 @@ type NomineeEntry = {
   categoryId: string;
   categoryName: string;
   scores: number[];
-  avgScore: number;
+  totalScore: number;   // sum of all judge scores — used for ranking
+  avgScore: number;     // average per judge — shown as context
   judgeCount: number;
   /** criterion id → running sum + count for averaging */
   criteriaTotals: Record<string, { sum: number; count: number }>;
@@ -322,6 +323,7 @@ function LeaderboardContent({ role }: { role: string | null }) {
           categoryId: s.categoryId ?? catMatch?.id ?? s.categoryName,
           categoryName: s.categoryName,
           scores: [],
+          totalScore: 0,
           avgScore: 0,
           judgeCount: 0,
           criteriaTotals: {},
@@ -329,7 +331,8 @@ function LeaderboardContent({ role }: { role: string | null }) {
       }
       const entry = nomineeMap.get(key)!;
       entry.scores.push(s.score);
-      entry.avgScore = entry.scores.reduce((a, b) => a + b, 0) / entry.scores.length;
+      entry.totalScore = entry.scores.reduce((a, b) => a + b, 0);
+      entry.avgScore = entry.totalScore / entry.scores.length;
       entry.judgeCount = entry.scores.length;
 
       // Accumulate per-criterion ratings for the breakdown view.
@@ -351,7 +354,7 @@ function LeaderboardContent({ role }: { role: string | null }) {
       catMap.get(entry.categoryName)!.push(entry);
     }
     for (const arr of catMap.values()) {
-      arr.sort((a, b) => b.avgScore - a.avgScore || b.judgeCount - a.judgeCount);
+      arr.sort((a, b) => b.totalScore - a.totalScore || b.avgScore - a.avgScore);
     }
 
     // Return sorted by known category order first, then alphabetical
@@ -385,7 +388,7 @@ function LeaderboardContent({ role }: { role: string | null }) {
               Judge <span className="text-gradient-gold">Leaderboard</span>
             </h1>
             <p className="mt-3 text-muted-foreground">
-              Average star ratings across all judges, per category. Updates live as judges submit scores.
+              Nominees ranked by total stars received from all judges. Updates live as judges submit scores.
             </p>
             <div className="mt-3">
               <Badge variant="outline" className="border-primary/30 text-primary text-[11px]">
@@ -447,7 +450,8 @@ function LeaderboardContent({ role }: { role: string | null }) {
               <div className="space-y-2">
                 {nominees.map((nominee, idx) => {
                   const rank = idx + 1;
-                  const pct = (nominee.avgScore / 5) * 100;
+                  const maxPossible = nominee.judgeCount * 5;
+                  const pct = maxPossible > 0 ? (nominee.totalScore / maxPossible) * 100 : 0;
                   const isTop = rank <= 3;
                   return (
                     <div
@@ -469,11 +473,19 @@ function LeaderboardContent({ role }: { role: string | null }) {
                           <p className={`font-semibold ${isTop ? "text-base" : "text-sm"}`}>
                             {nominee.nomineeName}
                           </p>
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-3 shrink-0">
                             <Stars value={nominee.avgScore} />
-                            <span className="text-sm font-bold text-foreground">
-                              {nominee.avgScore.toFixed(1)}<span className="text-muted-foreground font-normal">/5</span>
-                            </span>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-foreground leading-none">
+                                {nominee.totalScore.toFixed(1)}{" "}
+                                <span className="text-xs font-normal text-muted-foreground">
+                                  / {maxPossible} pts
+                                </span>
+                              </p>
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                {nominee.avgScore.toFixed(2)}/5 avg
+                              </p>
+                            </div>
                           </div>
                         </div>
 
@@ -494,7 +506,7 @@ function LeaderboardContent({ role }: { role: string | null }) {
                         </div>
 
                         <p className="mt-1 text-[11px] text-muted-foreground">
-                          Rated by {nominee.judgeCount} judge{nominee.judgeCount !== 1 ? "s" : ""}
+                          {nominee.judgeCount} judge{nominee.judgeCount !== 1 ? "s" : ""} rated · max {maxPossible} pts
                         </p>
 
                         <CriteriaBreakdown totals={nominee.criteriaTotals} />
@@ -519,6 +531,7 @@ function LeaderboardContent({ role }: { role: string | null }) {
               {l.label}
             </span>
           ))}
+          <span>· Ranked by total stars (sum)</span>
           <span>· Scores update in real time</span>
           <span>· Deadline: {CLOSE_DATE.toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}</span>
         </div>

@@ -4,6 +4,7 @@ import {
   Lock,
   LogOut,
   Star,
+  Loader2,
   ChevronRight,
   ChevronLeft,
   Mail,
@@ -1284,19 +1285,32 @@ function JudgeNominationDetail({
           )}
 
           {/* Scoring */}
-          <div className="space-y-4 border-t pt-6">
+          <div className="space-y-5 border-t pt-6">
+            {/* Section header */}
             <div className="flex items-center justify-between gap-2">
-              <p className="flex items-center gap-2 font-semibold">
+              <p className="flex items-center gap-2 text-base font-bold">
                 <MessageSquare className="h-4 w-4 text-primary" /> Your Evaluation
               </p>
-              <Badge variant="outline" className="border-primary/30 text-primary">
-                {overallPreview.toFixed(1)}/5 overall
-              </Badge>
+              <div className="flex items-center gap-1.5">
+                <div
+                  className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
+                    overallPreview > 0
+                      ? "bg-gold/20 text-primary"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  <Star className={`h-3.5 w-3.5 ${overallPreview > 0 ? "fill-yellow-400 text-yellow-400" : ""}`} />
+                  {overallPreview.toFixed(1)}/5 overall
+                </div>
+                <Badge variant="outline" className="border-primary/20 text-[11px]">
+                  {ratedCount}/{criteria.length} rated
+                </Badge>
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Rate each criterion below. The overall score is the weighted average of your
-              criterion ratings.
+              Rate each criterion 1–5 stars. Your overall score (weighted average) is added to the leaderboard total.
             </p>
+
             {!scoringOpen && (
               <div
                 className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${scoringStatus === "before" ? "border border-amber-200 bg-amber-50 text-amber-700" : "border border-red-200 bg-red-50 text-red-700"}`}
@@ -1313,19 +1327,38 @@ function JudgeNominationDetail({
             )}
 
             {/* Per-criterion star pickers */}
-            <div className="space-y-4">
-              {criteria.map((c) => (
-                <div key={c.id} className="rounded-xl border border-primary/10 bg-gray-50 p-4">
-                  <Label className="block text-sm font-semibold text-foreground">{c.label}</Label>
-                  {c.description && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">{c.description}</p>
-                  )}
+            <div className="space-y-3">
+              {criteria.map((c, i) => (
+                <div
+                  key={c.id}
+                  className={`rounded-xl border p-4 transition ${
+                    (criteriaInput[c.id] ?? 0) > 0
+                      ? "border-yellow-300/60 bg-yellow-50/40"
+                      : "border-primary/10 bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <Label className="block text-sm font-semibold text-foreground">
+                        <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+                          {i + 1}
+                        </span>
+                        {c.label}
+                      </Label>
+                      {c.description && (
+                        <p className="mt-0.5 ml-7 text-xs text-muted-foreground">{c.description}</p>
+                      )}
+                    </div>
+                    {(criteriaInput[c.id] ?? 0) > 0 && (
+                      <span className="shrink-0 text-xs font-bold text-yellow-600">
+                        {criteriaInput[c.id]}/5
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-3">
                     <StarPicker
                       value={criteriaInput[c.id] ?? 0}
-                      onChange={(v) =>
-                        setCriteriaInput({ ...criteriaInput, [c.id]: v })
-                      }
+                      onChange={(v) => setCriteriaInput({ ...criteriaInput, [c.id]: v })}
                       disabled={!scoringOpen}
                     />
                   </div>
@@ -1333,41 +1366,60 @@ function JudgeNominationDetail({
               ))}
             </div>
 
-            <div>
-              <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">
-                Comments &amp; justification
+            {/* Comment */}
+            <div className="rounded-xl border border-primary/15 bg-blue-50/40 p-4">
+              <Label className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                <MessageSquare className="h-4 w-4 text-primary" />
+                Judge's Comments
+                <span className="ml-auto text-xs font-normal text-muted-foreground">
+                  {commentInput.length}/1000
+                </span>
               </Label>
               <Textarea
                 value={commentInput}
-                onChange={(e) => setCommentInput(e.target.value)}
-                placeholder="Provide your evaluation reasoning. This will be visible to admin."
-                rows={5}
+                onChange={(e) => setCommentInput(e.target.value.slice(0, 1000))}
+                placeholder="Write your evaluation notes here — strengths, areas for improvement, reasoning for your ratings. This is visible to admin only."
+                rows={6}
                 disabled={!scoringOpen}
+                className="resize-y bg-white"
               />
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                Visible to admin only. Not shared with nominees.
+              </p>
             </div>
+
             <Button
               onClick={onSave}
               disabled={saving || !scoringOpen || ratedCount === 0}
               className="w-full bg-gold text-primary-foreground disabled:opacity-50"
+              size="lg"
             >
               {saving ? (
-                "Saving…"
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…
+                </>
               ) : (
                 <>
                   <CheckCircle2 className="mr-2 h-4 w-4" />
                   {hasScore ? "Update evaluation" : "Submit evaluation"}
+                  {overallPreview > 0 && (
+                    <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">
+                      {overallPreview.toFixed(1)}/5
+                    </span>
+                  )}
                 </>
               )}
             </Button>
             {ratedCount === 0 && scoringOpen && (
               <p className="text-center text-xs text-amber-600">
-                Rate at least one criterion to submit.
+                Rate at least one criterion to submit your evaluation.
               </p>
             )}
             {hasScore && (
-              <p className="text-center text-xs text-muted-foreground">
-                Evaluation recorded — admin can see your per-criterion ratings and timestamp.
-              </p>
+              <div className="flex items-center justify-center gap-1.5 rounded-lg border border-green-200 bg-green-50 py-2 text-xs text-green-700">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Evaluation recorded and added to the leaderboard.
+              </div>
             )}
           </div>
         </div>

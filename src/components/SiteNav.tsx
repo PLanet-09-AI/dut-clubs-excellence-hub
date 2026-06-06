@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Trophy, Calendar, Award, Sparkles, Users, ChevronRight } from "lucide-react";
+import { Menu, X, Trophy, Calendar, Award, Sparkles, Users, ChevronRight, BookOpen, Play } from "lucide-react";
 import { useState } from "react";
 import {
   Sheet,
@@ -26,6 +26,12 @@ export default function SiteNav() {
       </Link>
       <Link to="/winners" className="transition hover:text-primary" activeProps={{ className: "text-primary" }} onClick={() => setIsOpen(false)}>
         Winners
+      </Link>
+      <Link to="/guide" className="flex items-center gap-1 transition hover:text-primary" activeProps={{ className: "text-primary" }} onClick={() => setIsOpen(false)}>
+        <BookOpen className="h-3.5 w-3.5" /> Guide
+      </Link>
+      <Link to="/demo" className="flex items-center gap-1 transition hover:text-primary" activeProps={{ className: "text-primary" }} onClick={() => setIsOpen(false)}>
+        <Play className="h-3.5 w-3.5" /> Demo
       </Link>
       <Link to="/admin" className="transition hover:text-primary" activeProps={{ className: "text-primary" }} onClick={() => setIsOpen(false)}>
         Admin

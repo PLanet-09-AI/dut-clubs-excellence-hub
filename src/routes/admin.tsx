@@ -464,6 +464,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       nomineeName: string;
       categoryName: string;
       score: number;
+      criteriaScores?: Record<string, number>;
       comment: string;
       updatedAt: { toDate?: () => Date } | null;
     }>
@@ -1027,10 +1028,10 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                           {Array.from({ length: 5 }).map((_, i) => (
                             <Star
                               key={i}
-                              className={`h-4 w-4 ${i < s.score ? "fill-yellow-500 text-yellow-500" : "fill-muted text-muted-foreground/20"}`}
+                              className={`h-4 w-4 ${i < Math.round(s.score) ? "fill-yellow-500 text-yellow-500" : "fill-muted text-muted-foreground/20"}`}
                             />
                           ))}
-                          <span className="ml-1 text-sm">{s.score}/5</span>
+                          <span className="ml-1 text-sm">{s.score.toFixed(1)}/5</span>
                         </span>
                       </div>
                     </div>
@@ -1048,9 +1049,10 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                       </span>
                     </div>
                     {s.comment && (
-                      <p className="mt-2 rounded-lg bg-muted/50 px-3 py-2 text-sm italic text-foreground/80">
-                        "{s.comment}"
-                      </p>
+                      <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2">
+                        <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-600">Judge's comment</p>
+                        <p className="text-sm italic text-foreground/80">"{s.comment}"</p>
+                      </div>
                     )}
                   </div>
                 ))}

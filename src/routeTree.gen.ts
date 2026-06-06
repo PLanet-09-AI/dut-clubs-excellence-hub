@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WinnersRouteImport } from './routes/winners'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as JudgeRouteImport } from './routes/judge'
+import { Route as GuideRouteImport } from './routes/guide'
+import { Route as DemoRouteImport } from './routes/demo'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as NominateCategoryIdRouteImport } from './routes/nominate.$categoryId'
@@ -29,6 +31,16 @@ const LeaderboardRoute = LeaderboardRouteImport.update({
 const JudgeRoute = JudgeRouteImport.update({
   id: '/judge',
   path: '/judge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuideRoute = GuideRouteImport.update({
+  id: '/guide',
+  path: '/guide',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoRoute = DemoRouteImport.update({
+  id: '/demo',
+  path: '/demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -50,6 +62,8 @@ const NominateCategoryIdRoute = NominateCategoryIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/demo': typeof DemoRoute
+  '/guide': typeof GuideRoute
   '/judge': typeof JudgeRoute
   '/leaderboard': typeof LeaderboardRoute
   '/winners': typeof WinnersRoute
@@ -58,6 +72,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/demo': typeof DemoRoute
+  '/guide': typeof GuideRoute
   '/judge': typeof JudgeRoute
   '/leaderboard': typeof LeaderboardRoute
   '/winners': typeof WinnersRoute
@@ -67,6 +83,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/demo': typeof DemoRoute
+  '/guide': typeof GuideRoute
   '/judge': typeof JudgeRoute
   '/leaderboard': typeof LeaderboardRoute
   '/winners': typeof WinnersRoute
@@ -77,6 +95,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/demo'
+    | '/guide'
     | '/judge'
     | '/leaderboard'
     | '/winners'
@@ -85,6 +105,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/demo'
+    | '/guide'
     | '/judge'
     | '/leaderboard'
     | '/winners'
@@ -93,6 +115,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/demo'
+    | '/guide'
     | '/judge'
     | '/leaderboard'
     | '/winners'
@@ -102,6 +126,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  DemoRoute: typeof DemoRoute
+  GuideRoute: typeof GuideRoute
   JudgeRoute: typeof JudgeRoute
   LeaderboardRoute: typeof LeaderboardRoute
   WinnersRoute: typeof WinnersRoute
@@ -131,6 +157,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JudgeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/guide': {
+      id: '/guide'
+      path: '/guide'
+      fullPath: '/guide'
+      preLoaderRoute: typeof GuideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo': {
+      id: '/demo'
+      path: '/demo'
+      fullPath: '/demo'
+      preLoaderRoute: typeof DemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -158,6 +198,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  DemoRoute: DemoRoute,
+  GuideRoute: GuideRoute,
   JudgeRoute: JudgeRoute,
   LeaderboardRoute: LeaderboardRoute,
   WinnersRoute: WinnersRoute,
