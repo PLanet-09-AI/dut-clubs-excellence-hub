@@ -15,7 +15,6 @@
 import type { Handler, HandlerEvent } from "@netlify/functions";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
-import puppeteer from "puppeteer-core";
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
 
@@ -223,6 +222,11 @@ async function htmlToPdf(bodyHtml: string, documentTitle: string): Promise<Buffe
     }
     
     console.log("[htmlToPdf] Launch options prepared:", Object.keys(launchOptions).join(", "));
+    
+      // Dynamically import puppeteer-core (ESM module) to avoid bundler conflicts
+      const puppeteerModule = await import("puppeteer-core");
+      const puppeteer = puppeteerModule.default;
+    
     const browser = await puppeteer.launch(launchOptions);
     console.log("[htmlToPdf] Browser launched successfully");
 
