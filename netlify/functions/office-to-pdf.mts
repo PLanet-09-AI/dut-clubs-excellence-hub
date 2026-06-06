@@ -156,6 +156,26 @@ async function pptxToHtml(buffer: Buffer): Promise<string> {
 
 // ─── PDF renderer ────────────────────────────────────────────────────────────
 
+// Extra Chromium flags that reduce cold-start time and memory pressure in
+// serverless environments (no GPU, no sandbox, single-process renderer).
+const EXTRA_CHROMIUM_ARGS = [
+  "--disable-gpu",
+  "--disable-dev-shm-usage",
+  "--disable-setuid-sandbox",
+  "--no-sandbox",
+  "--no-zygote",
+  "--single-process",
+  "--disable-extensions",
+  "--disable-background-networking",
+  "--disable-default-apps",
+  "--disable-sync",
+  "--disable-translate",
+  "--hide-scrollbars",
+  "--metrics-recording-only",
+  "--mute-audio",
+  "--safebrowsing-disable-auto-update",
+];
+
 async function htmlToPdf(bodyHtml: string, documentTitle: string): Promise<Buffer> {
   const fullPage = `<!DOCTYPE html>
 <html lang="en">
@@ -195,66 +215,77 @@ async function htmlToPdf(bodyHtml: string, documentTitle: string): Promise<Buffe
 <body>${bodyHtml}</body>
 </html>`;
 
-  try {
-    // Dynamically import chromium (ESM module) to avoid bundler conflicts
-    const chromiumModule = await import("@sparticuz/chromium");
-    const chromium = chromiumModule.default;
-    
-    console.log("[htmlToPdf] Getting Chromium executable path...");
-    let executablePath: string | undefined;
-    try {
-      executablePath = await chromium.executablePath();
-    } catch (err) {
-      console.warn("[htmlToPdf] Failed to get chromium path:", err);
-    }
-    console.log(`[htmlToPdf] Executable path: ${executablePath || "(using system default)"}`);
-    
-    console.log("[htmlToPdf] Launching Chromium browser...");
-    const launchOptions: any = {
-      args: chromium.args,
-      defaultViewport: null,
-      headless: true,
-    };
-    
-    // Only set executablePath if we have a valid path
-    if (executablePath) {
-      launchOptions.executablePath = executablePath;
-    }
-    
-    console.log("[htmlToPdf] Launch options prepared:", Object.keys(launchOptions).join(", "));
-    
-      // Dynamically import puppeteer-core (ESM module) to avoid bundler conflicts
-      const puppeteerModule = await import("puppeteer-core");
-      const puppeteer = puppeteerModule.default;
-    
-    const browser = await puppeteer.launch(launchOptions);
-    console.log("[htmlToPdf] Browser launched successfully");
+  // Dynamically import both modules (ESM, not bundled)
+  const [chromiumModule, puppeteerModule] = await Promise.all([
+    import("@sparticuz/chromium"),
+    import("puppeteer-core"),
+  ]);
+  const chromium = chromiumModule.default;
+  const puppeteer = puppeteerModule.default;
 
-    try {
-      console.log("[htmlToPdf] Creating new page...");
-      const page = await browser.newPage();
-      
-      console.log("[htmlToPdf] Setting page content...");
-      await page.setContent(fullPage, { waitUntil: "domcontentloaded" });
-      
-      console.log("[htmlToPdf] Rendering PDF...");
-      const pdfBytes = await page.pdf({
-        format: "A4",
-        printBackground: true,
-        margin: { top: "15mm", bottom: "15mm", left: "15mm", right: "15mm" },
-      });
-      
-      console.log(`[htmlToPdf] PDF rendered: ${pdfBytes.length} bytes`);
-      return Buffer.from(pdfBytes);
-    } finally {
-      console.log("[htmlToPdf] Closing browser...");
-      await browser.close();
-      console.log("[htmlToPdf] Browser closed");
-    }
+  // executablePath() decompresses the bundled Chromium binary on first call —
+  // give it a generous timeout so a cold start doesn't abort early.
+  console.log("[htmlToPdf] Resolving Chromium executable path...");
+  let executablePath: string | undefined;
+  try {
+    const pathPromise = chromium.executablePath();
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("executablePath() timed out after 20 s")), 20_000),
+    );
+    executablePath = await Promise.race([pathPromise, timeoutPromise]);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[htmlToPdf] Error: ${msg}`);
-    throw err;
+    console.warn("[htmlToPdf] executablePath() failed — will attempt without explicit path:", err);
+  }
+  console.log(`[htmlToPdf] Executable path: ${executablePath ?? "(system default)"}`);
+
+  // Merge @sparticuz/chromium's recommended args with our extra performance flags,
+  // deduplicating so we don't pass the same flag twice.
+  const baseArgs: string[] = Array.isArray(chromium.args) ? chromium.args : [];
+  const mergedArgs = Array.from(new Set([...baseArgs, ...EXTRA_CHROMIUM_ARGS]));
+
+  const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
+    args: mergedArgs,
+    defaultViewport: { width: 1280, height: 900 },
+    headless: true,
+    // protocolTimeout guards against a page that never responds
+    protocolTimeout: 30_000,
+  };
+  if (executablePath) {
+    launchOptions.executablePath = executablePath;
+  }
+
+  console.log("[htmlToPdf] Launching browser...");
+  const browser = await puppeteer.launch(launchOptions);
+  console.log("[htmlToPdf] Browser launched");
+
+  try {
+    const page = await browser.newPage();
+
+    // Abort image/font/media requests — we only need the HTML we generated
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
+      if (["image", "font", "media", "stylesheet"].includes(req.resourceType())) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+
+    await page.setContent(fullPage, { waitUntil: "domcontentloaded", timeout: 15_000 });
+
+    console.log("[htmlToPdf] Rendering PDF...");
+    const pdfBytes = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "15mm", bottom: "15mm", left: "15mm", right: "15mm" },
+      timeout: 20_000,
+    });
+
+    console.log(`[htmlToPdf] PDF rendered: ${pdfBytes.length} bytes`);
+    return Buffer.from(pdfBytes);
+  } finally {
+    await browser.close();
+    console.log("[htmlToPdf] Browser closed");
   }
 }
 
