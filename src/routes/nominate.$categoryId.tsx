@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -102,6 +103,7 @@ function NominatePage() {
 type FormDraft = {
   nominee: { name: string; studentNumber: string; email: string; faculty: string; year: string };
   nominator: { name: string; email: string; relationship: string };
+  isSelfNomination: boolean;
   answers: Record<string, string>;
   /** Uploaded evidence files: questionId → slotKey ("e0","e1",…) → files */
   uploads: Record<string, EvidenceUploads>;
@@ -116,6 +118,7 @@ function makeEmptyDraft(): FormDraft {
   return {
     nominee: { name: "", studentNumber: "", email: "", faculty: "", year: "" },
     nominator: { name: "", email: "", relationship: "" },
+    isSelfNomination: false,
     answers: {},
     uploads: {},
     sessionId: crypto.randomUUID(),
@@ -138,7 +141,7 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
   const { draft, setDraft, undo, clearDraft, canUndo, snapshotCount, status, lastSaved, hasDraft } =
     useDraftForm<FormDraft>(`salea-draft-${category.id}`, initialDraft);
 
-  const { nominee, nominator, answers, uploads = {} } = draft;
+  const { nominee, nominator, isSelfNomination = false, answers, uploads = {} } = draft;
   // Old drafts (saved before sessionId was added) won't have the field.
   // Fall back to this mount's fresh UUID so the storage path is never "undefined".
   const sessionId = draft.sessionId ?? initialDraft.sessionId;
@@ -188,7 +191,12 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
       setError("Please complete all fields before continuing.");
       return;
     }
-    if (step === 2 && nominator.email.trim().toLowerCase() === nominee.email.trim().toLowerCase()) {
+    // Skip email-uniqueness check for self-nominations (same person, same email)
+    if (
+      step === 2 &&
+      !isSelfNomination &&
+      nominator.email.trim().toLowerCase() === nominee.email.trim().toLowerCase()
+    ) {
       setError("Your email address cannot be the same as the nominee's email address.");
       return;
     }
@@ -221,6 +229,7 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
         nominatorName: nominator.name.trim(),
         nominatorEmail: nominator.email.trim(),
         nominatorRelationship: nominator.relationship,
+        isSelfNomination,
         answers,
         uploads,
         status: "pending",
@@ -356,6 +365,24 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
             <StepNominator
               key="s2"
               nominator={nominator}
+              nominee={nominee}
+              isSelfNomination={isSelfNomination}
+              onSelfNominationChange={(v) => {
+                if (v) {
+                  // Auto-fill nominator fields from nominee and force relationship
+                  setDraft((prev) => ({
+                    ...prev,
+                    isSelfNomination: true,
+                    nominator: {
+                      name: prev.nominee.name,
+                      email: prev.nominee.email,
+                      relationship: "Self-nomination",
+                    },
+                  }));
+                } else {
+                  setDraft((prev) => ({ ...prev, isSelfNomination: false }));
+                }
+              }}
               onChange={(n) => setDraft((prev) => ({ ...prev, nominator: n }))}
             />
           )}
@@ -495,9 +522,15 @@ function StepNominee({
 
 function StepNominator({
   nominator,
+  nominee,
+  isSelfNomination,
+  onSelfNominationChange,
   onChange,
 }: {
   nominator: { name: string; email: string; relationship: string };
+  nominee: { name: string; email: string; studentNumber: string; faculty: string; year: string };
+  isSelfNomination: boolean;
+  onSelfNominationChange: (v: boolean) => void;
   onChange: (v: typeof nominator) => void;
 }) {
   const set = (k: keyof typeof nominator, v: string) => onChange({ ...nominator, [k]: v });
@@ -515,11 +548,33 @@ function StepNominator({
           Tell us about yourself — the person submitting this nomination.
         </p>
       </div>
+
+      {/* Self-nomination checkbox */}
+      <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+        <Checkbox
+          id="self-nom"
+          checked={isSelfNomination}
+          onCheckedChange={(checked) => onSelfNominationChange(!!checked)}
+          className="mt-0.5 shrink-0"
+        />
+        <div>
+          <label htmlFor="self-nom" className="cursor-pointer text-sm font-semibold text-foreground">
+            I am nominating myself
+          </label>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Tick this box to auto-fill your details from the nominee information and mark this as a
+            self-nomination. Self-nominations are reviewed separately by admin.
+          </p>
+        </div>
+      </div>
+
       <Field label="Your Full Name *">
         <Input
           value={nominator.name}
           onChange={(e) => set("name", e.target.value)}
           placeholder="e.g. Sipho Dlamini"
+          readOnly={isSelfNomination}
+          className={isSelfNomination ? "bg-muted/50" : ""}
         />
       </Field>
       <Field label="Your Email Address *">
@@ -528,11 +583,17 @@ function StepNominator({
           value={nominator.email}
           onChange={(e) => set("email", e.target.value)}
           placeholder="e.g. sipho@dut.ac.za"
+          readOnly={isSelfNomination}
+          className={isSelfNomination ? "bg-muted/50" : ""}
         />
       </Field>
       <Field label="Your Relationship to the Nominee *">
-        <Select value={nominator.relationship} onValueChange={(v) => set("relationship", v)}>
-          <SelectTrigger>
+        <Select
+          value={nominator.relationship}
+          onValueChange={(v) => set("relationship", v)}
+          disabled={isSelfNomination}
+        >
+          <SelectTrigger className={isSelfNomination ? "bg-muted/50" : ""}>
             <SelectValue placeholder="Select relationship" />
           </SelectTrigger>
           <SelectContent>
@@ -544,12 +605,14 @@ function StepNominator({
           </SelectContent>
         </Select>
       </Field>
-      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          <strong className="text-foreground">Self-nominations are welcome.</strong> If nominating
-          yourself, enter your own details above and select "Self-nomination" as your relationship.
-        </p>
-      </div>
+      {!isSelfNomination && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <strong className="text-foreground">Self-nominations are welcome.</strong> Tick the
+            checkbox above if you are nominating yourself.
+          </p>
+        </div>
+      )}
     </motion.div>
   );
 }

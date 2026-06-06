@@ -41,6 +41,7 @@ import { db } from "@/lib/firebase";
 import {
   convertOfficeToPdfBlob,
   OFFICE_FILE_PATTERN,
+  IMAGE_FILE_PATTERN,
 } from "@/lib/office-to-pdf";
 import {
   signIn,
@@ -81,6 +82,7 @@ type Nomination = {
   nominatorName: string;
   nominatorEmail: string;
   nominatorRelationship: string;
+  isSelfNomination?: boolean;
   answers: Record<string, string>;
   uploads?: Record<
     string,
@@ -99,7 +101,7 @@ type Nomination = {
   status: NominationStatus;
 };
 
-type PreviewKind = "pdf" | "office";
+type PreviewKind = "pdf" | "office" | "image";
 
 function hasFileExtension(value: string, extensionPattern: RegExp): boolean {
   if (!value) return false;
@@ -128,6 +130,12 @@ function getPreviewKind(
     hasFileExtension(fileUrl, OFFICE_FILE_PATTERN)
   ) {
     return "office";
+  }
+  if (
+    hasFileExtension(fileName, IMAGE_FILE_PATTERN) ||
+    hasFileExtension(fileUrl, IMAGE_FILE_PATTERN)
+  ) {
+    return "image";
   }
   return null;
 }
@@ -440,6 +448,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("__all__");
   const [statusFilter, setStatusFilter] = useState<"all" | NominationStatus>("all");
+  const [selfNomFilter, setSelfNomFilter] = useState(false);
   const [search, setSearch] = useState("");
   const [detailNom, setDetailNom] = useState<Nomination | null>(null);
   const [extraCategories, setExtraCategories] = useState<
@@ -544,6 +553,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       pending: nominations.filter((n) => n.status === "pending").length,
       shortlisted: nominations.filter((n) => n.status === "shortlisted").length,
       rejected: nominations.filter((n) => n.status === "rejected").length,
+      selfNominated: nominations.filter((n) => n.isSelfNomination).length,
     }),
     [nominations],
   );
@@ -563,6 +573,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     return nominations.filter((n) => {
       if (selectedCategory !== "__all__" && n.categoryId !== selectedCategory) return false;
       if (statusFilter !== "all" && n.status !== statusFilter) return false;
+      if (selfNomFilter && !n.isSelfNomination) return false;
       if (search.trim()) {
         const s = search.toLowerCase();
         return (
@@ -574,7 +585,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       }
       return true;
     });
-  }, [nominations, selectedCategory, statusFilter, search]);
+  }, [nominations, selectedCategory, statusFilter, selfNomFilter, search]);
 
   async function update(id: string, status: NominationStatus) {
     if (!canManage) return;
@@ -722,11 +733,21 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-5">
         <StatCard label="Total" value={stats.total} />
         <StatCard label="Pending" value={stats.pending} color="amber" />
         <StatCard label="Shortlisted" value={stats.shortlisted} color="gold" />
         <StatCard label="Rejected" value={stats.rejected} color="red" />
+        <button
+          onClick={() => setSelfNomFilter((v) => !v)}
+          className={`rounded-2xl border p-4 text-center transition ${selfNomFilter ? "border-blue-400/60 bg-blue-50 shadow" : "border-primary/15 bg-white hover:border-primary/30"}`}
+        >
+          <p className={`font-serif text-3xl font-bold ${selfNomFilter ? "text-blue-600" : "text-blue-500"}`}>{stats.selfNominated}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Self-nominated</p>
+          {selfNomFilter && (
+            <p className="mt-1 text-[10px] font-semibold text-blue-600">● Filtered</p>
+          )}
+        </button>
       </div>
 
       {/* Category tiles */}
@@ -870,11 +891,18 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                       <p className="text-[11px] text-muted-foreground line-clamp-1">
                         By {n.nominatorName}
                       </p>
-                      {totalFiles > 0 && (
-                        <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary font-medium">
-                          <FileText className="h-3 w-3" /> {totalFiles}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {n.isSelfNomination && (
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                            Self-nominated
+                          </span>
+                        )}
+                        {totalFiles > 0 && (
+                          <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary font-medium">
+                            <FileText className="h-3 w-3" /> {totalFiles}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="mt-3 flex items-center gap-1 text-[11px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
                       View details <ChevronDown className="h-3 w-3 -rotate-90" />
@@ -1564,6 +1592,15 @@ function NominationDetail({
                   </div>
                 </div>
               </div>
+            ) : resolvedKind === "image" ? (
+              <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
+                <img
+                  key={activePreview.path}
+                  src={activePreview.url}
+                  alt={activePreview.name}
+                  className="max-h-full max-w-full rounded object-contain"
+                />
+              </div>
             ) : (
               <iframe
                 key={activePreview.path}
@@ -1653,6 +1690,11 @@ function NominationDetail({
             <p className="text-muted-foreground">{nom.nominatorEmail}</p>
             {nom.nominatorRelationship && (
               <p className="text-muted-foreground">{nom.nominatorRelationship}</p>
+            )}
+            {nom.isSelfNomination && (
+              <span className="mt-1 inline-block rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700">
+                Self-nominated
+              </span>
             )}
           </div>
 

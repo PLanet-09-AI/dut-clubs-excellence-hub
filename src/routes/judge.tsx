@@ -41,6 +41,7 @@ import {
   getCriteriaForCategory,
   computeWeightedAverage,
 } from "@/data/awards";
+import { convertOfficeToPdfBlob } from "@/lib/office-to-pdf";
 import SiteNav from "@/components/SiteNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,7 +88,7 @@ type Nomination = {
   status: "pending" | "shortlisted" | "rejected";
 };
 
-type PreviewKind = "pdf" | "office";
+type PreviewKind = "pdf" | "office" | "image";
 
 function getPreviewKind(
   fileName: string,
@@ -98,6 +99,7 @@ function getPreviewKind(
   const target = `${fileName} ${fileUrl}`;
   if (/\.pdf($|\?)/i.test(target)) return "pdf";
   if (/\.(doc|docx|ppt|pptx|pps|ppsx|xls|xlsx)($|\?)/i.test(target)) return "office";
+  if (/\.(jpe?g|png|gif|webp|bmp|svg|avif|tiff?)($|\?)/i.test(target)) return "image";
   return null;
 }
 
@@ -774,7 +776,7 @@ function JudgeNominationDetail({
 
   const activePdfUrl = activePreview?.file.previewPdfUrl ?? activeRuntimePdfUrl;
 
-  const resolvedKind: "pdf" | "office" | null =
+  const resolvedKind: "pdf" | "office" | "image" | null =
     activePreview && activePreview.kind === "office" && activePdfUrl
       ? "pdf"
       : activePreview?.kind ?? null;
@@ -827,18 +829,7 @@ function JudgeNominationDetail({
         setRuntimeConvertingPath(target.path);
         setRuntimeConversionError(null);
 
-        const response = await fetch("/api/office-to-pdf", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sourceUrl: target.url, fileName: target.name }),
-        });
-
-        if (!response.ok) {
-          const text = await response.text().catch(() => "");
-          throw new Error(text || "Conversion failed");
-        }
-
-        const pdfBlob = await response.blob();
+        const pdfBlob = await convertOfficeToPdfBlob(target.url, target.name);
         if (cancelled) return;
 
         const objectUrl = URL.createObjectURL(pdfBlob);
@@ -1076,6 +1067,15 @@ function JudgeNominationDetail({
                     </a>
                   </div>
                 </div>
+              </div>
+            ) : activePreview.kind === "image" ? (
+              <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
+                <img
+                  key={activePreview.file.path}
+                  src={activePreview.file.url}
+                  alt={activePreview.file.name}
+                  className="max-h-full max-w-full rounded object-contain"
+                />
               </div>
             ) : (
               <iframe
@@ -1473,6 +1473,15 @@ function JudgeNominationDetail({
                         Preparing a PDF preview for this Office file. This can take a few seconds.
                       </p>
                     </div>
+                  </div>
+                ) : resolvedKind === "image" ? (
+                  <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
+                    <img
+                      key={activePreview.file.path}
+                      src={activePreview.file.url}
+                      alt={activePreview.file.name}
+                      className="max-h-full max-w-full rounded object-contain"
+                    />
                   </div>
                 ) : (
                   <iframe

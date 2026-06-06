@@ -21,6 +21,9 @@ export const OFFICE_TO_PDF_ENDPOINT = "/api/office-to-pdf";
 /** Matches the file extensions the conversion function accepts. */
 export const OFFICE_FILE_PATTERN = /\.(doc|docx|ppt|pptx|pps|ppsx|xls|xlsx)$/i;
 
+/** Matches common image extensions that can be previewed directly in-app. */
+export const IMAGE_FILE_PATTERN = /\.(jpe?g|png|gif|webp|bmp|svg|avif|tiff?)$/i;
+
 /** True when the given file name is a convertible Office document. */
 export function isOfficeFileName(name: string): boolean {
   return OFFICE_FILE_PATTERN.test(name);
