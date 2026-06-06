@@ -15,7 +15,6 @@
 import type { Handler, HandlerEvent } from "@netlify/functions";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
-import chromium from "@sparticuz/chromium";
 import puppeteer from "puppeteer-core";
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
@@ -198,6 +197,10 @@ async function htmlToPdf(bodyHtml: string, documentTitle: string): Promise<Buffe
 </html>`;
 
   try {
+    // Dynamically import chromium (ESM module) to avoid bundler conflicts
+    const chromiumModule = await import("@sparticuz/chromium");
+    const chromium = chromiumModule.default;
+    
     console.log("[htmlToPdf] Getting Chromium executable path...");
     let executablePath: string | undefined;
     try {
