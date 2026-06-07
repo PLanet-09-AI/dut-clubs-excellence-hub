@@ -111,7 +111,7 @@ export default function SiteNav() {
           <Play className="h-3.5 w-3.5" /> Demo
         </Link>
       )}
-      <Link to="/admin" className="transition hover:text-primary" activeProps={{ className: "text-primary" }} onClick={() => setIsOpen(false)}>
+      <Link to="/admin" className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/5 px-4 py-1.5 text-sm font-semibold text-primary transition hover:bg-primary/15 hover:border-primary/50" activeProps={{ className: "bg-primary/15 border-primary/50" }} onClick={() => setIsOpen(false)}>
         Admin
       </Link>
     </>
@@ -133,7 +133,7 @@ export default function SiteNav() {
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="hidden items-center gap-8 text-sm font-medium text-muted-foreground md:flex">
+        <nav className="hidden items-center gap-10 text-sm font-medium text-muted-foreground md:flex">
           <NavLinks />
         </nav>
 
