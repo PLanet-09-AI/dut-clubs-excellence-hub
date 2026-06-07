@@ -191,8 +191,8 @@ export default function SiteNav() {
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[85%] sm:w-[400px] border-l border-primary/20 backdrop-blur-xl bg-background/95">
-                <SheetHeader className="flex flex-row items-center justify-between mb-10 pb-6 border-b border-primary/10">
+              <SheetContent side="right" className="w-[85%] sm:w-[400px] border-l border-primary/20 backdrop-blur-xl bg-background/95 flex flex-col overflow-hidden">
+                <SheetHeader className="flex flex-row items-center justify-between mb-6 pb-6 border-b border-primary/10 shrink-0">
                   <div className="flex items-center gap-3">
                     <img src={logo} alt="Logo" className="h-10 w-auto" />
                     <div>
@@ -201,7 +201,7 @@ export default function SiteNav() {
                     </div>
                   </div>
                 </SheetHeader>
-                <nav className="flex flex-col gap-2">
+                <nav className="flex flex-col gap-2 flex-1 overflow-y-auto overscroll-contain pb-4">
                   <Link 
                     to="/" 
                     hash="categories" 
