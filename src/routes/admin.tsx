@@ -23,7 +23,11 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
+  BookOpen,
+  Play,
+  Info,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import {
   collection,
   onSnapshot,
@@ -178,6 +182,109 @@ export const Route = createFileRoute("/admin")({
     meta: [{ title: "Admin · SALEA 2026 Awards Management" }],
   }),
 });
+
+// ─── Admin quick-start guide ──────────────────────────────────────────────────
+
+const ADMIN_STEPS = [
+  { num: 1, title: "Review incoming nominations", body: "Every submission lands here as 'Pending'. Open a nomination card to read the full answers, view uploaded evidence (PDFs, transcripts, images) in the document preview pane, and check the nominee's details." },
+  { num: 2, title: "Shortlist or reject", body: "Use the Shortlist / Reject buttons inside a nomination to move it to the correct queue. Shortlisted nominations are visible to judges for scoring. You can undo a decision at any time." },
+  { num: 3, title: "Filter & search", body: "Use the search bar to find a nominee by name or student number. Use the category tiles to narrow to one award, or click the Self-nominated stat card to see only self-nominations." },
+  { num: 4, title: "Preview documents", body: "Uploaded Word docs, PowerPoints and Excel files are converted to PDF automatically in-app — no downloads needed. Use the zoom, page and navigation controls in the preview pane." },
+  { num: 5, title: "Export shortlisted CSV", body: "Click 'Export shortlisted' (top right) to download a CSV of all shortlisted nominees for printing or offline review." },
+  { num: 6, title: "Monitor judge activity", body: "The Judge Activity tab shows every judge's score per nomination — including their per-criterion star ratings and written comments. Use this to check progress and identify nominees that haven't been scored yet." },
+  { num: 7, title: "View the leaderboard", body: "Once scoring is open, visit /leaderboard to see nominees ranked by total stars from all judges. You can also share the leaderboard link with judges." },
+  { num: 8, title: "Manage categories (Admin only)", body: "The Categories tab lets you add custom award categories. Only accounts with the 'admin' Firestore role can do this — judge-access accounts see all other tabs but cannot manage categories." },
+];
+
+const JUDGE_ADMIN_STEPS = [
+  { num: 1, title: "View shortlisted nominations", body: "You can browse all shortlisted nominations and open each one to read answers and preview evidence documents." },
+  { num: 2, title: "Document preview", body: "Uploaded Word docs, PowerPoints and Excel files are converted to PDF for in-app preview. Use zoom, page and navigation controls." },
+  { num: 3, title: "Judge Activity tab", body: "See all judge scores per nomination. Your scoring is done in the Judge Panel (/judge), not here." },
+  { num: 4, title: "Leaderboard", body: "Visit /leaderboard to see live rankings once scoring is open." },
+];
+
+function AdminQuickGuide({ canManage }: { canManage: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem(canManage ? "adminGuideDismissed" : "judgeAdminGuideDismissed") === "1"; } catch { return false; }
+  });
+  const steps = canManage ? ADMIN_STEPS : JUDGE_ADMIN_STEPS;
+  const storageKey = canManage ? "adminGuideDismissed" : "judgeAdminGuideDismissed";
+
+  function dismiss() {
+    try { localStorage.setItem(storageKey, "1"); } catch { /* ignore */ }
+    setDismissed(true);
+  }
+
+  if (dismissed) {
+    return (
+      <div className="mt-6 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => { setDismissed(false); try { localStorage.removeItem(storageKey); } catch { /* ignore */ } setOpen(true); }}
+          className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-white px-3 py-1 text-xs font-semibold text-primary hover:bg-muted/30 transition"
+        >
+          <BookOpen className="h-3.5 w-3.5" /> Show quick guide
+        </button>
+        <Link to="/guide" className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-white px-3 py-1 text-xs font-semibold text-primary hover:bg-muted/30 transition">
+          <Info className="h-3.5 w-3.5" /> Full guide
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-primary/20 bg-white shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-muted/20 transition"
+      >
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+          <BookOpen className="h-4 w-4 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-foreground">
+            {canManage ? "Admin Quick Guide — How to manage nominations" : "Judge Access Guide — What you can do here"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">{steps.length} steps · expand to read</p>
+        </div>
+        <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="border-t border-primary/10 px-5 py-4">
+          <div className="space-y-3">
+            {steps.map((step) => (
+              <div key={step.num} className="flex gap-3">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground mt-0.5">{step.num}</div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{step.title}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{step.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-primary/10 pt-4">
+            <Link to="/guide" className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-white px-4 py-2 text-xs font-semibold text-primary hover:bg-muted/30 transition">
+              <BookOpen className="h-3.5 w-3.5" /> Full guide
+            </Link>
+            <button type="button" onClick={dismiss} className="ml-auto text-xs text-muted-foreground hover:text-foreground transition underline-offset-2 hover:underline">
+              Don't show again
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!open && (
+        <div className="border-t border-primary/10 bg-muted/20 px-5 py-2.5 flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">Click above to expand the step-by-step guide. <Link to="/guide" className="font-semibold text-primary hover:underline">View full guide →</Link></p>
+          <button type="button" onClick={dismiss} className="shrink-0 text-xs text-muted-foreground hover:text-foreground transition">Dismiss</button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AdminPage() {
   const [authed, setAuthed] = useState(false);
@@ -733,8 +840,11 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
         </Card>
       )}
 
+      {/* Quick-start guide */}
+      <AdminQuickGuide canManage={canManage} />
+
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         <StatCard label="Total" value={stats.total} />
         <StatCard label="Pending" value={stats.pending} color="amber" />
         <StatCard label="Shortlisted" value={stats.shortlisted} color="gold" />

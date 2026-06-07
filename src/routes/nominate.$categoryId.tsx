@@ -1,5 +1,5 @@
 // /nominate/$categoryId — Dedicated nomination page, decoupled from homepage
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -11,6 +11,9 @@ import {
   RotateCcw,
   CloudCheck,
   Clock,
+  Info,
+  BookOpen,
+  ChevronDown,
 } from "lucide-react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -353,6 +356,11 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
 
       {/* Step content */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
+        {/* Contextual guide — shown on step 1 for everyone, updated on step 2 for self-nominees */}
+        {(step === 1 || step === 2) && (
+          <NominationGuide isSelfNomination={step === 2 && isSelfNomination} />
+        )}
+
         <AnimatePresence mode="wait">
           {step === 1 && (
             <StepNominee
@@ -432,6 +440,66 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Nomination quick-guide tip card ─────────────────────────────────────────
+
+function NominationGuide({ isSelfNomination }: { isSelfNomination: boolean }) {
+  const [open, setOpen] = useState(false);
+
+  const nomSteps = [
+    { num: 1, title: "Nominee details (Step 1)", body: "Enter the student's full name, student number, DUT email address, faculty and year of study. All fields are required and will be verified by the admin team." },
+    { num: 2, title: "Your details as nominator (Step 2)", body: "Tell us who you are and your relationship to the nominee (peer, lecturer, coach, etc.). If you are nominating yourself, tick the 'I am nominating myself' checkbox — your details will be filled in automatically." },
+    { num: 3, title: "Answer the evaluation questions (Step 3)", body: "Each award category has specific questions. Answer them honestly and in detail. Where the question asks for evidence (transcripts, letters, photos), upload the files using the upload button next to that question." },
+    { num: 4, title: "Upload supporting evidence", body: "You can upload PDFs, Word docs, images and more. Files are stored securely and are only visible to the admin team and shortlisting judges. Maximum 10 MB per file." },
+    { num: 5, title: "Submit", body: "Click Submit on Step 3. You will see a confirmation screen. Your draft is automatically saved as you type — if you close the page and return, your progress will be restored." },
+  ];
+
+  const selfSteps = [
+    { num: 1, title: "Tick 'I am nominating myself'", body: "On Step 2 (Your Details), tick the checkbox. Your name, student number, email and faculty from Step 1 will be copied across automatically — no double-entry needed." },
+    { num: 2, title: "Your relationship is recorded as 'Self-nomination'", body: "This is perfectly allowed and encouraged when supported by a strong Portfolio of Evidence. Admin can see that the nomination is self-submitted." },
+    { num: 3, title: "Answer honestly and with evidence", body: "Self-nominations are evaluated on the same criteria as other nominations. Strong evidence — transcripts, letters of support, event reports — significantly strengthens your submission." },
+    { num: 4, title: "Get a supporting letter", body: "While not required, a letter from a lecturer, coach or community leader confirming your achievements can make your self-nomination much more competitive." },
+  ];
+
+  const steps = isSelfNomination ? selfSteps : nomSteps;
+  const title = isSelfNomination ? "Self-nomination guide — what to expect" : "How to complete this nomination — Quick Guide";
+  const storageKey = isSelfNomination ? "selfNomGuideOpen" : "nominatorGuideOpen";
+
+  return (
+    <div className={`rounded-xl border overflow-hidden mb-5 ${isSelfNomination ? "border-blue-200 bg-blue-50/40" : "border-primary/15 bg-muted/20"}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-black/5 transition"
+      >
+        <Info className={`h-4 w-4 shrink-0 ${isSelfNomination ? "text-blue-600" : "text-primary"}`} />
+        <span className="flex-1 text-sm font-semibold text-foreground">{title}</span>
+        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="border-t border-primary/10 px-4 py-4 space-y-3 bg-white/60">
+          {steps.map((step) => (
+            <div key={step.num} className="flex gap-3">
+              <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white mt-0.5 ${isSelfNomination ? "bg-blue-500" : "bg-primary"}`}>
+                {step.num}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">{step.title}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{step.body}</p>
+              </div>
+            </div>
+          ))}
+          <div className="pt-2 border-t border-primary/10">
+            <Link to="/guide" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+              <BookOpen className="h-3 w-3" /> View full user guide →
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

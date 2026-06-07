@@ -57,14 +57,29 @@ async function docxToHtml(buffer: Buffer): Promise<string> {
 }
 
 function xlsxToHtml(buffer: Buffer): string {
-  const workbook = XLSX.read(buffer, { type: "buffer" });
+  // Hard-limit the workbook to prevent ReDoS / prototype-pollution abuse
+  // (GHSA-4r6h-8v6p-xvw6, GHSA-5pgg-2g8v-p4x9 in the xlsx package).
+  // We never process formula evaluation (cellFormula: false) and disable
+  // dangerous features; only raw cell values are needed for display.
+  const workbook = XLSX.read(buffer, {
+    type: "buffer",
+    cellFormula: false,   // disable formula evaluation → prevents ReDoS
+    cellHTML: false,       // no raw HTML in cells
+    cellStyles: false,     // ignore styling
+    sheetRows: 500,        // never read more than 500 rows per sheet
+  });
+  const MAX_SHEETS = 10;
   if (workbook.SheetNames.length === 0) {
     return "<p><em>No sheets found in workbook.</em></p>";
   }
-  return workbook.SheetNames.map((sheetName: string) => {
+  return workbook.SheetNames.slice(0, MAX_SHEETS).map((sheetName: string) => {
+    // Sanitize the sheet name before embedding in HTML
+    const safeSheetName = sheetName.replace(/[<>&"']/g, (c) =>
+      ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" })[c] ?? c,
+    );
     const sheet = workbook.Sheets[sheetName];
-    const tableHtml = XLSX.utils.sheet_to_html(sheet, { id: sheetName });
-    return `<h2 style="margin-top:24px;">${sheetName}</h2>${tableHtml}`;
+    const tableHtml = XLSX.utils.sheet_to_html(sheet, { id: undefined });
+    return `<h2 style="margin-top:24px;">${safeSheetName}</h2>${tableHtml}`;
   }).join('<hr style="margin:24px 0;"/>');
 }
 
@@ -293,15 +308,39 @@ async function htmlToPdf(bodyHtml: string, documentTitle: string): Promise<Buffe
 
 export const handler: Handler = async (event: HandlerEvent) => {
   console.log(`[office-to-pdf] Incoming ${event.httpMethod} request`);
-  
+
   if (event.httpMethod !== "POST") {
     return jsonError("Method not allowed.", 405);
+  }
+
+  // ── Security: validate Origin to prevent CSRF (OWASP A05) ───────────────
+  const origin = event.headers["origin"] ?? "";
+  const host = event.headers["host"] ?? "";
+  const ALLOWED_ORIGINS = [
+    `https://${host}`,
+    "https://salea2026.netlify.app",
+    // allow local dev
+    "http://localhost:3000",
+    "http://localhost:5173",
+  ];
+  // Only block if an Origin header is present (same-origin requests from the browser
+  // won't send Origin for GET but do for POST — malicious cross-site POSTs will).
+  if (origin && !ALLOWED_ORIGINS.some((o) => origin.startsWith(o))) {
+    console.warn(`[office-to-pdf] Blocked cross-origin request from: ${origin}`);
+    return jsonError("Forbidden.", 403);
+  }
+
+  // ── Security: payload size guard (prevent DoS via huge body) ────────────
+  const bodyStr = event.body ?? "";
+  const MAX_BODY_BYTES = 10 * 1024; // JSON body is just URLs — 10 KB is generous
+  if (Buffer.byteLength(bodyStr, "utf8") > MAX_BODY_BYTES) {
+    return jsonError("Request body too large.", 413);
   }
 
   // Parse request body
   let body: { sourceUrl?: string; fileName?: string };
   try {
-    body = JSON.parse(event.body ?? "{}") as { sourceUrl?: string; fileName?: string };
+    body = JSON.parse(bodyStr) as { sourceUrl?: string; fileName?: string };
   } catch {
     return jsonError("Invalid JSON body.", 400);
   }
@@ -313,12 +352,34 @@ export const handler: Handler = async (event: HandlerEvent) => {
     return jsonError("Both sourceUrl and fileName are required.", 400);
   }
 
+  // ── Security: validate sourceUrl is a Firebase Storage URL (SSRF guard) ──
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(sourceUrl);
+  } catch {
+    return jsonError("Invalid sourceUrl.", 400);
+  }
+  const ALLOWED_STORAGE_HOSTS = [
+    "firebasestorage.googleapis.com",
+    "storage.googleapis.com",
+  ];
+  if (!ALLOWED_STORAGE_HOSTS.includes(parsedUrl.hostname)) {
+    console.warn(`[office-to-pdf] Blocked SSRF attempt — host: ${parsedUrl.hostname}`);
+    return jsonError("sourceUrl must point to Firebase Storage.", 400);
+  }
+
+  // ── Security: validate fileName extension ────────────────────────────────
   if (!OFFICE_PATTERN.test(fileName)) {
     const extension = ext(fileName);
     return jsonError(
       `Unsupported format: .${extension}. Supported: .doc, .docx, .xls, .xlsx, .pptx, .ppsx`,
       400,
     );
+  }
+
+  // ── Security: prevent path traversal in fileName ─────────────────────────
+  if (fileName.includes("..") || fileName.includes("/") || fileName.includes("\\")) {
+    return jsonError("Invalid fileName.", 400);
   }
 
   // Download source file from Firebase Storage
@@ -331,7 +392,20 @@ export const handler: Handler = async (event: HandlerEvent) => {
       console.error(`[office-to-pdf] ${msg}`);
       return jsonError(msg, 502);
     }
-    fileBuffer = Buffer.from(await response.arrayBuffer());
+
+    // ── Security: cap download size at 50 MB ──────────────────────────────
+    const MAX_FILE_BYTES = 50 * 1024 * 1024;
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+    if (contentLength > MAX_FILE_BYTES) {
+      return jsonError("Source file exceeds the 50 MB size limit.", 413);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > MAX_FILE_BYTES) {
+      return jsonError("Source file exceeds the 50 MB size limit.", 413);
+    }
+
+    fileBuffer = Buffer.from(arrayBuffer);
     console.log(`[office-to-pdf] Downloaded ${fileBuffer.length} bytes`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -1,0 +1,50 @@
+{
+  "name": "SALEA 2026 — Student Academic & Leadership Excellence Awards",
+  "short_name": "SALEA 2026",
+  "description": "Nominate, judge and celebrate outstanding DUT students at the Student Academic & Leadership Excellence Awards 2026.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a1a2e",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en-ZA",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nominate",
+      "short_name": "Nominate",
+      "description": "Submit a new nomination",
+      "url": "/#categories",
+      "icons": [{ "src": "/logo.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Judge Panel",
+      "short_name": "Judge",
+      "description": "Open the judge evaluation panel",
+      "url": "/judge",
+      "icons": [{ "src": "/logo.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Demo",
+      "short_name": "Demo",
+      "description": "Practice the voting flow",
+      "url": "/demo",
+      "icons": [{ "src": "/logo.png", "sizes": "96x96" }]
+    }
+  ]
+}

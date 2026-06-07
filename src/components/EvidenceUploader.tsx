@@ -24,8 +24,8 @@ import {
   isOfficeFileName,
   stripExtension,
 } from "@/lib/office-to-pdf";
-import { Upload, X, FileText, AlertCircle, Paperclip } from "lucide-react";
-import { motion } from "framer-motion";
+import { Upload, X, FileText, AlertCircle, Paperclip, Link2, ExternalLink, Eye } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 // ─── Exported types ───────────────────────────────────────────────────────────
 
@@ -33,12 +33,14 @@ export type UploadedFile = {
   name: string;
   url: string;
   size: number;
-  /** Firebase Storage path — used for deletion */
+  /** Firebase Storage path — used for deletion. Empty string for link entries. */
   path: string;
   /** Generated PDF preview URL for Office files */
   previewPdfUrl?: string;
   /** Firebase Storage path for generated preview PDF */
   previewPdfPath?: string;
+  /** "sharepoint" = external link alternative, no file stored in Firebase */
+  type?: "file" | "sharepoint";
 };
 
 /**
@@ -94,6 +96,49 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// ─── SharePoint link preview modal ───────────────────────────────────────────
+
+function SharePointPreview({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+  // Attempt iframe embed: append ?web=1 for SharePoint, leave others as-is
+  const embedUrl = url.includes("sharepoint.com") && !url.includes("?")
+    ? `${url}?web=1`
+    : url.includes("sharepoint.com")
+    ? url.replace(/(\?|$)/, "?web=1&")
+    : url;
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex flex-col w-full max-w-4xl h-[80vh] rounded-xl overflow-hidden border border-primary/20 bg-background shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-primary/10 bg-primary/5 shrink-0">
+          <Link2 className="h-4 w-4 text-primary" />
+          <span className="flex-1 min-w-0 truncate text-sm font-medium">{name}</span>
+          <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0">
+            <ExternalLink className="h-3.5 w-3.5" /> Open in SharePoint
+          </a>
+          <button type="button" onClick={onClose} className="ml-2 rounded p-1 hover:bg-primary/10 text-muted-foreground hover:text-foreground transition">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <iframe
+          src={embedUrl}
+          title={name}
+          className="flex-1 w-full border-0"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+        />
+        <p className="px-4 py-2 text-[10px] text-muted-foreground text-center shrink-0">
+          Preview powered by SharePoint's built-in viewer · If blank, the link may require DUT login or "Anyone with the link" sharing.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Single-label uploader (internal) ────────────────────────────────────────
 
 interface LabelUploaderProps {
@@ -108,6 +153,10 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
   const inputRef = useRef<HTMLInputElement>(null);
   const [tasks, setTasks] = useState<InProgressUpload[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [linkInput, setLinkInput] = useState("");
+  const [linkError, setLinkError] = useState("");
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
 
   const handleFiles = useCallback(
     (fileList: File[]) => {
@@ -175,20 +224,36 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
     [basePath, files, onFilesChange],
   );
 
-  async function removeFile(file: UploadedFile) {
-    try {
-      await deleteObject(storageRef(storage, file.path));
-    } catch {
-      /* ignore */
+  function addLink() {
+    setLinkError("");
+    const trimmed = linkInput.trim();
+    if (!trimmed) { setLinkError("Paste a link first."); return; }
+    let parsed: URL;
+    try { parsed = new URL(trimmed); } catch { setLinkError("Not a valid URL."); return; }
+    if (parsed.protocol !== "https:") { setLinkError("Only HTTPS links are accepted."); return; }
+    if (files.some((f) => f.type === "sharepoint" && f.url === trimmed)) {
+      setLinkError("This link is already added."); return;
     }
-    if (file.previewPdfPath) {
-      try {
-        await deleteObject(storageRef(storage, file.previewPdfPath));
-      } catch {
-        /* ignore */
+    // Derive a readable name from the URL
+    const rawName = decodeURIComponent(parsed.pathname.split("/").filter(Boolean).pop() ?? "")
+      || parsed.hostname;
+    const name = rawName.length > 60 ? rawName.slice(0, 57) + "…" : rawName;
+    onFilesChange([
+      ...files,
+      { name, url: trimmed, size: 0, path: "", type: "sharepoint" },
+    ]);
+    setLinkInput("");
+    setShowLinkInput(false);
+  }
+
+  async function removeFile(file: UploadedFile) {
+    if (file.type !== "sharepoint") {
+      try { await deleteObject(storageRef(storage, file.path)); } catch { /* ignore */ }
+      if (file.previewPdfPath) {
+        try { await deleteObject(storageRef(storage, file.previewPdfPath)); } catch { /* ignore */ }
       }
     }
-    onFilesChange(files.filter((f) => f.path !== file.path));
+    onFilesChange(files.filter((f) => f !== file));
   }
 
   function onDrop(e: React.DragEvent) {
@@ -199,6 +264,9 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
 
   return (
     <div className="rounded-lg border border-primary/15 bg-background/40">
+      {preview && (
+        <SharePointPreview url={preview.url} name={preview.name} onClose={() => setPreview(null)} />
+      )}
       {/* Label row */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-primary/10">
         <Paperclip className="h-3 w-3 shrink-0 text-primary/70" />
@@ -210,36 +278,65 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
         )}
       </div>
 
-      {/* Uploaded files */}
+      {/* Uploaded files + links */}
       {files.length > 0 && (
         <div className="space-y-1 px-3 pt-2">
-          {files.map((file) => (
-            <div
-              key={file.path}
-              className="flex items-center gap-2 rounded-md bg-primary/5 px-2 py-1.5"
-            >
-              <FileText className="h-3 w-3 shrink-0 text-primary" />
-              <a
-                href={file.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="min-w-0 flex-1 truncate text-xs text-foreground hover:text-primary hover:underline"
-              >
-                {file.name}
-              </a>
-              <span className="shrink-0 text-[10px] text-muted-foreground">
-                {formatFileSize(file.size)}
-              </span>
-              <button
-                type="button"
-                onClick={() => removeFile(file)}
-                className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
-                title="Remove"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
+          {files.map((file, i) =>
+            file.type === "sharepoint" ? (
+              <div key={i} className="flex items-center gap-2 rounded-md bg-blue-500/10 border border-blue-500/20 px-2 py-1.5">
+                <Link2 className="h-3 w-3 shrink-0 text-blue-500" />
+                <span className="min-w-0 flex-1 truncate text-xs text-foreground">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setPreview({ url: file.url, name: file.name })}
+                  className="shrink-0 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-500/10 transition"
+                  title="Preview"
+                >
+                  <Eye className="h-3 w-3" /> Preview
+                </button>
+                <a
+                  href={file.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-primary transition"
+                  title="Open in SharePoint"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => removeFile(file)}
+                  className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
+                  title="Remove"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <div key={file.path} className="flex items-center gap-2 rounded-md bg-primary/5 px-2 py-1.5">
+                <FileText className="h-3 w-3 shrink-0 text-primary" />
+                <a
+                  href={file.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-w-0 flex-1 truncate text-xs text-foreground hover:text-primary hover:underline"
+                >
+                  {file.name}
+                </a>
+                <span className="shrink-0 text-[10px] text-muted-foreground">
+                  {formatFileSize(file.size)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeFile(file)}
+                  className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
+                  title="Remove"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )
+          )}
         </div>
       )}
 
@@ -320,6 +417,54 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
           }}
         />
       </div>
+
+      {/* SharePoint / link alternative */}
+      <div className="mx-3 mb-2.5">
+        <button
+          type="button"
+          onClick={() => { setShowLinkInput((v) => !v); setLinkError(""); }}
+          className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition"
+        >
+          <Link2 className="h-3 w-3" />
+          {showLinkInput ? "Cancel link" : "Add SharePoint / OneDrive link instead"}
+        </button>
+        <AnimatePresence>
+          {showLinkInput && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="url"
+                  value={linkInput}
+                  onChange={(e) => setLinkInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addLink()}
+                  placeholder="https://dutac.sharepoint.com/..."
+                  className="flex-1 min-w-0 rounded-md border border-primary/20 bg-background px-2.5 py-1.5 text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+                />
+                <button
+                  type="button"
+                  onClick={addLink}
+                  className="shrink-0 rounded-md bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 text-xs font-medium transition"
+                >
+                  Add
+                </button>
+              </div>
+              {linkError && (
+                <p className="mt-1 flex items-center gap-1 text-[10px] text-destructive">
+                  <AlertCircle className="h-3 w-3" /> {linkError}
+                </p>
+              )}
+              <p className="mt-1 text-[10px] text-muted-foreground/70">
+                Share the file with "Anyone with the link (view)" for the reviewer to see it.
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
@@ -350,7 +495,7 @@ export function EvidenceUploader({
 }: EvidenceUploaderProps) {
   return (
     <div className="mt-3 overflow-hidden rounded-lg border border-primary/20 bg-primary/5">
-      <p className="px-3 pt-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-primary">
+      <p className="px-3 pt-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-red-600 dark:text-red-400">
         Supporting Evidence Required — upload each document below
       </p>
       <div className="space-y-2 px-3 pb-3">

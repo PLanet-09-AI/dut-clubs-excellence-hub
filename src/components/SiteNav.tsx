@@ -1,17 +1,93 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Trophy, Calendar, Award, Sparkles, Users, ChevronRight, BookOpen, Play } from "lucide-react";
-import { useState } from "react";
+import { Menu, Trophy, Calendar, Award, Sparkles, Users, ChevronRight, BookOpen, Play, Download, CheckCircle2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
   SheetHeader,
 } from "@/components/ui/sheet";
+import { subscribeToAuthState } from "@/lib/auth-firebase";
+import { getDoc, doc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
 const logo = "/logo.png";
+const APP_VERSION = "1.0.0";
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
+/** Returns true when running as an installed PWA (standalone display mode). */
+function useIsPWA() {
+  const [isPWA, setIsPWA] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(display-mode: standalone)");
+    setIsPWA(mq.matches || (navigator as Navigator & { standalone?: boolean }).standalone === true);
+    const handler = (e: MediaQueryListEvent) => setIsPWA(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isPWA;
+}
 
 export default function SiteNav() {
   const [isOpen, setIsOpen] = useState(false);
+  const [userRole, setUserRole] = useState<"admin" | "judge" | "none" | null>(null);
+  const isPWA = useIsPWA();
+
+  // PWA install prompt
+  const installPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
+  const [installState, setInstallState] = useState<"idle" | "installed" | "unavailable">("idle");
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      installPromptRef.current = e as BeforeInstallPromptEvent;
+      setInstallState("idle");
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    // Already installed?
+    window.addEventListener("appinstalled", () => {
+      installPromptRef.current = null;
+      setInstallState("installed");
+    });
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeToAuthState(async (user) => {
+      if (!user) { setUserRole("none"); return; }
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const role = snap.data()?.role;
+        setUserRole(role === "admin" || role === "judge" ? role : "none");
+      } catch {
+        setUserRole("none");
+      }
+    });
+    return unsub;
+  }, []);
+
+  const isPrivileged = userRole === "admin" || userRole === "judge";
+
+  async function handleInstall(onFallback?: () => void) {
+    if (installPromptRef.current) {
+      await installPromptRef.current.prompt();
+      const { outcome } = await installPromptRef.current.userChoice;
+      if (outcome === "accepted") {
+        installPromptRef.current = null;
+        setInstallState("installed");
+      }
+    } else {
+      // Prompt unavailable (iOS, already installed, non-HTTPS dev, etc.)
+      setInstallState("unavailable");
+      setTimeout(() => setInstallState("idle"), 4000);
+      onFallback?.();
+    }
+  }
 
   const NavLinks = () => (
     <>
@@ -30,9 +106,11 @@ export default function SiteNav() {
       <Link to="/guide" className="flex items-center gap-1 transition hover:text-primary" activeProps={{ className: "text-primary" }} onClick={() => setIsOpen(false)}>
         <BookOpen className="h-3.5 w-3.5" /> Guide
       </Link>
-      <Link to="/demo" className="flex items-center gap-1 transition hover:text-primary" activeProps={{ className: "text-primary" }} onClick={() => setIsOpen(false)}>
-        <Play className="h-3.5 w-3.5" /> Demo
-      </Link>
+      {isPrivileged && (
+        <Link to="/demo" className="flex items-center gap-1 transition hover:text-primary" activeProps={{ className: "text-primary" }} onClick={() => setIsOpen(false)}>
+          <Play className="h-3.5 w-3.5" /> Demo
+        </Link>
+      )}
       <Link to="/admin" className="transition hover:text-primary" activeProps={{ className: "text-primary" }} onClick={() => setIsOpen(false)}>
         Admin
       </Link>
@@ -60,9 +138,50 @@ export default function SiteNav() {
         </nav>
 
         <div className="flex items-center gap-4">
-          <Link to="/" hash="about" className="hidden sm:block">
-            <Button className="bg-gold text-primary-foreground hover:opacity-90">Learn More</Button>
-          </Link>
+          {/* Desktop CTA: "Download App" on browser, "Learn More" inside PWA */}
+          {isPWA ? (
+            <Link to="/" hash="about" className="hidden sm:flex items-center gap-2">
+              <Button className="bg-gold text-primary-foreground hover:opacity-90">
+                Learn More
+              </Button>
+            </Link>
+          ) : (
+            <div className="relative hidden sm:block">
+              <Button
+                className="bg-gold text-primary-foreground hover:opacity-90 flex items-center gap-2"
+                title={`SALEA 2026 v${APP_VERSION}`}
+                onClick={() => handleInstall(() =>
+                  document.getElementById("about")?.scrollIntoView({ behavior: "smooth" })
+                )}
+              >
+                {installState === "installed" ? (
+                  <><CheckCircle2 className="h-4 w-4" /> Installed!</>
+                ) : (
+                  <><Download className="h-4 w-4" /> Install App
+                    <span className="text-[10px] opacity-70 font-normal ml-1">v{APP_VERSION}</span>
+                  </>
+                )}
+              </Button>
+              {installState === "unavailable" && (
+                <div className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-primary/20 bg-white shadow-lg p-4 text-xs text-muted-foreground z-50 space-y-2">
+                  <p className="font-semibold text-foreground text-sm">Install SALEA 2026</p>
+                  <div>
+                    <p className="font-medium text-foreground">💻 Desktop (Chrome / Edge)</p>
+                    <p>Look for the <strong>install icon ⊕</strong> in the address bar and click it, or open the browser menu → "Install SALEA 2026".</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">🍎 iPhone / iPad</p>
+                    <p>Tap the Share button → "Add to Home Screen".</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">🤖 Android</p>
+                    <p>Tap ⋮ browser menu → "Add to Home Screen" or "Install app".</p>
+                  </div>
+                  <p className="text-muted-foreground/60 pt-1 border-t border-primary/10">The app may already be installed — check your Start Menu or home screen.</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Mobile Nav Toggle - Positioned on the RIGHT */}
           <div className="md:hidden">
@@ -143,17 +262,19 @@ export default function SiteNav() {
                     <span className="text-lg font-semibold">Guide</span>
                   </Link>
 
-                  <Link 
-                    to="/demo" 
-                    className="flex items-center gap-4 px-4 py-4 rounded-xl transition hover:bg-primary/5 hover:text-primary group"
-                    activeProps={{ className: "bg-primary/10 text-primary" }}
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                      <Play className="h-5 w-5" />
-                    </div>
-                    <span className="text-lg font-semibold">Demo</span>
-                  </Link>
+                  {isPrivileged && (
+                    <Link 
+                      to="/demo" 
+                      className="flex items-center gap-4 px-4 py-4 rounded-xl transition hover:bg-primary/5 hover:text-primary group"
+                      activeProps={{ className: "bg-primary/10 text-primary" }}
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                        <Play className="h-5 w-5" />
+                      </div>
+                      <span className="text-lg font-semibold">Demo</span>
+                    </Link>
+                  )}
 
                   <Link 
                     to="/admin" 
@@ -167,12 +288,40 @@ export default function SiteNav() {
                     <span className="text-lg font-semibold">Admin</span>
                   </Link>
 
-                  <div className="mt-8 pt-8 border-t border-primary/10">
-                    <Link to="/" hash="about" onClick={() => setIsOpen(false)}>
-                      <Button className="w-full h-14 bg-gold text-primary-foreground text-lg font-bold shadow-lg shadow-gold/20 flex items-center justify-center gap-2">
-                        Learn More <ChevronRight className="h-5 w-5" />
-                      </Button>
-                    </Link>
+                  <div className="mt-8 pt-8 border-t border-primary/10 space-y-2">
+                    {isPWA ? (
+                      <Link to="/" hash="about" onClick={() => setIsOpen(false)}>
+                        <Button className="w-full h-14 bg-gold text-primary-foreground text-lg font-bold shadow-lg shadow-gold/20 flex items-center justify-center gap-2">
+                          Learn More <ChevronRight className="h-5 w-5" />
+                        </Button>
+                      </Link>
+                    ) : (
+                      <>
+                        <button
+                          className="w-full h-14 rounded-lg bg-gold text-primary-foreground text-lg font-bold shadow-lg shadow-gold/20 flex items-center justify-center gap-2"
+                          onClick={() => {
+                            setIsOpen(false);
+                            handleInstall();
+                          }}
+                        >
+                          {installState === "installed" ? (
+                            <><CheckCircle2 className="h-5 w-5" /> Installed!</>
+                          ) : (
+                            <><Download className="h-5 w-5" /> Install App
+                              <span className="text-xs opacity-70 font-normal">v{APP_VERSION}</span>
+                            </>
+                          )}
+                        </button>
+                        {installState === "unavailable" && (
+                          <div className="rounded-lg border border-primary/15 bg-muted/40 p-3 text-xs text-muted-foreground space-y-1.5">
+                            <p className="font-semibold text-foreground">Install SALEA 2026</p>
+                            <p><strong>💻 Desktop:</strong> look for ⊕ in the address bar, or browser menu → "Install SALEA 2026".</p>
+                            <p><strong>🍎 iOS:</strong> Share → "Add to Home Screen".</p>
+                            <p><strong>🤖 Android:</strong> ⋮ menu → "Install app".</p>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 </nav>
               </SheetContent>

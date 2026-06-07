@@ -15,7 +15,7 @@ import {
 import { collection, onSnapshot, query, orderBy, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { signIn, signOut as firebaseSignOut, subscribeToAuthState } from "@/lib/auth-firebase";
-import { AWARD_THEME, AWARD_CATEGORIES, EVALUATION_CRITERIA } from "@/data/awards";
+import { AWARD_THEME, AWARD_CATEGORIES, getCriteriaForCategory } from "@/data/awards";
 import SiteNav from "@/components/SiteNav";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -93,12 +93,15 @@ function Stars({ value, max = 5 }: { value: number; max?: number }) {
 // ─── Per-criterion breakdown (collapsible) ────────────────────────────────────
 function CriteriaBreakdown({
   totals,
+  categoryId,
 }: {
   totals: Record<string, { sum: number; count: number }>;
+  categoryId: string;
 }) {
   const [open, setOpen] = useState(false);
 
-  const rows = EVALUATION_CRITERIA.map((c) => {
+  const criteria = getCriteriaForCategory(categoryId);
+  const rows = criteria.map((c) => {
     const t = totals[c.id];
     const avg = t && t.count > 0 ? t.sum / t.count : 0;
     return { id: c.id, label: c.label, avg, count: t?.count ?? 0, max: c.max ?? 5 };
@@ -456,7 +459,7 @@ function LeaderboardContent({ role }: { role: string | null }) {
                   return (
                     <div
                       key={nominee.nominationId}
-                      className={`flex items-center gap-4 rounded-2xl border px-5 py-4 transition ${
+                      className={`flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border px-4 py-4 transition ${
                         rank === 1
                           ? "border-yellow-400/50 bg-yellow-50/60 shadow-sm"
                           : rank === 2
@@ -466,11 +469,16 @@ function LeaderboardContent({ role }: { role: string | null }) {
                           : "border-primary/10 bg-white"
                       }`}
                     >
-                      <RankBadge rank={rank} />
+                      <div className="flex items-center gap-3 sm:contents">
+                        <RankBadge rank={rank} />
+                        <p className={`font-semibold sm:hidden ${isTop ? "text-base" : "text-sm"}`}>
+                          {nominee.nomineeName}
+                        </p>
+                      </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className={`font-semibold ${isTop ? "text-base" : "text-sm"}`}>
+                          <p className={`font-semibold hidden sm:block ${isTop ? "text-base" : "text-sm"}`}>
                             {nominee.nomineeName}
                           </p>
                           <div className="flex items-center gap-3 shrink-0">
@@ -509,7 +517,7 @@ function LeaderboardContent({ role }: { role: string | null }) {
                           {nominee.judgeCount} judge{nominee.judgeCount !== 1 ? "s" : ""} rated · max {maxPossible} pts
                         </p>
 
-                        <CriteriaBreakdown totals={nominee.criteriaTotals} />
+                        <CriteriaBreakdown totals={nominee.criteriaTotals} categoryId={nominee.categoryId} />
                       </div>
                     </div>
                   );
