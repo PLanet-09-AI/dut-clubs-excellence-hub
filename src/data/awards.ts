@@ -17,8 +17,10 @@ export type AwardCategory = {
 };
 
 // ─── Judge evaluation criteria ────────────────────────────────────────────────
-// Judges rate each nominee against every criterion below (per-question rating).
-// The overall leaderboard score is the average of these criterion ratings.
+// Each category has its own set of judge criteria derived from its nomination
+// questions. Judges rate 1–5 stars per criterion; the leaderboard sums the totals.
+//
+// Keep `id` values stable once scoring begins — changing an id orphans saved scores.
 
 export type EvaluationCriterion = {
   id: string;
@@ -28,58 +30,91 @@ export type EvaluationCriterion = {
   description?: string;
   /** Maximum stars for this criterion (default 5) */
   max?: number;
-  /** Weight used when averaging (default 1) */
+  /** Weight used when computing the weighted average (default 1) */
   weight?: number;
 };
 
-/**
- * DUMMY / placeholder evaluation criteria.
- *
- * ⚠️ These are temporary stand-ins. The real evaluation questions are not yet
- * available — when you receive them, replace each `label` / `description` below
- * (and add/remove entries) and the judge panel + leaderboard update automatically.
- *
- * Keep the `id` values stable once judges start scoring, otherwise existing
- * per-criterion scores will no longer line up with their criterion.
- */
-export const EVALUATION_CRITERIA: EvaluationCriterion[] = [
-  {
-    id: "c1",
-    label: "Criterion 1 — Placeholder",
-    description: "Dummy criterion. Replace with the official evaluation question.",
-    max: 5,
-    weight: 1,
-  },
-  {
-    id: "c2",
-    label: "Criterion 2 — Placeholder",
-    description: "Dummy criterion. Replace with the official evaluation question.",
-    max: 5,
-    weight: 1,
-  },
-  {
-    id: "c3",
-    label: "Criterion 3 — Placeholder",
-    description: "Dummy criterion. Replace with the official evaluation question.",
-    max: 5,
-    weight: 1,
-  },
-  {
-    id: "c4",
-    label: "Criterion 4 — Placeholder",
-    description: "Dummy criterion. Replace with the official evaluation question.",
-    max: 5,
-    weight: 1,
-  },
+// ─── Per-category criteria ────────────────────────────────────────────────────
+
+const CRITERIA_DEAN: EvaluationCriterion[] = [
+  { id: "dean-c1", label: "Academic Excellence", description: "Has the nominee demonstrated a strong academic record (75%+ aggregate)? Are their achievements well-evidenced?", max: 5, weight: 2 },
+  { id: "dean-c2", label: "Leadership & Mentorship", description: "Quality and breadth of leadership roles held and impact on peers through mentorship.", max: 5, weight: 2 },
+  { id: "dean-c3", label: "Community Service & Outreach", description: "Depth and sustained nature of community or campus outreach contributions.", max: 5, weight: 1 },
+  { id: "dean-c4", label: "Innovation & Creativity", description: "Has the nominee introduced original ideas or improved processes at DUT or in the community?", max: 5, weight: 1 },
+  { id: "dean-c5", label: "Integrity & Values", description: "Does the nominee embody SALEA values: excellence, integrity, leadership and DUT's Living Values Framework?", max: 5, weight: 1 },
+  { id: "dean-c6", label: "Personal Growth", description: "Evidence of deliberate personal development, resilience and overcoming challenges.", max: 5, weight: 1 },
 ];
 
+const CRITERIA_SPORT: EvaluationCriterion[] = [
+  { id: "sport-c1", label: "Sportsmanship & Integrity", description: "Demonstrated integrity, fairness, respect for opponents and positive attitude during competition.", max: 5, weight: 2 },
+  { id: "sport-c2", label: "Leadership in Sport", description: "Leadership roles held — captain, club officer, event organiser — and the impact of that leadership.", max: 5, weight: 2 },
+  { id: "sport-c3", label: "Team & Community Culture", description: "Has the nominee fostered unity, teamwork and a positive sport culture at DUT or in the community?", max: 5, weight: 1 },
+  { id: "sport-c4", label: "Academic Balance", description: "Has the nominee maintained the required academic standard (65%) alongside their sporting commitments?", max: 5, weight: 1 },
+];
+
+const CRITERIA_WELLNESS: EvaluationCriterion[] = [
+  { id: "well-c1", label: "Quality of Wellness Initiative", description: "How impactful, innovative and well-organised were the wellness programmes or activities led by the nominee?", max: 5, weight: 2 },
+  { id: "well-c2", label: "Measurable Impact on Peers", description: "Evidence of positive change in physical, mental or emotional well-being of DUT students.", max: 5, weight: 2 },
+  { id: "well-c3", label: "Collaboration & Sustainability", description: "Did the nominee collaborate with other departments or organisations? Are the initiatives sustainable?", max: 5, weight: 1 },
+];
+
+const CRITERIA_SOCIETY: EvaluationCriterion[] = [
+  { id: "soc-c1", label: "Leadership Excellence", description: "Quality of academic excellence and leadership initiatives driven by the society/club.", max: 5, weight: 2 },
+  { id: "soc-c2", label: "Impactful Initiatives", description: "Evidence of initiatives that meaningfully enhanced DUT student life (outputs and outcomes documented).", max: 5, weight: 2 },
+  { id: "soc-c3", label: "Inclusivity & Vibrancy", description: "Commitment to a diverse, vibrant, inclusive campus community.", max: 5, weight: 1 },
+  { id: "soc-c4", label: "Creative & Innovative Approaches", description: "Did the society use unique, creative methods to achieve objectives?", max: 5, weight: 1 },
+  { id: "soc-c5", label: "Collaborations", description: "Quality and reach of partnerships with other organisations, departments or external bodies.", max: 5, weight: 1 },
+  { id: "soc-c6", label: "Documented Outcomes", description: "Are the outcomes clearly evidenced through reports, registers and testimonials?", max: 5, weight: 1 },
+];
+
+const CRITERIA_RESIDENCE: EvaluationCriterion[] = [
+  { id: "res-c1", label: "Overall Residence Achievement", description: "How compelling is the residence's story of excellence — culture, engagement and student outcomes?", max: 5, weight: 2 },
+  { id: "res-c2", label: "Programme Quality & Attendance", description: "Quality, frequency and attendance rates of in-house and central programmes.", max: 5, weight: 2 },
+  { id: "res-c3", label: "Living Values in Practice", description: "How well are DUT Living Values embedded — consequence management, code of conduct and resident well-being?", max: 5, weight: 2 },
+];
+
+const CRITERIA_ENTREPRENEUR: EvaluationCriterion[] = [
+  { id: "ent-c1", label: "Originality & Value Proposition", description: "How original, unique and relevant is the entrepreneurial venture? Is the value proposition clearly articulated?", max: 5, weight: 2 },
+  { id: "ent-c2", label: "Vision & Strategic Leadership", description: "Clarity of long-term vision and evidence that the nominee is effectively leading the venture toward it.", max: 5, weight: 2 },
+  { id: "ent-c3", label: "Resilience & Personal Growth", description: "Depth of reflection on challenges faced and growth demonstrated on the entrepreneurial journey.", max: 5, weight: 1 },
+  { id: "ent-c4", label: "Team & Resource Management", description: "Effectiveness of managing people, finances and operations for productivity.", max: 5, weight: 1 },
+  { id: "ent-c5", label: "Social Responsibility & Community Impact", description: "Contribution of the venture to social responsibility or the DUT/broader community.", max: 5, weight: 1 },
+];
+
+const CRITERIA_EMERGING: EvaluationCriterion[] = [
+  { id: "em-c1", label: "Early Leadership Potential", description: "Strength and quality of leadership roles already taken as a first-year student.", max: 5, weight: 2 },
+  { id: "em-c2", label: "Character & Integrity", description: "Evidence of outstanding integrity, positive values and making a difference for others.", max: 5, weight: 2 },
+  { id: "em-c3", label: "Positive Difference Made", description: "Specific, documented moments where the nominee improved student life or the DUT community.", max: 5, weight: 2 },
+];
+
+const CRITERIA_DIVERSITY: EvaluationCriterion[] = [
+  { id: "div-c1", label: "Advocacy Effectiveness", description: "How effectively has the nominee championed minority or special-interest groups on campus?", max: 5, weight: 2 },
+  { id: "div-c2", label: "Measurable Impact", description: "Evidence of positive change in campus culture, belonging or inclusion (attendance, surveys, testimonials).", max: 5, weight: 2 },
+  { id: "div-c3", label: "Cross-department Collaboration", description: "Quality of partnerships formed with other units, departments or external organisations to advance inclusion.", max: 5, weight: 1 },
+];
+
+/** Criteria map keyed by category id */
+const CRITERIA_BY_CATEGORY: Record<string, EvaluationCriterion[]> = {
+  dean: CRITERIA_DEAN,
+  sport: CRITERIA_SPORT,
+  wellness: CRITERIA_WELLNESS,
+  society: CRITERIA_SOCIETY,
+  residence: CRITERIA_RESIDENCE,
+  entrepreneur: CRITERIA_ENTREPRENEUR,
+  emerging: CRITERIA_EMERGING,
+  diversity: CRITERIA_DIVERSITY,
+};
+
+/** Fallback for unknown/missing category ids */
+export const EVALUATION_CRITERIA: EvaluationCriterion[] = CRITERIA_DEAN;
+
 /**
- * Returns the evaluation criteria for a given category. Currently every category
- * shares the same criteria, but this indirection lets you provide category-specific
- * criteria later without touching the judge/leaderboard UI.
+ * Returns the evaluation criteria for a given category id.
+ * Falls back to Dean's Award criteria if the id is not recognised.
  */
-export function getCriteriaForCategory(_categoryId?: string): EvaluationCriterion[] {
-  return EVALUATION_CRITERIA;
+export function getCriteriaForCategory(categoryId?: string): EvaluationCriterion[] {
+  if (!categoryId) return EVALUATION_CRITERIA;
+  return CRITERIA_BY_CATEGORY[categoryId] ?? EVALUATION_CRITERIA;
 }
 
 /** Weighted average (0–5 scale) of a set of per-criterion star ratings. */

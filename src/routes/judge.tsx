@@ -7,6 +7,7 @@ import {
   Loader2,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Mail,
   Search,
   FileText,
@@ -21,6 +22,8 @@ import {
   ZoomOut,
   RotateCcw,
   Download,
+  BookOpen,
+  Play,
   X as XIcon,
 } from "lucide-react";
 import {
@@ -347,6 +350,152 @@ function JudgePage() {
   );
 }
 
+// ─── Quick-start guide shown on the judge dashboard ──────────────────────────
+
+const JUDGE_STEPS = [
+  {
+    num: 1,
+    title: "Sign in",
+    body: "You're already here! Sign in with the credentials provided by the SALEA admin team. Only judge-role accounts can access this panel.",
+  },
+  {
+    num: 2,
+    title: "Browse shortlisted nominations",
+    body: "The list below shows all nominations shortlisted by admin. Use the search box to find a nominee by name or student number, or filter by category using the dropdown.",
+  },
+  {
+    num: 3,
+    title: "Open a nomination & review the submission",
+    body: "Click any nomination card to open it. On the left you will see the full submission — the nominee's written answers to each question, plus any uploaded evidence (PDFs, transcripts, photos). Read everything carefully before scoring.",
+  },
+  {
+    num: 4,
+    title: "Rate each criterion 1–5 stars",
+    body: "The right panel shows the evaluation criteria for that award category. Rate each criterion from 1 (Poor) to 5 (Exceptional). You can rate as many or as few criteria as you like per session — your ratings auto-save when you click Submit.",
+  },
+  {
+    num: 5,
+    title: "Write your comments & justification",
+    body: "Below the star pickers, type your reasoning, observations and any concerns in the Comments box (max 1 000 characters). This is visible to admin only — nominees never see it.",
+  },
+  {
+    num: 6,
+    title: "Submit your evaluation",
+    body: "Click Submit. You can return and update your scores at any time before the scoring deadline. Your overall score (weighted average of your criteria ratings) is added to the leaderboard total.",
+  },
+  {
+    num: 7,
+    title: "View the leaderboard",
+    body: "Once you have scored at least one nominee, visit the Leaderboard (link in the scoring-open banner above) to see how nominees rank based on all judges' cumulative star totals.",
+  },
+];
+
+function JudgeQuickGuide() {
+  const [open, setOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem("judgeGuideDismissed") === "1"; } catch { return false; }
+  });
+
+  function dismiss() {
+    try { localStorage.setItem("judgeGuideDismissed", "1"); } catch { /* ignore */ }
+    setDismissed(true);
+  }
+
+  if (dismissed) {
+    return (
+      <div className="mt-6 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => { setDismissed(false); try { localStorage.removeItem("judgeGuideDismissed"); } catch { /* ignore */ } setOpen(true); }}
+          className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-white px-3 py-1 text-xs font-semibold text-primary hover:bg-muted/30 transition"
+        >
+          <BookOpen className="h-3.5 w-3.5" /> Show quick guide
+        </button>
+        <Link to="/guide" className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-white px-3 py-1 text-xs font-semibold text-primary hover:bg-muted/30 transition">
+          <Play className="h-3.5 w-3.5" /> Full guide & demo
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-primary/20 bg-white shadow-sm overflow-hidden">
+      {/* Header — always visible */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-muted/20 transition"
+      >
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+          <BookOpen className="h-4 w-4 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-foreground">How to use this panel — Quick Guide</p>
+          <p className="text-xs text-muted-foreground mt-0.5">7 steps · takes about 2 minutes to read</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            to="/demo"
+            onClick={(e) => e.stopPropagation()}
+            className="hidden sm:inline-flex items-center gap-1 rounded-full bg-gold/15 px-3 py-1 text-xs font-semibold text-primary hover:bg-gold/25 transition"
+          >
+            <Play className="h-3 w-3" /> Practice in Demo
+          </Link>
+          <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+
+      {/* Expandable steps */}
+      {open && (
+        <div className="border-t border-primary/10 px-5 py-4">
+          <div className="space-y-3">
+            {JUDGE_STEPS.map((step) => (
+              <div key={step.num} className="flex gap-3">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground mt-0.5">
+                  {step.num}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{step.title}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{step.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-primary/10 pt-4">
+            <Link to="/demo" className="inline-flex items-center gap-1.5 rounded-lg bg-gold text-primary-foreground px-4 py-2 text-xs font-bold hover:opacity-90 transition">
+              <Play className="h-3.5 w-3.5" /> Practice with dummy nominees
+            </Link>
+            <Link to="/guide" className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-white px-4 py-2 text-xs font-semibold text-primary hover:bg-muted/30 transition">
+              <BookOpen className="h-3.5 w-3.5" /> Full guide
+            </Link>
+            <button
+              type="button"
+              onClick={dismiss}
+              className="ml-auto text-xs text-muted-foreground hover:text-foreground transition underline-offset-2 hover:underline"
+            >
+              Don't show again
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Collapsed footer hint */}
+      {!open && (
+        <div className="border-t border-primary/10 bg-muted/20 px-5 py-2.5 flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            New here? Click above to expand the step-by-step guide, or{" "}
+            <Link to="/demo" className="font-semibold text-primary hover:underline">practice in the demo sandbox</Link>.
+          </p>
+          <button type="button" onClick={dismiss} className="shrink-0 text-xs text-muted-foreground hover:text-foreground transition">
+            Dismiss
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
   const uid = auth.currentUser?.uid ?? "";
   const judgeEmail = auth.currentUser?.email ?? "";
@@ -548,6 +697,9 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
           </Link>
         </div>
       )}
+
+      {/* Quick-start guide */}
+      <JudgeQuickGuide />
 
       {/* Stats */}
       <div className="mt-6 grid grid-cols-3 gap-3">
