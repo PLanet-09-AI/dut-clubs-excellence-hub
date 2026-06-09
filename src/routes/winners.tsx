@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { Trophy, Star, Quote, School, GraduationCap } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Trophy, Star, Quote, School, GraduationCap, X } from "lucide-react";
 import SiteNav from "@/components/SiteNav";
 import { subscribePastWinners, type PastWinner, type WinnerTier } from "@/lib/firestore";
 
@@ -42,7 +42,91 @@ const TIER_STYLES: Record<WinnerTier, { label: string; badge: string; border: st
   },
 };
 
-function WinnerCard({ winner, idx }: { winner: PastWinner; idx: number }) {
+function WinnerModal({ winner, onClose }: { winner: PastWinner; onClose: () => void }) {
+  const tier = TIER_STYLES[winner.tier ?? "standard"];
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          className={`relative w-full max-w-md overflow-hidden rounded-2xl border bg-card shadow-2xl ${tier.border}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
+          {/* Photo */}
+          {winner.imageBase64 && (
+            <div className="h-64 w-full overflow-hidden">
+              <img
+                src={winner.imageBase64}
+                alt={winner.name}
+                className="h-full w-full object-cover object-top"
+              />
+            </div>
+          )}
+
+          <div className="p-6">
+            {/* Tier badge + trophy */}
+            <div className="mb-4 flex items-center gap-3">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-card shadow-sm ${tier.icon}`}>
+                <Trophy className="h-5 w-5" />
+              </div>
+              <span className={`rounded-full px-3 py-0.5 text-xs font-bold uppercase tracking-wider ${tier.badge}`}>
+                {tier.label}
+              </span>
+            </div>
+
+            <h2 className="text-xl font-bold leading-snug">{winner.name}</h2>
+            <p className="mt-1 text-sm font-semibold text-primary">{winner.categoryName}</p>
+
+            <div className="mt-3 space-y-2">
+              {winner.faculty && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <School className="h-4 w-4 shrink-0" />
+                  {winner.faculty}
+                </div>
+              )}
+              {winner.programme && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <GraduationCap className="h-4 w-4 shrink-0" />
+                  {winner.programme}
+                </div>
+              )}
+            </div>
+
+            {winner.quote && (
+              <div className="mt-5 rounded-xl border border-primary/10 bg-primary/5 p-4">
+                <Quote className="mb-2 h-5 w-5 text-primary/40" />
+                <p className="text-base italic leading-relaxed text-foreground">"{winner.quote}"</p>
+              </div>
+            )}
+
+            {!winner.quote && (
+              <p className="mt-5 text-sm text-muted-foreground italic">Class of {winner.year} · {tier.label} Award Recipient</p>
+            )}
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function WinnerCard({ winner, idx, onClick }: { winner: PastWinner; idx: number; onClick: () => void }) {
   const tier = TIER_STYLES[winner.tier ?? "standard"];
   return (
     <motion.div
@@ -50,15 +134,16 @@ function WinnerCard({ winner, idx }: { winner: PastWinner; idx: number }) {
       whileInView={{ opacity: 1, scale: 1 }}
       viewport={{ once: true }}
       transition={{ delay: idx * 0.07 }}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-card/40 backdrop-blur-sm transition-all hover:shadow-gold ${tier.border}`}
+      onClick={onClick}
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-card/40 backdrop-blur-sm transition-all hover:shadow-gold cursor-pointer ${tier.border}`}
     >
       {/* Photo */}
       {winner.imageBase64 && (
-        <div className="h-64 w-full overflow-hidden bg-muted/20 flex items-center justify-center">
+        <div className="h-64 w-full overflow-hidden">
           <img
             src={winner.imageBase64}
             alt={winner.name}
-            className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-105"
+            className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
           />
         </div>
       )}
@@ -107,6 +192,7 @@ function WinnerCard({ winner, idx }: { winner: PastWinner; idx: number }) {
 function WinnersPage() {
   const [winners, setWinners] = useState<PastWinner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<PastWinner | null>(null);
 
   useEffect(() => {
     const unsub = subscribePastWinners((docs) => {
@@ -160,9 +246,9 @@ function WinnersPage() {
                     <span className="text-xs text-muted-foreground">{yearWinners.length} winner{yearWinners.length !== 1 ? "s" : ""}</span>
                   </div>
 
-                  <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+                  <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
                     {yearWinners.map((winner, idx) => (
-                      <WinnerCard key={winner.id} winner={winner} idx={idx} />
+                      <WinnerCard key={winner.id} winner={winner} idx={idx} onClick={() => setSelected(winner)} />
                     ))}
                   </div>
                 </section>
@@ -171,6 +257,8 @@ function WinnersPage() {
           </div>
         )}
       </main>
+
+      {selected && <WinnerModal winner={selected} onClose={() => setSelected(null)} />}
 
       <footer className="relative z-10 border-t border-primary/10 bg-background/60 py-12 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 text-sm text-muted-foreground sm:flex-row">

@@ -16,6 +16,8 @@ export default defineConfig({
           globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
           navigateFallback: "/index.html",
           navigateFallbackDenylist: [/^\/\.netlify\//, /^\/api\//],
+          // Exclude Firestore and Firebase Auth WebChannel URLs from SW interception
+          navigateFallbackAllowlist: [/^(?!\/(api|\.netlify))/],
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
@@ -25,6 +27,11 @@ export default defineConfig({
                 expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 7 },
                 cacheableResponse: { statuses: [0, 200] },
               },
+            },
+            {
+              // Exclude Firestore/Firebase APIs from caching — they use streaming/WebChannel
+              urlPattern: /^https:\/\/(firestore|identitytoolkit|securetoken)\.googleapis\.com\/.*/i,
+              handler: "NetworkOnly",
             },
             {
               urlPattern: /^https:\/\/.*/,
@@ -38,7 +45,7 @@ export default defineConfig({
             },
           ],
         },
-        devOptions: { enabled: true, type: "module" },
+        devOptions: { enabled: false, type: "module" },
       }),
     ],
     // Vitest configuration

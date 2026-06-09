@@ -43,6 +43,7 @@ import { join, extname, basename } from "path";
 import { fileURLToPath } from "url";
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import sharp from "sharp";
 
 const __dir = fileURLToPath(new URL(".", import.meta.url));
 const rootDir = join(__dir, "..");
@@ -76,10 +77,24 @@ function mimeFromExt(ext) {
   return map[ext.toLowerCase()] ?? "image/jpeg";
 }
 
-function toBase64DataUrl(filePath) {
-  const ext = extname(filePath);
-  const mime = mimeFromExt(ext);
-  const data = readFileSync(filePath).toString("base64");
+// Max base64 size Firestore allows per field is ~1MB. Target 700KB raw bytes.
+const MAX_BYTES = 700_000;
+
+async function toBase64DataUrl(filePath) {
+  let buf = readFileSync(filePath);
+  if (buf.length > MAX_BYTES) {
+    // Resize + compress with sharp until under limit
+    buf = await sharp(buf)
+      .resize({ width: 900, height: 900, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 75 })
+      .toBuffer();
+    // If still too large, reduce further
+    if (buf.length > MAX_BYTES) {
+      buf = await sharp(buf).jpeg({ quality: 55 }).toBuffer();
+    }
+  }
+  const mime = buf[0] === 0xff ? "image/jpeg" : "image/png";
+  const data = buf.toString("base64");
   return { base64: `data:${mime};base64,${data}`, mime };
 }
 
@@ -121,16 +136,27 @@ async function main() {
       continue;
     }
     const year = Number(parts[1]);
-    const slug = parts[2];
+    let slug = parts[2];
+
+    // Strip known category suffixes so "riashnie-thavier-dean" matches "Riashnie Thavier" in dean category
+    const CATEGORY_SUFFIXES = ["-dean", "-wellness", "-sport", "-society", "-entrepreneurship", "-emerging", "-diversity"];
+    let categoryHint = null;
+    for (const suffix of CATEGORY_SUFFIXES) {
+      if (slug.endsWith(suffix)) {
+        categoryHint = suffix.slice(1); // e.g. "dean"
+        slug = slug.slice(0, slug.length - suffix.length);
+        break;
+      }
+    }
 
     // Find best-matching winner (same year + slug fuzzy match)
     const candidate = winners.find((w) => {
       if (w.year !== year) return false;
+      if (categoryHint && w.categoryId !== categoryHint) return false;
       const winnerSlug = toSlug(w.name);
-      // Accept if the image slug is a leading substring of the winner slug OR vice versa
       // Check slug words: all words in image slug appear in winner slug
       const slugWords = slug.split("-").filter(Boolean);
-      const allWordsMatch = slugWords.every(w => winnerSlug.includes(w));
+      const allWordsMatch = slugWords.every(sw => winnerSlug.includes(sw));
       return winnerSlug.startsWith(slug) || slug.startsWith(winnerSlug) || winnerSlug.includes(slug) || slug.includes(winnerSlug.slice(0, 8)) || allWordsMatch;
     });
 
@@ -141,12 +167,9 @@ async function main() {
     }
 
     const filePath = join(imgDir, file);
-    const { base64, mime } = toBase64DataUrl(filePath);
-    const sizeMB = (readFileSync(filePath).length / 1_048_576).toFixed(2);
+    const { base64, mime } = await toBase64DataUrl(filePath);
+    const sizeMB = (Buffer.from(base64.split(",")[1], "base64").length / 1_048_576).toFixed(2);
 
-    if (readFileSync(filePath).length > 800_000) {
-      console.warn(`  WARN  ${file} is ${sizeMB} MB — Firestore document limit is ~1 MB. Consider resizing.`);
-    }
 
     await db.collection("past_winners").doc(candidate.id).update({
       imageBase64: base64,

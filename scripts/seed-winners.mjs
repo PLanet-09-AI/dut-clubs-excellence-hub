@@ -40,12 +40,29 @@ const seeds = [
   { year: 2023, name: "L Section Residence", categoryId: "residence", categoryName: "Outstanding Residence Life Award", faculty: "ML Sultan Campus", quote: "Care is the curriculum.", tier: "standard" },
 
   // ── 2024 ──────────────────────────────────────────────────────────────────
-  { year: 2024, name: "Thandeka Mhlongo", categoryId: "dean", categoryName: "Dean of Students Prestigious Award", faculty: "Management Sciences", quote: "Leadership is the courage to listen first.", tier: "standard" },
-  { year: 2024, name: "Lwazi Khumalo", categoryId: "sport", categoryName: "Sportsmanship Award", faculty: "Applied Sciences", quote: "Discipline carries you when motivation cannot.", tier: "standard" },
-  { year: 2024, name: "Aisha Patel", categoryId: "wellness", categoryName: "Promotion of Healthy Lifestyle Award", faculty: "Health Sciences", quote: "Service is love made visible.", tier: "standard" },
-  { year: 2024, name: "DUT Activate Society", categoryId: "society", categoryName: "Exemplary Society/Club/Structure Award", faculty: "Steve Biko Campus", quote: "Together is a verb.", tier: "standard" },
-  { year: 2024, name: "Steve Biko Residence", categoryId: "residence", categoryName: "Outstanding Residence Life Award", faculty: "Steve Biko Campus", quote: "Home is where character is built.", tier: "standard" },
-  { year: 2024, name: "Nomvula Zulu", categoryId: "diversity", categoryName: "Diversity & Inclusion Award", faculty: "Arts & Design", quote: "Belonging is the first freedom.", tier: "standard" },
+  // Promotion of Healthy Lifestyle
+  { year: 2024, name: "Riashnie Thavier", categoryId: "wellness", categoryName: "Promotion of Healthy Lifestyle Award", tier: "standard" },
+  // Sportsmanship
+  { year: 2024, name: "Minenhle Ngubani", categoryId: "sport", categoryName: "Sportsmanship Award", tier: "platinum" },
+  { year: 2024, name: "Thalente Hadebe", categoryId: "sport", categoryName: "Sportsmanship Award", tier: "gold" },
+  // Exemplary Society/Club/Structure
+  { year: 2024, name: "Green Campus Initiative", categoryId: "society", categoryName: "Exemplary Society/Club/Structure Award", tier: "platinum" },
+  { year: 2024, name: "University of Life Changers", categoryId: "society", categoryName: "Exemplary Society/Club/Structure Award", tier: "gold" },
+  { year: 2024, name: "South African Institution of Civil Engineering (SAICE)", categoryId: "society", categoryName: "Exemplary Society/Club/Structure Award", tier: "silver" },
+  // Emerging Leader
+  { year: 2024, name: "Mazomba Sesenkosi", categoryId: "emerging", categoryName: "Emerging Leader (First Year Student)", tier: "standard" },
+  // Student Entrepreneurship
+  { year: 2024, name: "Luyanda Majozi", categoryId: "entrepreneurship", categoryName: "Student Entrepreneurship Award", tier: "platinum" },
+  { year: 2024, name: "Noluthando Zuma", categoryId: "entrepreneurship", categoryName: "Student Entrepreneurship Award", tier: "gold" },
+  { year: 2024, name: "Sabelo Mpungose", categoryId: "entrepreneurship", categoryName: "Student Entrepreneurship Award", tier: "silver" },
+  // Dean of Students Prestigious Award
+  { year: 2024, name: "Lungelo Maphumulo", categoryId: "dean", categoryName: "Dean of Students Prestigious Award", tier: "platinum" },
+  { year: 2024, name: "Nonhlanhla Mkhwanazi", categoryId: "dean", categoryName: "Dean of Students Prestigious Award", tier: "gold" },
+  { year: 2024, name: "Riashnie Thavier", categoryId: "dean", categoryName: "Dean of Students Prestigious Award", tier: "silver" },
+  // Outstanding Residence Life
+  { year: 2024, name: "Bayaphambili Residence", categoryId: "residence", categoryName: "Outstanding Residence Life Award", tier: "platinum" },
+  { year: 2024, name: "Astra House", categoryId: "residence", categoryName: "Outstanding Residence Life Award", tier: "gold" },
+  { year: 2024, name: "Hlelo Property 197 Anton Lembede", categoryId: "residence", categoryName: "Outstanding Residence Life Award", tier: "silver" },
 
   // ── 2025 SSA Winners ──────────────────────────────────────────────────────
   // Outstanding Residence Life
