@@ -11,8 +11,9 @@ import {
   Lock,
   Mail,
   ChevronDown,
+  Award,
 } from "lucide-react";
-import { collection, onSnapshot, query, orderBy, doc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, getDoc, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { signIn, signOut as firebaseSignOut, subscribeToAuthState } from "@/lib/auth-firebase";
 import { AWARD_THEME, AWARD_CATEGORIES, getCriteriaForCategory } from "@/data/awards";
@@ -22,6 +23,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { promoteToWinner, type WinnerTier } from "@/lib/firestore";
 
 // ─── Scoring window ───────────────────────────────────────────────────────────
 const OPEN_DATE = new Date(AWARD_THEME.scoringOpenDate);
@@ -138,6 +140,123 @@ function CriteriaBreakdown({
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Declare Winner button (admin only) ───────────────────────────────────────
+const TIER_OPTIONS_LB: { value: WinnerTier; label: string }[] = [
+  { value: "platinum", label: "Platinum" },
+  { value: "gold", label: "Gold" },
+  { value: "silver", label: "Silver" },
+  { value: "standard", label: "Standard" },
+];
+
+function DeclareWinnerButton({
+  nominee,
+  autoTier,
+}: {
+  nominee: NomineeEntry;
+  autoTier: WinnerTier;
+}) {
+  const [open, setOpen] = useState(false);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [tier, setTier] = useState<WinnerTier>(autoTier);
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function handleConfirm() {
+    setSaving(true);
+    setErr("");
+    try {
+      await promoteToWinner({
+        nominationId: nominee.nominationId,
+        nomineeName: nominee.nomineeName,
+        categoryId: nominee.categoryId,
+        categoryName: nominee.categoryName,
+        year,
+        tier,
+      });
+      setDone(true);
+      setTimeout(() => { setOpen(false); setDone(false); }, 1500);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to promote winner.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => { setOpen(true); setTier(autoTier); setDone(false); setErr(""); }}
+        className="mt-2 inline-flex items-center gap-1 rounded-full border border-yellow-400/60 bg-yellow-50 px-3 py-1 text-[11px] font-semibold text-yellow-800 hover:bg-yellow-100 transition"
+      >
+        <Award className="h-3 w-3" /> Declare Winner
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-primary/20 bg-white p-6 shadow-xl">
+            <h3 className="font-bold text-base mb-1">Declare as Winner</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              This will add <strong>{nominee.nomineeName}</strong> to the public Hall of Fame.
+            </p>
+
+            {done ? (
+              <p className="text-sm font-semibold text-green-700">✓ Winner declared and added to Hall of Fame!</p>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <Label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">Award Year</Label>
+                  <Input
+                    type="number"
+                    value={year}
+                    onChange={(e) => setYear(Number(e.target.value))}
+                    min={2000}
+                    max={2100}
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">Tier</Label>
+                  <div className="flex overflow-hidden rounded-xl border border-primary/20 bg-muted/40">
+                    {TIER_OPTIONS_LB.map((t) => (
+                      <button
+                        key={t.value}
+                        type="button"
+                        onClick={() => setTier(t.value)}
+                        className={`flex-1 py-1.5 text-xs font-medium transition ${tier === t.value ? "bg-gold text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {err && <p className="text-xs text-destructive">{err}</p>}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleConfirm}
+                    disabled={saving}
+                    className="flex-1 rounded-xl bg-gold py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                  >
+                    {saving ? "Saving…" : "Confirm"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="flex-1 rounded-xl border border-primary/20 py-2 text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -518,6 +637,14 @@ function LeaderboardContent({ role }: { role: string | null }) {
                         </p>
 
                         <CriteriaBreakdown totals={nominee.criteriaTotals} categoryId={nominee.categoryId} />
+
+                        {/* Declare winner — admin only, top 3 */}
+                        {role === "admin" && rank <= 3 && (
+                          <DeclareWinnerButton
+                            nominee={nominee}
+                            autoTier={rank === 1 ? "platinum" : rank === 2 ? "gold" : "silver"}
+                          />
+                        )}
                       </div>
                     </div>
                   );

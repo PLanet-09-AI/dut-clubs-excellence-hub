@@ -26,6 +26,11 @@ import {
   BookOpen,
   Play,
   Info,
+  Trophy,
+  Upload,
+  Pencil,
+  ImageIcon,
+  Loader2,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -68,7 +73,18 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { AWARD_CATEGORIES } from "@/data/awards";
+import { AWARD_CATEGORIES, FACULTIES } from "@/data/awards";
+import {
+  subscribePastWinners,
+  addPastWinner,
+  updatePastWinner,
+  deletePastWinner,
+  seedPastWinners,
+  promoteToWinner,
+  type PastWinner,
+  type PastWinnerInput,
+  type WinnerTier,
+} from "@/lib/firestore";
 
 // ─── Firestore nomination type (includes per-category answers) ───────────────
 type NominationStatus = "pending" | "shortlisted" | "rejected";
@@ -939,6 +955,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
         <TabsList className="bg-card/60">
           <TabsTrigger value="nominations">Nominations</TabsTrigger>
           {canManage && <TabsTrigger value="categories">Categories</TabsTrigger>}
+          {canManage && <TabsTrigger value="winners" className="gap-1.5"><Trophy className="h-3.5 w-3.5" /> Winners</TabsTrigger>}
           {canManage && (
             <TabsTrigger value="judges" className="gap-1.5">
               <Users2 className="h-3.5 w-3.5" /> Judge Activity
@@ -1110,6 +1127,13 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
           </TabsContent>
         )}
 
+        {/* ── Winners CRUD tab ─── */}
+        {canManage && (
+          <TabsContent value="winners" className="mt-6">
+            <WinnersTab />
+          </TabsContent>
+        )}
+
         {/* ── Judge Activity tab ─── */}
         {canManage && (
           <TabsContent value="judges" className="mt-6">
@@ -1194,6 +1218,462 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
           )}
         </SheetContent>
       </Sheet>
+    </div>
+  );
+}
+
+/* ── Winners CRUD tab ──────────────────────────────────────────────── */
+
+const TIER_OPTIONS: { value: WinnerTier; label: string }[] = [
+  { value: "platinum", label: "Platinum" },
+  { value: "gold", label: "Gold" },
+  { value: "silver", label: "Silver" },
+  { value: "standard", label: "Standard" },
+];
+
+const TIER_BADGE: Record<WinnerTier, string> = {
+  platinum: "bg-slate-100 text-slate-700 border border-slate-300",
+  gold: "bg-yellow-50 text-yellow-700 border border-yellow-300",
+  silver: "bg-zinc-100 text-zinc-600 border border-zinc-300",
+  standard: "bg-primary/10 text-primary border border-primary/20",
+};
+
+const MAX_IMAGE_BYTES = 800_000; // 800 KB raw — warn above this
+
+function compressImageToBase64(file: File, maxPx = 800): Promise<{ base64: string; mime: string }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+      const mime = file.type === "image/png" ? "image/png" : "image/jpeg";
+      resolve({ base64: canvas.toDataURL(mime, 0.82), mime });
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+type WinnerFormState = Omit<PastWinnerInput, "imageBase64" | "imageMimeType"> & {
+  imageBase64?: string;
+  imageMimeType?: string;
+};
+
+function emptyForm(): WinnerFormState {
+  return {
+    year: new Date().getFullYear(),
+    name: "",
+    categoryId: AWARD_CATEGORIES[0].id,
+    categoryName: AWARD_CATEGORIES[0].name,
+    faculty: "",
+    programme: "",
+    quote: "",
+    tier: "standard",
+  };
+}
+
+function WinnersTab() {
+  const [winners, setWinners] = useState<PastWinner[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
+  const [seedMsg, setSeedMsg] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<WinnerFormState>(emptyForm());
+  const [saving, setSaving] = useState(false);
+  const [imgWarning, setImgWarning] = useState("");
+
+  useEffect(() => {
+    const unsub = subscribePastWinners((docs) => {
+      setWinners(docs);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  function openAdd() {
+    setEditingId(null);
+    setForm(emptyForm());
+    setImgWarning("");
+    setShowForm(true);
+  }
+
+  function openEdit(w: PastWinner) {
+    setEditingId(w.id);
+    setForm({
+      year: w.year,
+      name: w.name,
+      categoryId: w.categoryId,
+      categoryName: w.categoryName,
+      faculty: w.faculty ?? "",
+      programme: w.programme ?? "",
+      quote: w.quote ?? "",
+      tier: w.tier ?? "standard",
+      imageBase64: w.imageBase64,
+      imageMimeType: w.imageMimeType,
+      nominationId: w.nominationId,
+    });
+    setImgWarning("");
+    setShowForm(true);
+  }
+
+  function setField<K extends keyof WinnerFormState>(key: K, value: WinnerFormState[K]) {
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      // Keep categoryName in sync when categoryId changes
+      if (key === "categoryId") {
+        const cat = AWARD_CATEGORIES.find((c) => c.id === value);
+        if (cat) next.categoryName = cat.name;
+      }
+      return next;
+    });
+  }
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_IMAGE_BYTES) {
+      setImgWarning(`Image is ${(file.size / 1024).toFixed(0)} KB — compressing to fit Firestore limit.`);
+    } else {
+      setImgWarning("");
+    }
+    try {
+      const { base64, mime } = await compressImageToBase64(file, 800);
+      setField("imageBase64", base64);
+      setField("imageMimeType", mime);
+    } catch {
+      setImgWarning("Could not process image. Try a different file.");
+    }
+    e.target.value = "";
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload: PastWinnerInput = {
+        year: form.year,
+        name: form.name.trim(),
+        categoryId: form.categoryId,
+        categoryName: form.categoryName,
+        faculty: form.faculty?.trim() || undefined,
+        programme: form.programme?.trim() || undefined,
+        quote: form.quote?.trim() || undefined,
+        tier: form.tier,
+        imageBase64: form.imageBase64,
+        imageMimeType: form.imageMimeType,
+        nominationId: form.nominationId,
+      };
+      if (editingId) {
+        await updatePastWinner(editingId, payload);
+      } else {
+        await addPastWinner(payload);
+      }
+      setShowForm(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Delete winner "${name}"? This cannot be undone.`)) return;
+    await deletePastWinner(id);
+  }
+
+  async function handleSeed() {
+    if (!confirm("Seed all historical winners (2022–2025) into Firestore? Existing records will be skipped.")) return;
+    setSeeding(true);
+    setSeedMsg("");
+    try {
+      const { added, skipped } = await seedPastWinners();
+      setSeedMsg(`✓ Seeded ${added} new winners, ${skipped} already existed.`);
+    } catch (err) {
+      setSeedMsg(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setSeeding(false);
+    }
+  }
+
+  const years = Array.from(new Set(winners.map((w) => w.year))).sort((a, b) => b - a);
+
+  return (
+    <div className="space-y-6">
+      {/* Header actions */}
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="flex-1 text-lg font-bold">Past Winners</h2>
+        <Button
+          variant="outline"
+          className="border-primary/30 text-primary text-xs"
+          onClick={handleSeed}
+          disabled={seeding}
+        >
+          {seeding ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trophy className="mr-1.5 h-3.5 w-3.5" />}
+          Seed Historical Winners
+        </Button>
+        <Button onClick={openAdd} className="bg-gold text-primary-foreground text-xs">
+          + Add Winner
+        </Button>
+      </div>
+
+      {seedMsg && (
+        <p className={`text-sm ${seedMsg.startsWith("Error") ? "text-destructive" : "text-green-700"}`}>{seedMsg}</p>
+      )}
+
+      {/* Add / Edit form */}
+      {showForm && (
+        <form
+          onSubmit={handleSave}
+          className="rounded-2xl border border-primary/20 bg-white p-6 shadow-sm space-y-4"
+        >
+          <h3 className="font-semibold">{editingId ? "Edit Winner" : "Add Winner"}</h3>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Year */}
+            <div>
+              <Label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">Year</Label>
+              <Input
+                type="number"
+                value={form.year}
+                onChange={(e) => setField("year", Number(e.target.value))}
+                min={2000}
+                max={2100}
+                required
+              />
+            </div>
+
+            {/* Tier */}
+            <div>
+              <Label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">Tier</Label>
+              <div className="flex overflow-hidden rounded-xl border border-primary/20 bg-muted/40">
+                {TIER_OPTIONS.map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => setField("tier", t.value)}
+                    className={`flex-1 py-1.5 text-xs font-medium transition ${form.tier === t.value ? "bg-gold text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Name */}
+            <div className="sm:col-span-2">
+              <Label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">Name / Entity</Label>
+              <Input
+                value={form.name}
+                onChange={(e) => setField("name", e.target.value)}
+                placeholder="e.g. Luke Jaden Krishnan"
+                required
+              />
+            </div>
+
+            {/* Category */}
+            <div>
+              <Label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">Category</Label>
+              <select
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={form.categoryId}
+                onChange={(e) => setField("categoryId", e.target.value)}
+                required
+              >
+                {AWARD_CATEGORIES.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Faculty */}
+            <div>
+              <Label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">Faculty / Campus</Label>
+              <Input
+                value={form.faculty ?? ""}
+                onChange={(e) => setField("faculty", e.target.value)}
+                placeholder="e.g. Health Sciences"
+                list="faculty-list"
+              />
+              <datalist id="faculty-list">
+                {FACULTIES.map((f) => <option key={f} value={f} />)}
+              </datalist>
+            </div>
+
+            {/* Programme */}
+            <div className="sm:col-span-2">
+              <Label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">Programme / Qualification</Label>
+              <Input
+                value={form.programme ?? ""}
+                onChange={(e) => setField("programme", e.target.value)}
+                placeholder="e.g. Bachelor of Health Sciences in Radiotherapy"
+              />
+            </div>
+
+            {/* Quote */}
+            <div className="sm:col-span-2">
+              <Label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">Inspiring Quote (optional)</Label>
+              <Input
+                value={form.quote ?? ""}
+                onChange={(e) => setField("quote", e.target.value)}
+                placeholder="e.g. Excellence is a habit, not an accident."
+              />
+            </div>
+
+            {/* Photo */}
+            <div className="sm:col-span-2">
+              <Label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">Photo (optional, max 800 KB)</Label>
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-primary/30 bg-muted/20 px-4 py-3 hover:border-primary/50 transition">
+                <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Click to upload image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+              </label>
+              {imgWarning && <p className="mt-1 text-xs text-amber-600">{imgWarning}</p>}
+              {form.imageBase64 && (
+                <div className="mt-2 flex items-center gap-3">
+                  <img
+                    src={form.imageBase64}
+                    alt="Preview"
+                    className="h-16 w-16 rounded-lg object-cover border border-primary/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setField("imageBase64", undefined); setField("imageMimeType", undefined); }}
+                    className="text-xs text-destructive hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Button type="submit" disabled={saving} className="bg-gold text-primary-foreground">
+              {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+              {editingId ? "Save changes" : "Add winner"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {/* Winners list */}
+      {loading ? (
+        <p className="animate-pulse text-sm text-muted-foreground">Loading…</p>
+      ) : winners.length === 0 ? (
+        <Card className="p-12 text-center text-muted-foreground">
+          No winners yet. Click "Seed Historical Winners" to import 2022–2025 data, or add winners manually.
+        </Card>
+      ) : (
+        <div className="space-y-10">
+          {/* Legend */}
+          <div className="flex items-center gap-4 rounded-xl border border-primary/10 bg-muted/30 px-4 py-2.5 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5"><ImageIcon className="h-3.5 w-3.5 text-green-600" /> Photo uploaded</span>
+            <span className="flex items-center gap-1.5"><ImageIcon className="h-3.5 w-3.5 text-muted-foreground" /> Click to upload photo</span>
+            <span className="flex items-center gap-1.5"><Pencil className="h-3.5 w-3.5" /> Edit all fields</span>
+            <span className="ml-auto font-medium">
+              {winners.filter((w) => !w.imageBase64).length > 0
+                ? `${winners.filter((w) => !w.imageBase64).length} photos missing`
+                : "✓ All photos uploaded"}
+            </span>
+          </div>
+          {years.map((year) => (
+            <section key={year}>
+              <div className="mb-3 flex items-center gap-3">
+                <h3 className="font-serif text-2xl font-bold opacity-30">{year}</h3>
+                <div className="h-px flex-1 bg-gradient-to-r from-primary/20 to-transparent" />
+                <span className="text-xs text-muted-foreground">
+                  {winners.filter((w) => w.year === year).length} winner{winners.filter((w) => w.year === year).length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {winners
+                  .filter((w) => w.year === year)
+                  .sort((a, b) => {
+                    const tierOrder: WinnerTier[] = ["platinum", "gold", "silver", "standard"];
+                    return tierOrder.indexOf(a.tier) - tierOrder.indexOf(b.tier);
+                  })
+                  .map((w) => (
+                    <div
+                      key={w.id}
+                      className="flex items-center gap-3 rounded-xl border border-primary/10 bg-white px-4 py-3"
+                    >
+                      {w.imageBase64 ? (
+                        <img src={w.imageBase64} alt="" className="h-10 w-10 rounded-full object-cover border border-primary/20 shrink-0" />
+                      ) : (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                          <Trophy className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p className="font-semibold text-sm truncate">{w.name}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${TIER_BADGE[w.tier ?? "standard"]}`}>
+                            {w.tier ?? "standard"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {w.categoryName}{w.faculty ? ` · ${w.faculty}` : ""}
+                          {w.programme ? ` — ${w.programme}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        {/* Quick photo upload — no form needed */}
+                        <label
+                          title={w.imageBase64 ? "Replace photo" : "Upload photo"}
+                          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition"
+                        >
+                          <ImageIcon className={`h-3.5 w-3.5 ${w.imageBase64 ? "text-green-600" : ""}`} />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const { base64, mime } = await compressImageToBase64(file, 800);
+                              await updatePastWinner(w.id, { imageBase64: base64, imageMimeType: mime });
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => openEdit(w)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(w.id, w.name)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
