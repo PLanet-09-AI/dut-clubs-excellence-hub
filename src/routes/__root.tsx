@@ -123,7 +123,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <div className="md:pl-20">
+        <Outlet />
+      </div>
     </QueryClientProvider>
   );
 }
