@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Star, Quote, School, GraduationCap, X } from "lucide-react";
+import { Trophy, Star, Quote, School, GraduationCap, X, ChevronLeft, ChevronRight } from "lucide-react";
 import SiteNav from "@/components/SiteNav";
 import { subscribePastWinners, type PastWinner, type WinnerTier } from "@/lib/firestore";
 
@@ -189,6 +189,36 @@ function WinnerCard({ winner, idx, onClick }: { winner: PastWinner; idx: number;
   );
 }
 
+function MobileWinnerCarousel({ winners, onSelect }: { winners: PastWinner[]; onSelect: (w: PastWinner) => void }) {
+  const [idx, setIdx] = useState(0);
+  if (winners.length === 0) return null;
+  const winner = winners[idx];
+  return (
+    <div className="relative">
+      <WinnerCard winner={winner} idx={0} onClick={() => onSelect(winner)} />
+      {winners.length > 1 && (
+        <div className="mt-4 flex items-center justify-center gap-4">
+          <button
+            onClick={() => setIdx((i) => (i - 1 + winners.length) % winners.length)}
+            disabled={idx === 0}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/20 bg-card text-primary disabled:opacity-30 transition hover:bg-primary/5"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="text-xs text-muted-foreground">{idx + 1} / {winners.length}</span>
+          <button
+            onClick={() => setIdx((i) => (i + 1) % winners.length)}
+            disabled={idx === winners.length - 1}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/20 bg-card text-primary disabled:opacity-30 transition hover:bg-primary/5"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WinnersPage() {
   const [winners, setWinners] = useState<PastWinner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -202,7 +232,7 @@ function WinnersPage() {
     return unsub;
   }, []);
 
-  const years = Array.from(new Set(winners.map((w) => w.year))).sort((a, b) => b - a);
+  const years = Array.from(new Set(winners.map((w) => w.year))).filter((y) => y >= 2024).sort((a, b) => b - a);
 
   return (
     <div className="relative min-h-screen bg-hero text-foreground">
@@ -246,7 +276,12 @@ function WinnersPage() {
                     <span className="text-xs text-muted-foreground">{yearWinners.length} winner{yearWinners.length !== 1 ? "s" : ""}</span>
                   </div>
 
-                  <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
+                  {/* Mobile: one at a time carousel */}
+                  <div className="sm:hidden">
+                    <MobileWinnerCarousel winners={yearWinners} onSelect={setSelected} />
+                  </div>
+                  {/* Desktop: grid */}
+                  <div className="hidden sm:grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
                     {yearWinners.map((winner, idx) => (
                       <WinnerCard key={winner.id} winner={winner} idx={idx} onClick={() => setSelected(winner)} />
                     ))}

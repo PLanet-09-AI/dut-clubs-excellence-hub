@@ -881,7 +881,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       {/* Sidebar + Content layout */}
       <div className="flex gap-6">
         {/* Sidebar */}
-        <aside className="hidden md:flex flex-col gap-1 w-52 shrink-0">
+        <aside className="hidden md:flex flex-col gap-1 w-52 shrink-0 sticky top-28 self-start">
           {([
             { key: "nominations" as const, label: "Nominations", icon: <FileText className="h-4 w-4" /> },
             ...(canManage ? [
