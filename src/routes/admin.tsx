@@ -72,7 +72,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+// Tabs components removed — sidebar navigation used instead
 import { AWARD_CATEGORIES, FACULTIES } from "@/data/awards";
 import {
   subscribePastWinners,
@@ -578,6 +578,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     { id: string; name: string; tagline: string }[]
   >([]);
   const [newCat, setNewCat] = useState({ name: "", tagline: "" });
+  const [activeSection, setActiveSection] = useState<"nominations" | "categories" | "winners" | "judges">("nominations");
   const [judgeScores, setJudgeScores] = useState<
     Array<{
       id: string;
@@ -877,98 +878,141 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
         </button>
       </div>
 
-      {/* Category tiles */}
-      <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-          <Filter className="h-3 w-3" /> Filter by Category
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <CategoryChip
-            label="All nominations"
-            count={nominations.length}
-            active={selectedCategory === "__all__"}
-            onClick={() => setSelectedCategory("__all__")}
-          />
-          {categoryTiles.map((c) => (
-            <CategoryChip
-              key={c.id}
-              label={c.name}
-              count={c.count}
-              active={selectedCategory === c.id}
-              onClick={() => setSelectedCategory(c.id)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Search + status filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search nominee, student number, nominator…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-          {search && (
+      {/* Sidebar + Content layout */}
+      <div className="flex gap-6">
+        {/* Sidebar */}
+        <aside className="hidden md:flex flex-col gap-1 w-52 shrink-0">
+          {([
+            { key: "nominations" as const, label: "Nominations", icon: <FileText className="h-4 w-4" /> },
+            ...(canManage ? [
+              { key: "categories" as const, label: "Categories", icon: <Filter className="h-4 w-4" /> },
+              { key: "winners" as const, label: "Winners", icon: <Trophy className="h-4 w-4" /> },
+              { key: "judges" as const, label: "Judge Activity", icon: <Users2 className="h-4 w-4" />, badge: judgeScores.length > 0 ? judgeScores.length : undefined },
+            ] : [])
+          ]).map((item) => (
             <button
-              onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              key={item.key}
+              onClick={() => setActiveSection(item.key)}
+              className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all text-left ${
+                activeSection === item.key
+                  ? "bg-primary text-primary-foreground shadow"
+                  : "text-muted-foreground hover:bg-primary/5 hover:text-primary"
+              }`}
             >
-              <XIcon className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-        <div className="flex overflow-hidden rounded-xl border border-primary/20 bg-muted/30 shrink-0">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setStatusFilter(f.value)}
-              className={`px-3 py-1.5 text-xs font-medium transition ${statusFilter === f.value ? "bg-gold text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Results count */}
-      {nominations.length > 0 && (
-        <p className="text-sm text-muted-foreground -mt-4">
-          Showing <span className="font-semibold text-foreground">{filtered.length}</span> of{" "}
-          {nominations.length} nominations
-          {selectedCategory !== "__all__" && (
-            <>
-              {" "}
-              in{" "}
-              <span className="text-primary font-medium">
-                {categoryTiles.find((c) => c.id === selectedCategory)?.name}
-              </span>
-            </>
-          )}
-        </p>
-      )}
-
-      {/* Tabs: Nominations | Categories | Judge Activity */}
-      <Tabs defaultValue="nominations">
-        <TabsList className="bg-card/60">
-          <TabsTrigger value="nominations">Nominations</TabsTrigger>
-          {canManage && <TabsTrigger value="categories">Categories</TabsTrigger>}
-          {canManage && <TabsTrigger value="winners" className="gap-1.5"><Trophy className="h-3.5 w-3.5" /> Winners</TabsTrigger>}
-          {canManage && (
-            <TabsTrigger value="judges" className="gap-1.5">
-              <Users2 className="h-3.5 w-3.5" /> Judge Activity
-              {judgeScores.length > 0 && (
-                <span className="ml-1 rounded-full bg-gold px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
-                  {judgeScores.length}
-                </span>
+              {item.icon}
+              <span className="flex-1">{item.label}</span>
+              {item.badge !== undefined && (
+                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                  activeSection === item.key ? "bg-white/20 text-white" : "bg-gold text-primary-foreground"
+                }`}>{item.badge}</span>
               )}
-            </TabsTrigger>
-          )}
-        </TabsList>
+            </button>
+          ))}
 
-        <TabsContent value="nominations" className="mt-6">
+          {/* Mobile: small scrollable row */}
+        </aside>
+
+        {/* Mobile tab strip */}
+        <div className="md:hidden flex gap-1 overflow-x-auto pb-1 w-full mb-2">
+          {([
+            { key: "nominations" as const, label: "Nominations" },
+            ...(canManage ? [
+              { key: "categories" as const, label: "Categories" },
+              { key: "winners" as const, label: "Winners" },
+              { key: "judges" as const, label: "Judges" },
+            ] : [])
+          ]).map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setActiveSection(item.key)}
+              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                activeSection === item.key
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted/40 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content area */}
+        <div className="flex-1 min-w-0">
+
+        {activeSection === "nominations" && <div className="space-y-6">
+          {/* Category tiles */}
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+              <Filter className="h-3 w-3" /> Filter by Category
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <CategoryChip
+                label="All nominations"
+                count={nominations.length}
+                active={selectedCategory === "__all__"}
+                onClick={() => setSelectedCategory("__all__")}
+              />
+              {categoryTiles.map((c) => (
+                <CategoryChip
+                  key={c.id}
+                  label={c.name}
+                  count={c.count}
+                  active={selectedCategory === c.id}
+                  onClick={() => setSelectedCategory(c.id)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Search + status filters */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search nominee, student number, nominator…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <XIcon className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="flex overflow-hidden rounded-xl border border-primary/20 bg-muted/30 shrink-0">
+              {STATUS_FILTERS.map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => setStatusFilter(f.value)}
+                  className={`px-3 py-1.5 text-xs font-medium transition ${statusFilter === f.value ? "bg-gold text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Results count */}
+          {nominations.length > 0 && (
+            <p className="text-sm text-muted-foreground -mt-2">
+              Showing <span className="font-semibold text-foreground">{filtered.length}</span> of{" "}
+              {nominations.length} nominations
+              {selectedCategory !== "__all__" && (
+                <>
+                  {" "}in{" "}
+                  <span className="text-primary font-medium">
+                    {categoryTiles.find((c) => c.id === selectedCategory)?.name}
+                  </span>
+                </>
+              )}
+            </p>
+          )}
+
+          {/* Nomination cards */}
           {nominations.length === 0 ? (
             <Card className="p-12 text-center text-muted-foreground">
               No nominations yet. Submissions from the public form will appear here in real time.
@@ -1040,10 +1084,9 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
               })}
             </div>
           )}
-        </TabsContent>
+        </div>}
 
-        {canManage && (
-          <TabsContent value="categories" className="mt-6 space-y-6">
+        {canManage && activeSection === "categories" && <div className="space-y-6">
             {/* Add custom category form */}
             <Card className="p-6">
               <h3 className="font-serif text-lg font-bold mb-1">Add custom category</h3>
@@ -1124,19 +1167,15 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                 </div>
               </div>
             )}
-          </TabsContent>
-        )}
+          </div>}
 
-        {/* ── Winners CRUD tab ─── */}
-        {canManage && (
-          <TabsContent value="winners" className="mt-6">
+        {/* ── Winners section ─── */}
+        {canManage && activeSection === "winners" && <div>
             <WinnersTab />
-          </TabsContent>
-        )}
+          </div>}
 
-        {/* ── Judge Activity tab ─── */}
-        {canManage && (
-          <TabsContent value="judges" className="mt-6">
+        {/* ── Judge Activity section ─── */}
+        {canManage && activeSection === "judges" && <div>
             {judgeScores.length === 0 ? (
               <Card className="p-12 text-center text-muted-foreground">
                 No judge scores submitted yet.
@@ -1192,9 +1231,10 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                 ))}
               </div>
             )}
-          </TabsContent>
-        )}
-      </Tabs>
+          </div>}
+
+        </div>{/* end content area */}
+      </div>{/* end sidebar layout */}
 
       {/* Detail slide-over */}
       <Sheet
