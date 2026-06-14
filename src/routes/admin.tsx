@@ -416,7 +416,7 @@ function AdminPage() {
     <div className="relative min-h-screen overflow-x-hidden bg-hero">
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,oklch(0.90_0.04_260)_0%,transparent_60%)]" />
       <SiteNav />
-      <main className="relative z-10 mx-auto max-w-7xl px-6 pt-28 pb-16">
+      <main className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 pt-24 pb-16">
         {!authed ? (
           <div className="mx-auto mt-20 max-w-md rounded-3xl border border-primary/30 bg-card/60 p-10 backdrop-blur">
             <div className="mx-auto mb-6 grid h-14 w-14 place-items-center rounded-full bg-gold shadow-gold">
@@ -879,8 +879,32 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       </div>
 
       {/* Sidebar + Content layout */}
+      {/* Mobile tab strip — sits above content, outside the flex row */}
+      <div className="md:hidden flex gap-1 overflow-x-auto pb-1 w-full">
+        {([
+          { key: "nominations" as const, label: "Nominations" },
+          ...(canManage ? [
+            { key: "categories" as const, label: "Categories" },
+            { key: "winners" as const, label: "Winners" },
+            { key: "judges" as const, label: "Judges" },
+          ] : [])
+        ]).map((item) => (
+          <button
+            key={item.key}
+            onClick={() => setActiveSection(item.key)}
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+              activeSection === item.key
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted/40 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex gap-6">
-        {/* Sidebar */}
+        {/* Sidebar — desktop only */}
         <aside className="hidden md:flex flex-col gap-1 w-52 shrink-0 sticky top-28 self-start">
           {([
             { key: "nominations" as const, label: "Nominations", icon: <FileText className="h-4 w-4" /> },
@@ -908,33 +932,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
               )}
             </button>
           ))}
-
-          {/* Mobile: small scrollable row */}
         </aside>
-
-        {/* Mobile tab strip */}
-        <div className="md:hidden flex gap-1 overflow-x-auto pb-1 w-full mb-2">
-          {([
-            { key: "nominations" as const, label: "Nominations" },
-            ...(canManage ? [
-              { key: "categories" as const, label: "Categories" },
-              { key: "winners" as const, label: "Winners" },
-              { key: "judges" as const, label: "Judges" },
-            ] : [])
-          ]).map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setActiveSection(item.key)}
-              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                activeSection === item.key
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/40 text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
 
         {/* Content area */}
         <div className="flex-1 min-w-0">
@@ -1022,7 +1020,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
               No nominations match your filters.
             </Card>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
               {filtered.map((n) => {
                 const totalFiles = n.uploads
                   ? Object.values(n.uploads)
@@ -1961,6 +1959,24 @@ function NominationDetail({
         : activePreview.url
     : "";
 
+  /**
+   * Returns a PWA-safe viewer URL for PDFs.
+   * - Blob URLs (runtime-converted): returned as-is; caller should use <object>.
+   * - Remote URLs: wrapped in Google Docs viewer so iOS PWA can render them.
+   */
+  function getPwaViewerUrl(rawPdfUrl: string): { kind: "blob" | "gdocs"; src: string } {
+    if (rawPdfUrl.startsWith("blob:")) return { kind: "blob", src: rawPdfUrl };
+    return {
+      kind: "gdocs",
+      src: `https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`,
+    };
+  }
+
+  const resolvedPdfSrc = resolvedKind === "pdf" && activePreview
+    ? (activePdfUrl ?? activePreview.url)
+    : null;
+  const pwaViewer = resolvedPdfSrc ? getPwaViewerUrl(resolvedPdfSrc) : null;
+
   useEffect(() => {
     setOfficePreviewError(false);
   }, [previewPath]);
@@ -2035,6 +2051,20 @@ function NominationDetail({
     setPreviewPath(previewableFiles[next].file.path);
     setPreviewPage(1);
     setPreviewZoom(110);
+  }
+
+  /** Clears the conversion error so the useEffect re-triggers a fresh attempt. */
+  function retryConversion() {
+    if (!activePreview) return;
+    setRuntimeConversionError(null);
+    // Remove any stale cached blob so the effect re-runs
+    setRuntimePreviewPdfUrls((prev) => {
+      const existing = prev[activePreview.path];
+      if (existing) URL.revokeObjectURL(existing);
+      const next = { ...prev };
+      delete next[activePreview.path];
+      return next;
+    });
   }
 
   return (
@@ -2197,10 +2227,20 @@ function NominationDetail({
                   <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
                   <p className="text-xs text-amber-800">
                     {runtimeConversionError
-                      ? "Automatic conversion failed and this Office file cannot be embedded here. Open or download the file instead."
-                      : "This Office file cannot be embedded in the in-app viewer. Open or download the file instead."}
+                      ? "Document conversion failed. Check your internet connection and try again."
+                      : "This Office file cannot be embedded in the in-app viewer."}
                   </p>
-                  <div className="flex items-center justify-center gap-2">
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {runtimeConversionError && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 px-3 text-xs bg-primary text-primary-foreground"
+                        onClick={retryConversion}
+                      >
+                        <RotateCcw className="mr-1 h-3.5 w-3.5" /> Retry
+                      </Button>
+                    )}
                     <a href={activePreview.url} target="_blank" rel="noopener noreferrer">
                       <Button
                         type="button"
@@ -2233,6 +2273,34 @@ function NominationDetail({
                   className="max-h-full max-w-full rounded object-contain"
                 />
               </div>
+            ) : resolvedKind === "pdf" && pwaViewer?.kind === "blob" ? (
+              /* Runtime-converted blob PDF — use <object> which works across all PWA environments */
+              <object
+                key={activePreview.path}
+                data={pwaViewer.src}
+                type="application/pdf"
+                className="h-full w-full rounded-lg border border-primary/20 bg-white"
+              >
+                <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold">PDF ready</p>
+                    <p className="text-xs text-muted-foreground">Your browser cannot embed this PDF inline.</p>
+                    <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
+                      <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                        <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open PDF
+                      </Button>
+                    </a>
+                  </div>
+                </div>
+              </object>
+            ) : resolvedKind === "pdf" && pwaViewer?.kind === "gdocs" ? (
+              /* Remote PDF — Google Docs viewer works in iOS PWA, Android PWA, and all browsers */
+              <iframe
+                key={activePreview.path}
+                src={pwaViewer.src}
+                title={`Document preview for ${activePreview.name}`}
+                className="h-full w-full rounded-lg border border-primary/20 bg-white"
+              />
             ) : (
               <iframe
                 key={activePreview.path}
@@ -2636,10 +2704,20 @@ function NominationDetail({
                     <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
                     <p className="text-xs text-amber-800">
                       {runtimeConversionError
-                        ? "Automatic conversion failed and this Office file cannot be embedded here. Open or download the file instead."
-                        : "This Office file cannot be embedded in the in-app viewer. Open or download the file instead."}
+                        ? "Document conversion failed. Check your internet connection and try again."
+                        : "This Office file cannot be embedded in the in-app viewer."}
                     </p>
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      {runtimeConversionError && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-8 px-3 text-xs bg-primary text-primary-foreground"
+                          onClick={retryConversion}
+                        >
+                          <RotateCcw className="mr-1 h-3.5 w-3.5" /> Retry
+                        </Button>
+                      )}
                       <a href={activePreview.url} target="_blank" rel="noopener noreferrer">
                         <Button
                           type="button"
@@ -2663,7 +2741,46 @@ function NominationDetail({
                     </div>
                   </div>
                 </div>
+              ) : resolvedKind === "image" ? (
+                /* Images — direct render, works in all PWA environments */
+                <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
+                  <img
+                    key={`mobile-img-${activePreview.path}`}
+                    src={activePreview.url}
+                    alt={activePreview.name}
+                    className="max-h-full max-w-full rounded object-contain"
+                  />
+                </div>
+              ) : resolvedKind === "pdf" && pwaViewer?.kind === "blob" ? (
+                /* Runtime-converted blob PDF — <object> works reliably in PWA */
+                <object
+                  key={`mobile-blob-${activePreview.path}`}
+                  data={pwaViewer.src}
+                  type="application/pdf"
+                  className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                >
+                  <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold">PDF ready</p>
+                      <p className="text-xs text-muted-foreground">Your browser cannot embed this PDF inline.</p>
+                      <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                          <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open PDF
+                        </Button>
+                      </a>
+                    </div>
+                  </div>
+                </object>
+              ) : resolvedKind === "pdf" && pwaViewer?.kind === "gdocs" ? (
+                /* Remote PDF — Google Docs viewer works in iOS PWA + Android PWA */
+                <iframe
+                  key={`mobile-gdocs-${activePreview.path}`}
+                  src={pwaViewer.src}
+                  title={`Document preview for ${activePreview.name}`}
+                  className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                />
               ) : (
+                /* Office Online or other embeddable content */
                 <iframe
                   key={`mobile-${activePreview.path}`}
                   src={activePreviewUrl}
