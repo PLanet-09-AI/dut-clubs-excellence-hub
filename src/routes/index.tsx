@@ -1,10 +1,12 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { lazy, Suspense, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Award, Sparkles, Calendar, MapPin, Users, Trophy, Heart, Briefcase, Home, Globe, GraduationCap, ChevronDown, ChevronRight, ShieldCheck, Star, FileText } from "lucide-react";
+import { Award, Sparkles, Calendar, MapPin, Users, Trophy, Heart, Briefcase, Home, Globe, GraduationCap, ChevronDown, ChevronRight, ShieldCheck, Star, FileText, Loader } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SiteNav from "@/components/SiteNav";
 import EventProgram from "@/components/EventProgram";
+import { RouteTransitionLoader } from "@/components/RouteTransitionLoader";
+import { downloadGuidePDF } from "@/lib/pdf-download";
 import { AWARD_CATEGORIES, AWARD_THEME } from "@/data/awards";
 
 const AwardScene = lazy(() => import("@/components/AwardScene"));
@@ -49,11 +51,24 @@ const stats = [
 
 function Index() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   const navigate = useNavigate();
+
+  const handleDownloadPDF = async () => {
+    setIsDownloading(true);
+    try {
+      await downloadGuidePDF();
+    } catch (error) {
+      console.error("Failed to download PDF:", error);
+      alert("Failed to download PDF. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-hero text-foreground">
-
+      <RouteTransitionLoader />
 
       <SiteNav />
 
@@ -79,12 +94,21 @@ function Index() {
                <Link to="/winners">
                 <Button variant="outline" className="w-full sm:w-auto h-12 border-primary/20">View Winners</Button>
                </Link>
-               <a href="/SALEA-2026-POE-Guide.pdf" download className="w-full sm:w-auto">
-                <Button className="w-full h-12 bg-gold text-primary-foreground flex items-center justify-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Download POE Guide
+               <button onClick={handleDownloadPDF} disabled={isDownloading} className="w-full sm:w-auto">
+                <Button className="w-full h-12 bg-gold text-primary-foreground flex items-center justify-center gap-2 disabled:opacity-70" disabled={isDownloading}>
+                  {isDownloading ? (
+                    <>
+                      <Loader className="h-4 w-4 animate-spin" />
+                      Generating PDF...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4" />
+                      Download as PDF
+                    </>
+                  )}
                 </Button>
-               </a>
+               </button>
             </div>
 
 
