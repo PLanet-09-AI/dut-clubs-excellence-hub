@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { lazy, Suspense, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Award, Sparkles, Calendar, MapPin, Users, Trophy, Heart, Briefcase, Home, Globe, GraduationCap, ChevronDown, ChevronRight, ShieldCheck, Star } from "lucide-react";
+import { Award, Sparkles, Calendar, MapPin, Users, Trophy, Heart, Briefcase, Home, Globe, GraduationCap, ChevronDown, ChevronRight, ShieldCheck, Star, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SiteNav from "@/components/SiteNav";
 import EventProgram from "@/components/EventProgram";
@@ -79,6 +79,12 @@ function Index() {
                <Link to="/winners">
                 <Button variant="outline" className="w-full sm:w-auto h-12 border-primary/20">View Winners</Button>
                </Link>
+               <a href="/SALEA-2026-POE-Guide.pdf" download className="w-full sm:w-auto">
+                <Button className="w-full h-12 bg-gold text-primary-foreground flex items-center justify-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Download POE Guide
+                </Button>
+               </a>
             </div>
 
 
@@ -170,6 +176,15 @@ function Index() {
             <h2 className="mt-4 text-4xl font-bold leading-tight sm:text-5xl">
               Recognising <span className="text-gradient-gold">academic excellence</span> and leadership.
             </h2>
+            <div className="mt-8">
+              <a href="/SALEA-2026-POE-Guide.pdf" download className="inline-block">
+                <Button className="bg-gold text-primary-foreground hover:bg-gold/90 flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Download Criteria & Guidelines
+                </Button>
+              </a>
+              <p className="mt-2 text-xs text-muted-foreground">PDF guide for nomination criteria and Portfolio of Evidence requirements</p>
+            </div>
           </div>
           <div className="space-y-6 text-muted-foreground lg:col-span-7">
             <p className="text-lg leading-relaxed">
@@ -356,9 +371,23 @@ function Index() {
 
 
       <footer className="relative z-10 border-t border-primary/10 bg-background/60 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-8 text-sm text-muted-foreground sm:flex-row">
-          <p>© 2026 SALEA — Student Academic &amp; Leadership Excellence Awards</p>
-          <p>Recognising Excellence · Celebrating Leadership · Inspiring Greatness</p>
+        <div className="mx-auto max-w-7xl px-6 py-12">
+          <div className="mb-8 rounded-2xl border border-primary/20 bg-white/50 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <p className="font-semibold text-foreground">Need Help with Your Nomination?</p>
+              <p className="text-sm text-muted-foreground mt-1">Download the complete guide with criteria and Portfolio of Evidence requirements.</p>
+            </div>
+            <a href="/SALEA-2026-POE-Guide.pdf" download className="shrink-0">
+              <Button className="bg-gold text-primary-foreground hover:bg-gold/90 flex items-center gap-2 whitespace-nowrap">
+                <FileText className="h-4 w-4" />
+                Download Guide
+              </Button>
+            </a>
+          </div>
+          <div className="flex flex-col items-center justify-between gap-4 text-sm text-muted-foreground sm:flex-row border-t border-primary/10 pt-8">
+            <p>© 2026 SALEA — Student Academic &amp; Leadership Excellence Awards</p>
+            <p>Recognising Excellence · Celebrating Leadership · Inspiring Greatness</p>
+          </div>
         </div>
       </footer>
     </div>
