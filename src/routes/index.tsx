@@ -240,8 +240,8 @@ function Index() {
       {/* Categories */}
       <section id="categories" className="relative z-10 mx-auto max-w-7xl px-6 py-20">
         <div className="mb-14 text-center">
-          <p className="text-xs uppercase tracking-[0.3em] text-primary">Eight Categories</p>
-          <h2 className="mt-3 text-4xl font-bold sm:text-5xl">
+          <p className="text-xs uppercase tracking-[0.3em] text-black">Eight Categories</p>
+          <h2 className="mt-3 text-4xl font-bold sm:text-5xl text-black">
             Celebrating <span className="text-gradient-gold">student excellence.</span>
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
