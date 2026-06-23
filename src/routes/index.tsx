@@ -52,17 +52,39 @@ const stats = [
 function Index() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [nominatingId, setNominatingId] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const handleNominate = async (categoryId: string) => {
+    setNominatingId(categoryId);
+    // Brief delay for visual feedback
+    await new Promise(resolve => setTimeout(resolve, 300));
+    navigate({ to: "/nominate/$categoryId", params: { categoryId } });
+  };
 
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
+    setDownloadProgress(0);
     try {
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setDownloadProgress(prev => Math.min(prev + Math.random() * 40, 90));
+      }, 300);
+      
       await downloadGuidePDF();
+      
+      clearInterval(progressInterval);
+      setDownloadProgress(100);
+      
+      // Keep it at 100% briefly for satisfaction
+      await new Promise(resolve => setTimeout(resolve, 600));
     } catch (error) {
       console.error("Failed to download PDF:", error);
       alert("Failed to download PDF. Please try again.");
     } finally {
       setIsDownloading(false);
+      setDownloadProgress(0);
     }
   };
 
@@ -94,21 +116,50 @@ function Index() {
                <Link to="/winners">
                 <Button variant="outline" className="w-full sm:w-auto h-12 border-primary/20">View Winners</Button>
                </Link>
-               <button onClick={handleDownloadPDF} disabled={isDownloading} className="w-full sm:w-auto">
-                <Button className="w-full h-12 bg-gold text-primary-foreground flex items-center justify-center gap-2 disabled:opacity-70" disabled={isDownloading}>
-                  {isDownloading ? (
-                    <>
-                      <Loader className="h-4 w-4 animate-spin" />
-                      Generating PDF...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="h-4 w-4" />
-                      Download as PDF
-                    </>
+               <motion.button 
+                 onClick={handleDownloadPDF} 
+                 disabled={isDownloading} 
+                 className="w-full sm:w-auto relative"
+                 whileHover={!isDownloading ? { scale: 1.02 } : {}}
+                 whileTap={!isDownloading ? { scale: 0.98 } : {}}
+               >
+                <div className="relative">
+                  <Button className="w-full h-12 bg-gold text-primary-foreground flex items-center justify-center gap-2 disabled:opacity-70 transition-all" disabled={isDownloading}>
+                    {isDownloading ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        >
+                          <Loader className="h-4 w-4" />
+                        </motion.div>
+                        <span>Generating PDF...</span>
+                      </>
+                    ) : (
+                      <>
+                        <motion.div
+                          animate={{ y: [0, -2, 0] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </motion.div>
+                        Download as PDF
+                      </>
+                    )}
+                  </Button>
+                  {isDownloading && (
+                    <motion.div
+                      className="absolute inset-0 rounded-lg"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 0.2 }}
+                      style={{
+                        background: `linear-gradient(90deg, transparent, rgba(255,215,0,0.5), transparent)`,
+                        backgroundSize: '200% 100%',
+                      }}
+                    />
                   )}
-                </Button>
-               </button>
+                </div>
+               </motion.button>
             </div>
 
 
@@ -201,12 +252,32 @@ function Index() {
               Recognising <span className="text-gradient-gold">academic excellence</span> and leadership.
             </h2>
             <div className="mt-8">
-              <a href="/SALEA-2026-POE-Guide.pdf" download className="inline-block">
-                <Button className="bg-gold text-primary-foreground hover:bg-gold/90 flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Download Criteria & Guidelines
+              <motion.button 
+                onClick={handleDownloadPDF} 
+                disabled={isDownloading}
+                whileHover={!isDownloading ? { scale: 1.05 } : {}}
+                whileTap={!isDownloading ? { scale: 0.95 } : {}}
+                className="inline-block"
+              >
+                <Button className="bg-gold text-primary-foreground hover:bg-gold/90 flex items-center gap-2 transition-all disabled:opacity-70" disabled={isDownloading}>
+                  {isDownloading ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Loader className="h-5 w-5" />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      animate={{ y: [0, -2, 0] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      <FileText className="h-5 w-5" />
+                    </motion.div>
+                  )}
+                  {isDownloading ? "Generating PDF..." : "Download Criteria & Guidelines"}
                 </Button>
-              </a>
+              </motion.button>
               <p className="mt-2 text-xs text-muted-foreground">PDF guide for nomination criteria and Portfolio of Evidence requirements</p>
             </div>
           </div>
@@ -323,15 +394,32 @@ function Index() {
                             </li>
                           ))}
                         </ul>
-                        <button
+                        <motion.button
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate({ to: "/nominate/$categoryId", params: { categoryId: c.id } });
+                            handleNominate(c.id);
                           }}
-                          className="mt-4 w-full rounded-xl bg-gold px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-gold transition hover:opacity-90 active:scale-95"
+                          disabled={nominatingId === c.id}
+                          whileHover={nominatingId !== c.id ? { scale: 1.05 } : {}}
+                          whileTap={nominatingId !== c.id ? { scale: 0.95 } : {}}
+                          className="mt-4 w-full rounded-xl bg-gold px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-gold transition hover:opacity-90 disabled:opacity-70"
                         >
-                          Nominate for this Award
-                        </button>
+                          <div className="flex items-center justify-center gap-2">
+                            {nominatingId === c.id ? (
+                              <>
+                                <motion.div
+                                  animate={{ rotate: 360 }}
+                                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                >
+                                  <Loader className="h-4 w-4" />
+                                </motion.div>
+                                <span>Processing...</span>
+                              </>
+                            ) : (
+                              <span>Nominate for this Award</span>
+                            )}
+                          </div>
+                        </motion.button>
                       </div>
                     </motion.div>
                   )}
@@ -401,12 +489,32 @@ function Index() {
               <p className="font-semibold text-foreground">Need Help with Your Nomination?</p>
               <p className="text-sm text-muted-foreground mt-1">Download the complete guide with criteria and Portfolio of Evidence requirements.</p>
             </div>
-            <a href="/SALEA-2026-POE-Guide.pdf" download className="shrink-0">
-              <Button className="bg-gold text-primary-foreground hover:bg-gold/90 flex items-center gap-2 whitespace-nowrap">
-                <FileText className="h-4 w-4" />
-                Download Guide
+            <motion.button 
+              onClick={handleDownloadPDF} 
+              disabled={isDownloading}
+              whileHover={!isDownloading ? { scale: 1.05 } : {}}
+              whileTap={!isDownloading ? { scale: 0.95 } : {}}
+              className="shrink-0"
+            >
+              <Button className="bg-gold text-primary-foreground hover:bg-gold/90 flex items-center gap-2 whitespace-nowrap transition-all disabled:opacity-70" disabled={isDownloading}>
+                {isDownloading ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Loader className="h-4 w-4" />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    animate={{ y: [0, -2, 0] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    <FileText className="h-4 w-4" />
+                  </motion.div>
+                )}
+                {isDownloading ? "Generating PDF..." : "Download Guide"}
               </Button>
-            </a>
+            </motion.button>
           </div>
           <div className="flex flex-col items-center justify-between gap-4 text-sm text-muted-foreground sm:flex-row border-t border-primary/10 pt-8">
             <p>© 2026 SALEA — Student Academic &amp; Leadership Excellence Awards</p>
