@@ -152,17 +152,6 @@ type JudgeScore = {
   updatedAt: { toDate?: () => Date } | null;
 };
 
-// ── Scoring window helpers ────────────────────────────────────────────────────
-const OPEN_DATE = new Date(AWARD_THEME.scoringOpenDate);
-const CLOSE_DATE = new Date(AWARD_THEME.scoringDeadline);
-
-function getScoringStatus(): "before" | "open" | "closed" {
-  const now = new Date();
-  if (now < OPEN_DATE) return "before";
-  if (now > CLOSE_DATE) return "closed";
-  return "open";
-}
-
 // ── Interactive 0-5 star picker ───────────────────────────────────────────────
 function StarPicker({
   value,
@@ -510,8 +499,7 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
   const [saving, setSaving] = useState(false);
   const [realJudgingActive, setRealJudgingActive] = useState(false);
 
-  const scoringStatus = getScoringStatus();
-  const scoringOpen = scoringStatus === "open";
+  const scoringOpen = realJudgingActive;
 
   // Only shortlisted nominations
   useEffect(() => {
@@ -656,59 +644,11 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
         </Button>
       </div>
 
-      {/* Scoring window banner */}
-      {scoringStatus === "before" && (
+      {/* Scoring status banner - only show when real judging is NOT active */}
+      {!realJudgingActive && (
         <div className="mt-6 flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <Clock className="h-5 w-5 shrink-0" />
-          <span>
-            Scoring opens on{" "}
-            <strong>
-              {OPEN_DATE.toLocaleDateString("en-ZA", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </strong>
-            . Nominations close 31 July 2026 (nomination window: 01 July 2026 - 31 July 2026) - check back then.
-          </span>
-        </div>
-      )}
-      {scoringStatus === "closed" && (
-        <div className="mt-6 flex items-center gap-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
           <AlertTriangle className="h-5 w-5 shrink-0" />
-          <span>
-            The scoring period closed on{" "}
-            <strong>
-              {CLOSE_DATE.toLocaleDateString("en-ZA", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </strong>
-            . No further scores can be submitted.
-          </span>
-        </div>
-      )}
-      {scoringStatus === "open" && (
-        <div className="mt-6 flex items-center gap-3 rounded-xl border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800">
-          <CheckCircle2 className="h-5 w-5 shrink-0" />
-          <span>
-            Scoring is open. Deadline:{" "}
-            <strong>
-              {CLOSE_DATE.toLocaleDateString("en-ZA", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </strong>
-            .
-          </span>
-          <Link
-            to="/leaderboard"
-            className="ml-auto flex shrink-0 items-center gap-1 font-semibold underline-offset-2 hover:underline"
-          >
-            <Trophy className="h-4 w-4" /> Leaderboard
-          </Link>
+          <span>Real judging has not been activated yet. Contact the admin to enable scoring.</span>
         </div>
       )}
 
@@ -818,7 +758,6 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
               setCommentInput={setCommentInput}
               saving={saving}
               scoringOpen={scoringOpen}
-              scoringStatus={scoringStatus}
               hasScore={!!myScores[detail.id]}
               realJudgingActive={realJudgingActive}
               onSave={saveScore}
@@ -839,7 +778,6 @@ function JudgeNominationDetail({
   setCommentInput,
   saving,
   scoringOpen,
-  scoringStatus,
   hasScore,
   realJudgingActive,
   onSave,
@@ -851,7 +789,6 @@ function JudgeNominationDetail({
   setCommentInput: (v: string) => void;
   saving: boolean;
   scoringOpen: boolean;
-  scoringStatus: "before" | "open" | "closed";
   hasScore: boolean;
   realJudgingActive: boolean;
   onSave: () => void;
@@ -1482,16 +1419,10 @@ function JudgeNominationDetail({
 
             {!scoringOpen && (
               <div
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${scoringStatus === "before" ? "border border-amber-200 bg-amber-50 text-amber-700" : "border border-red-200 bg-red-50 text-red-700"}`}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm border border-amber-200 bg-amber-50 text-amber-700`}
               >
-                {scoringStatus === "before" ? (
-                  <Clock className="h-4 w-4" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4" />
-                )}
-                {scoringStatus === "before"
-                  ? `Scoring opens ${OPEN_DATE.toLocaleDateString("en-ZA")}`
-                  : "Scoring period has closed — no edits allowed"}
+                <AlertTriangle className="h-4 w-4" />
+                <span>Real judging not yet activated by admin — cannot submit scores</span>
               </div>
             )}
 
@@ -1559,7 +1490,7 @@ function JudgeNominationDetail({
 
             <Button
               onClick={onSave}
-              disabled={saving || !scoringOpen || ratedCount === 0 || !realJudgingActive}
+              disabled={saving || ratedCount === 0 || !realJudgingActive}
               className="w-full bg-gold text-primary-foreground disabled:opacity-50"
               size="lg"
             >

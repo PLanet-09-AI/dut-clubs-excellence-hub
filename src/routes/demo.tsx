@@ -418,19 +418,23 @@ function SubmissionViewer({ nominee }: { nominee: DemoNominee }) {
             <p className="mb-3 text-xs font-bold uppercase tracking-wider text-primary">Supporting Documents</p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {nominee.evidenceFiles.map((doc, idx) => (
-                <div
+                <button
                   key={idx}
-                  className="flex items-center gap-3 rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm transition-colors hover:border-blue-200 hover:bg-blue-50"
+                  onClick={() => {
+                    // Simple viewer - in real app, would open PDF viewer
+                    alert(`📄 ${doc.label}\n\n${doc.name}\n\nType: ${doc.type.toUpperCase()}\n\nNote: This is a demo file. Full document viewer available in live judging interface.`);
+                  }}
+                  className="flex items-center gap-3 rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm transition-colors hover:border-blue-300 hover:bg-blue-50 cursor-pointer"
                 >
                   <FileText className="h-4 w-4 shrink-0 text-blue-600" />
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 text-left">
                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{doc.label}</p>
                     <p className="truncate text-xs text-muted-foreground">{doc.name}</p>
                   </div>
                   <span className="shrink-0 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-bold uppercase text-blue-700">
                     {doc.type}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
