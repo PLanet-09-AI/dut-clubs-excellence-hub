@@ -959,6 +959,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
             { key: "categories" as const, label: "Categories" },
             { key: "winners" as const, label: "Winners" },
             { key: "judges" as const, label: "Judges" },
+            { key: "leaderboard" as const, label: "Leaderboard" },
           ] : [])
         ]).map((item) => (
           <button
@@ -984,6 +985,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
               { key: "categories" as const, label: "Categories", icon: <Filter className="h-4 w-4" /> },
               { key: "winners" as const, label: "Winners", icon: <Trophy className="h-4 w-4" /> },
               { key: "judges" as const, label: "Judge Activity", icon: <Users2 className="h-4 w-4" />, badge: judgeScores.length > 0 ? judgeScores.length : undefined },
+              { key: "leaderboard" as const, label: "Leaderboard", icon: <Trophy className="h-4 w-4" /> },
             ] : [])
           ]).map((item) => (
             <button
@@ -1251,20 +1253,11 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                 No judge scores submitted yet.
               </Card>
             ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs text-muted-foreground">
-                    All judge evaluations in real time — sorted newest first. Each entry is
-                    timestamped.
-                  </p>
-                  <button
-                    onClick={() => setActiveSection("leaderboard")}
-                    className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-gold/90 transition"
-                  >
-                    <Trophy className="h-4 w-4" />
-                    View Leaderboard
-                  </button>
-                </div>
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  All judge evaluations in real time — sorted newest first. Each entry is
+                  timestamped.
+                </p>
                 <div className="space-y-3">
                   {judgeScores.map((s) => (
                     <div
@@ -1317,12 +1310,6 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
         {/* ── Leaderboard section ─── */}
         {canManage && activeSection === "leaderboard" && (
           <div>
-            <button
-              onClick={() => setActiveSection("judges")}
-              className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition"
-            >
-              <ChevronLeft className="h-4 w-4" /> Back to Judge Activity
-            </button>
             <LeaderboardAdminPanel />
           </div>
         )}
