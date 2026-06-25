@@ -130,38 +130,36 @@ function Index() {
                </Link>
                <motion.button 
                  onClick={handleDownloadPDF} 
-                 disabled={isDownloading} 
-                 className="w-full sm:w-auto relative"
+                 disabled={isDownloading}
+                 className="w-full sm:w-auto h-12 bg-gold text-primary-foreground rounded-md flex items-center justify-center gap-2 disabled:opacity-70 transition-all font-medium"
                  whileHover={!isDownloading ? { scale: 1.02 } : {}}
                  whileTap={!isDownloading ? { scale: 0.98 } : {}}
                >
-                <div className="relative">
-                  <Button className="w-full h-12 bg-gold text-primary-foreground flex items-center justify-center gap-2 disabled:opacity-70 transition-all" disabled={isDownloading}>
-                    {isDownloading ? (
-                      <>
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                        >
-                          <Loader className="h-4 w-4" />
-                        </motion.div>
-                        <span>Generating PDF...</span>
-                      </>
-                    ) : (
-                      <>
-                        <motion.div
-                          animate={{ y: [0, -2, 0] }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                        >
-                          <FileText className="h-4 w-4" />
-                        </motion.div>
-                        Download as PDF
-                      </>
-                    )}
-                  </Button>
+                <div className="relative flex items-center justify-center gap-2 w-full">
+                  {isDownloading ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      >
+                        <Loader className="h-4 w-4" />
+                      </motion.div>
+                      <span>Generating PDF...</span>
+                    </>
+                  ) : (
+                    <>
+                      <motion.div
+                        animate={{ y: [0, -2, 0] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        <FileText className="h-4 w-4" />
+                      </motion.div>
+                      Download as PDF
+                    </>
+                  )}
                   {isDownloading && (
                     <motion.div
-                      className="absolute inset-0 rounded-lg"
+                      className="absolute inset-0 rounded-md"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 0.2 }}
                       style={{

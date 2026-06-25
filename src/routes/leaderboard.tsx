@@ -506,14 +506,25 @@ function LeaderboardContent({ role }: { role: string | null }) {
 
   // Apply category filter with dynamic ranking
   const filteredRanking = useMemo(() => {
-    if (!selectedCategory) return unifiedRanking;
+    if (!selectedCategory) {
+      console.log("❌ No category selected, returning unified ranking");
+      return unifiedRanking;
+    }
     // Filter nominees to selected category (case-insensitive)
     // Then re-rank them locally starting from 1
     const filtered = unifiedRanking.filter(
       (n) => n.categoryName?.toLowerCase().trim() === selectedCategory.toLowerCase().trim()
     );
+    console.log(`✅ Filtered "${selectedCategory}": found ${filtered.length} nominees`);
+    console.log("   Nominees:", filtered.map(n => `${n.nomineeName} (${n.totalScore})`));
     // Re-rank the filtered nominees
-    return filtered.map((n, idx) => ({ ...n, rank: idx + 1 }));
+    const reranked = filtered.map((n, idx) => {
+      const newRank = idx + 1;
+      console.log(`   Re-ranking: ${n.nomineeName} rank ${n.rank} → ${newRank}`);
+      return { ...n, rank: newRank };
+    });
+    console.log("   Final:", reranked.map(n => `${n.nomineeName} (rank ${n.rank})`));
+    return reranked;
   }, [unifiedRanking, selectedCategory]);
 
   // Get list of all judges and their scores
@@ -604,7 +615,10 @@ function LeaderboardContent({ role }: { role: string | null }) {
             {viewMode === "unified" && (
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => setSelectedCategory(null)}
+                  onClick={() => {
+                    console.log("📌 Clearing filter, showing all categories");
+                    setSelectedCategory(null);
+                  }}
                   className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
                     selectedCategory === null
                       ? "bg-gold text-primary-foreground"
@@ -616,7 +630,10 @@ function LeaderboardContent({ role }: { role: string | null }) {
                 {categories.map(([catName]) => (
                   <button
                     key={catName}
-                    onClick={() => setSelectedCategory(catName.trim())}
+                    onClick={() => {
+                      console.log(`📌 Filtering by category: "${catName}"`);
+                      setSelectedCategory(catName.trim());
+                    }}
                     className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
                       selectedCategory?.toLowerCase() === catName.toLowerCase()
                         ? "bg-gold text-primary-foreground"
