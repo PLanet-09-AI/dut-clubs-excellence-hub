@@ -484,7 +484,7 @@ function LeaderboardContent({ role }: { role: string | null }) {
 
     // Return sorted by known category order first, then alphabetical
     const knownOrder = AWARD_CATEGORIES.map((c) => c.name);
-    const result = Array.from(catMap.entries()).sort(([a], [b]) => {
+    return Array.from(catMap.entries()).sort(([a], [b]) => {
       const ai = knownOrder.indexOf(a);
       const bi = knownOrder.indexOf(b);
       if (ai !== -1 && bi !== -1) return ai - bi;
@@ -492,8 +492,6 @@ function LeaderboardContent({ role }: { role: string | null }) {
       if (bi !== -1) return 1;
       return a.localeCompare(b);
     });
-    console.log("📊 Categories found in Firestore:", result.map(([name, nominees]) => `${name} (${nominees.length})`));
-    return result;
   }, [allScores]);
 
   // For unified view: flatten all nominees and rank globally
@@ -509,27 +507,13 @@ function LeaderboardContent({ role }: { role: string | null }) {
   // Apply category filter with dynamic ranking
   const filteredRanking = useMemo(() => {
     if (!selectedCategory) return unifiedRanking;
-    // Get nominees in selected category and re-rank them (1, 2, 3, ... within category)
-    // Use case-insensitive and trim whitespace comparison for robustness
-    const normalized = selectedCategory.trim().toLowerCase();
-    console.log("🔍 Filtering for category:", selectedCategory, "→ normalized:", normalized);
-    const categoryNominees = unifiedRanking.filter((n) => {
-      const nNormalized = n.categoryName?.trim().toLowerCase();
-      const match = nNormalized === normalized;
-      if (!match) console.log("  ✗ ", n.nomineeName, "has:", n.categoryName, "→ normalized:", nNormalized);
-      return match;
-    });
-    console.log("  ✓ Found", categoryNominees.length, "nominees in", selectedCategory);
-    // Sort by totalScore DESC to ensure correct ranking order within category
-    const sorted = [...categoryNominees].sort((a, b) => b.totalScore - a.totalScore || b.avgScore - a.avgScore);
-    // Re-rank locally within this category
-    const reranked = sorted.map((n, idx) => {
-      const newRank = idx + 1;
-      console.log(`    → ${n.nomineeName}: was rank ${n.rank}, now rank ${newRank}`);
-      return { ...n, rank: newRank };
-    });
-    console.log("  📤 Returning filtered ranking with", reranked.length, "items");
-    return reranked;
+    // Filter nominees to selected category (case-insensitive)
+    // Then re-rank them locally starting from 1
+    const filtered = unifiedRanking.filter(
+      (n) => n.categoryName?.toLowerCase().trim() === selectedCategory.toLowerCase().trim()
+    );
+    // Re-rank the filtered nominees
+    return filtered.map((n, idx) => ({ ...n, rank: idx + 1 }));
   }, [unifiedRanking, selectedCategory]);
 
   // Get list of all judges and their scores
@@ -632,12 +616,9 @@ function LeaderboardContent({ role }: { role: string | null }) {
                 {categories.map(([catName]) => (
                   <button
                     key={catName}
-                    onClick={() => {
-                      console.log("📌 Button clicked for category:", catName);
-                      setSelectedCategory(catName);
-                    }}
+                    onClick={() => setSelectedCategory(catName.trim())}
                     className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
-                      selectedCategory === catName
+                      selectedCategory?.toLowerCase() === catName.toLowerCase()
                         ? "bg-gold text-primary-foreground"
                         : "border border-primary/20 bg-white text-muted-foreground hover:border-primary/40"
                     }`}
