@@ -2,7 +2,9 @@ import { motion } from "framer-motion";
 import { Download, MapPin, Clock, Accessibility, Car, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const session1Schedule = [
   { time: "10:00", title: "Welcome & Opening Address", desc: "Dean's remarks and programme introduction" },
@@ -38,6 +40,7 @@ const venueFacts = [
 
 export default function EventProgram() {
   const [activeSession, setActiveSession] = useState("session1");
+  const isMobile = useIsMobile();
 
   const schedule = activeSession === "session1" ? session1Schedule : session2Schedule;
   const sessionTitle = activeSession === "session1" ? "Judge Session 1 (10:00–13:00)" : "Judge Session 2 (16:00–22:00)";
@@ -61,19 +64,29 @@ export default function EventProgram() {
       <div className="grid gap-10 lg:grid-cols-12">
         {/* Timeline with session tabs */}
         <div className="lg:col-span-7">
-          <Tabs value={activeSession} onValueChange={setActiveSession} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="session1" className="text-sm font-semibold">
-                <Clock className="mr-2 h-4 w-4" />
-                Session 1: 10:00–13:00
-              </TabsTrigger>
-              <TabsTrigger value="session2" className="text-sm font-semibold">
-                <Clock className="mr-2 h-4 w-4" />
-                Session 2: 16:00–22:00
-              </TabsTrigger>
-            </TabsList>
+          {isMobile ? (
+            // Mobile: Use dropdown select
+            <div className="w-full space-y-6">
+              <Select value={activeSession} onValueChange={setActiveSession}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a session" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="session1">
+                    <span className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Session 1: 10:00–13:00
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="session2">
+                    <span className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Session 2: 16:00–22:00
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
 
-            <TabsContent value="session1" className="space-y-4">
               <div className="rounded-lg border border-primary/15 bg-blue-50 px-4 py-3">
                 <p className="text-sm font-semibold text-primary">{sessionTitle}</p>
                 <p className="text-xs text-muted-foreground">{sessionDesc}</p>
@@ -81,7 +94,7 @@ export default function EventProgram() {
               <div className="relative rounded-3xl border border-primary/20 bg-card/50 p-8 backdrop-blur-sm">
                 <div className="absolute left-[6.5rem] top-8 bottom-8 w-px bg-gradient-to-b from-primary via-primary/40 to-transparent" />
                 <ol className="space-y-5">
-                  {session1Schedule.map((s, idx) => (
+                  {schedule.map((s, idx) => (
                     <motion.li
                       key={s.time}
                       initial={{ opacity: 0, x: -20 }}
@@ -102,39 +115,84 @@ export default function EventProgram() {
                   ))}
                 </ol>
               </div>
-            </TabsContent>
+            </div>
+          ) : (
+            // Desktop: Use tabs
+            <Tabs value={activeSession} onValueChange={setActiveSession} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="session1" className="text-sm font-semibold">
+                  <Clock className="mr-2 h-4 w-4" />
+                  Session 1: 10:00–13:00
+                </TabsTrigger>
+                <TabsTrigger value="session2" className="text-sm font-semibold">
+                  <Clock className="mr-2 h-4 w-4" />
+                  Session 2: 16:00–22:00
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="session2" className="space-y-4">
-              <div className="rounded-lg border border-primary/15 bg-amber-50 px-4 py-3">
-                <p className="text-sm font-semibold text-primary">{sessionTitle}</p>
-                <p className="text-xs text-muted-foreground">{sessionDesc}</p>
-              </div>
-              <div className="relative rounded-3xl border border-primary/20 bg-card/50 p-8 backdrop-blur-sm">
-                <div className="absolute left-[6.5rem] top-8 bottom-8 w-px bg-gradient-to-b from-primary via-primary/40 to-transparent" />
-                <ol className="space-y-5">
-                  {session2Schedule.map((s, idx) => (
-                    <motion.li
-                      key={s.time}
-                      initial={{ opacity: 0, x: -20 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true, margin: "-40px" }}
-                      transition={{ delay: idx * 0.04, duration: 0.5 }}
-                      className="relative flex items-start gap-6"
-                    >
-                      <div className="w-20 shrink-0 pt-0.5 text-right font-serif text-lg font-bold text-gradient-gold">
-                        {s.time}
-                      </div>
-                      <div className="relative z-10 mt-2 h-3 w-3 shrink-0 rounded-full bg-gold shadow-[0_0_0_4px_oklch(0.18_0.06_265)]" />
-                      <div className="flex-1 pb-1">
-                        <p className="font-semibold text-foreground">{s.title}</p>
-                        <p className="text-sm text-muted-foreground">{s.desc}</p>
-                      </div>
-                    </motion.li>
-                  ))}
-                </ol>
-              </div>
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="session1" className="space-y-4">
+                <div className="rounded-lg border border-primary/15 bg-blue-50 px-4 py-3">
+                  <p className="text-sm font-semibold text-primary">{sessionTitle}</p>
+                  <p className="text-xs text-muted-foreground">{sessionDesc}</p>
+                </div>
+                <div className="relative rounded-3xl border border-primary/20 bg-card/50 p-8 backdrop-blur-sm">
+                  <div className="absolute left-[6.5rem] top-8 bottom-8 w-px bg-gradient-to-b from-primary via-primary/40 to-transparent" />
+                  <ol className="space-y-5">
+                    {session1Schedule.map((s, idx) => (
+                      <motion.li
+                        key={s.time}
+                        initial={{ opacity: 0, x: -20 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true, margin: "-40px" }}
+                        transition={{ delay: idx * 0.04, duration: 0.5 }}
+                        className="relative flex items-start gap-6"
+                      >
+                        <div className="w-20 shrink-0 pt-0.5 text-right font-serif text-lg font-bold text-gradient-gold">
+                          {s.time}
+                        </div>
+                        <div className="relative z-10 mt-2 h-3 w-3 shrink-0 rounded-full bg-gold shadow-[0_0_0_4px_oklch(0.18_0.06_265)]" />
+                        <div className="flex-1 pb-1">
+                          <p className="font-semibold text-foreground">{s.title}</p>
+                          <p className="text-sm text-muted-foreground">{s.desc}</p>
+                        </div>
+                      </motion.li>
+                    ))}
+                  </ol>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="session2" className="space-y-4">
+                <div className="rounded-lg border border-primary/15 bg-amber-50 px-4 py-3">
+                  <p className="text-sm font-semibold text-primary">{sessionTitle}</p>
+                  <p className="text-xs text-muted-foreground">{sessionDesc}</p>
+                </div>
+                <div className="relative rounded-3xl border border-primary/20 bg-card/50 p-8 backdrop-blur-sm">
+                  <div className="absolute left-[6.5rem] top-8 bottom-8 w-px bg-gradient-to-b from-primary via-primary/40 to-transparent" />
+                  <ol className="space-y-5">
+                    {session2Schedule.map((s, idx) => (
+                      <motion.li
+                        key={s.time}
+                        initial={{ opacity: 0, x: -20 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true, margin: "-40px" }}
+                        transition={{ delay: idx * 0.04, duration: 0.5 }}
+                        className="relative flex items-start gap-6"
+                      >
+                        <div className="w-20 shrink-0 pt-0.5 text-right font-serif text-lg font-bold text-gradient-gold">
+                          {s.time}
+                        </div>
+                        <div className="relative z-10 mt-2 h-3 w-3 shrink-0 rounded-full bg-gold shadow-[0_0_0_4px_oklch(0.18_0.06_265)]" />
+                        <div className="flex-1 pb-1">
+                          <p className="font-semibold text-foreground">{s.title}</p>
+                          <p className="text-sm text-muted-foreground">{s.desc}</p>
+                        </div>
+                      </motion.li>
+                    ))}
+                  </ol>
+                </div>
+              </TabsContent>
+            </Tabs>
+          )}
 
           <a
             href="/DUT-Awards-2026-Program.pdf"
