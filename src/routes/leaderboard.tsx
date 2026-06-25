@@ -508,7 +508,11 @@ function LeaderboardContent({ role }: { role: string | null }) {
   const filteredRanking = useMemo(() => {
     if (!selectedCategory) return unifiedRanking;
     // Get nominees in selected category and re-rank them (1, 2, 3, ... within category)
-    const categoryNominees = unifiedRanking.filter((n) => n.categoryName === selectedCategory);
+    // Use case-insensitive and trim whitespace comparison for robustness
+    const categoryNominees = unifiedRanking.filter(
+      (n) => n.categoryName?.trim().toLowerCase() === selectedCategory.trim().toLowerCase()
+    );
+    // Re-rank locally within this category
     return categoryNominees.map((n, idx) => ({ ...n, rank: idx + 1 }));
   }, [unifiedRanking, selectedCategory]);
 
