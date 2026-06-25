@@ -43,7 +43,7 @@ export default function EventProgram() {
   const isMobile = useIsMobile();
 
   const schedule = activeSession === "session1" ? session1Schedule : session2Schedule;
-  const sessionTitle = activeSession === "session1" ? "Judge Session 1 (10:00–13:00)" : "Judge Session 2 (16:00–22:00)";
+  const sessionTitle = activeSession === "session1" ? "Session 1 (10:00–13:00)" : "Session 2 (16:00–22:00)";
   const sessionDesc = activeSession === "session1" 
     ? "Morning session with light refreshments" 
     : "Evening session with full three-course dinner and dancing";
