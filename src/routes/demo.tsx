@@ -53,6 +53,12 @@ type DemoNominee = {
   nominatorRelationship: string;
   /** Keyed by question id from AWARD_CATEGORIES */
   answers: Record<string, string>;
+  /** Mock supporting documents */
+  evidenceFiles?: Array<{
+    name: string;
+    label: string;
+    type: "pdf" | "image" | "text";
+  }>;
 };
 
 const DEMO_NOMINEES: DemoNominee[] = [
@@ -128,6 +134,15 @@ const DEMO_NOMINEES: DemoNominee[] = [
       "well-3":
         "Naledi partnered with the DUT Sports Department to integrate mental wellness messaging into pre-season athlete orientations. She collaborated with the Residence Life unit to train 18 residence advisors as Mental Health First Aiders using the SADAG youth toolkit. She also engaged the Faculty of Health Sciences to offer academic credit for students who completed the peer-support training module, demonstrating an ability to work across institutional structures to embed wellness sustainability.",
     },
+    evidenceFiles: [
+      { name: "Mental-Health-Awareness-Week-Event-Poster.pdf", label: "Event Poster", type: "pdf" },
+      { name: "Mental-Health-Awareness-Week-Attendance-Register.pdf", label: "Attendance Register", type: "pdf" },
+      { name: "DUT-Student-Wellness-Handbook.pdf", label: "DUT Student Wellness Handbook", type: "pdf" },
+      { name: "Post-Event-Survey-Report.pdf", label: "Post-Event Survey Report", type: "pdf" },
+      { name: "Counselling-Centre-Referral-Data.pdf", label: "Counselling Centre Referral Data", type: "pdf" },
+      { name: "Collaboration-Plan-Sports-Department.pdf", label: "Collaboration Plan — Sports Department", type: "pdf" },
+      { name: "MHFirstAider-Training-Attendance-Register.pdf", label: "MH First Aider Training Register", type: "pdf" },
+    ],
   },
   {
     id: "demo-4",
@@ -397,9 +412,35 @@ function SubmissionViewer({ nominee }: { nominee: DemoNominee }) {
           </div>
         ))}
 
-        <div className="rounded-lg border border-dashed border-primary/20 bg-muted/20 p-4 text-center text-xs text-muted-foreground">
-          In the real judge panel, supporting documents (PDFs, transcripts, photos) appear above as a document preview viewer.
-        </div>
+        {/* Supporting documents section */}
+        {nominee.evidenceFiles && nominee.evidenceFiles.length > 0 && (
+          <div className="rounded-lg border border-primary/15 bg-blue-50 p-4">
+            <p className="mb-3 text-xs font-bold uppercase tracking-wider text-primary">Supporting Documents</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {nominee.evidenceFiles.map((doc, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-3 rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm transition-colors hover:border-blue-200 hover:bg-blue-50"
+                >
+                  <FileText className="h-4 w-4 shrink-0 text-blue-600" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{doc.label}</p>
+                    <p className="truncate text-xs text-muted-foreground">{doc.name}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-bold uppercase text-blue-700">
+                    {doc.type}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!nominee.evidenceFiles || nominee.evidenceFiles.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-primary/20 bg-muted/20 p-4 text-center text-xs text-muted-foreground">
+            No supporting documents attached.
+          </div>
+        ) : null}
       </div>
     </div>
   );
