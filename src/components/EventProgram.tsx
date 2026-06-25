@@ -38,6 +38,30 @@ const venueFacts = [
   { icon: Shirt, label: "Dress code", value: "Black tie · Traditional attire warmly welcomed" },
 ];
 
+const downloadBothSessions = () => {
+  const content = `SALEA 2026 — Complete Programme of Events
+==========================================
+
+SESSION 1: Morning Session (10:00–13:00)
+${session1Schedule.map(s => `${s.time} — ${s.title}\n${s.desc}`).join('\n\n')}
+
+SESSION 2: Evening Session (16:00–22:00)
+${session2Schedule.map(s => `${s.time} — ${s.title}\n${s.desc}`).join('\n\n')}
+
+Venue: DUT Sports Center
+76 Steve Biko Road
+Dress Code: Black Tie (Traditional attire warmly welcomed)
+`;
+  
+  const element = document.createElement('a');
+  element.setAttribute('href', `data:text/plain;charset=utf-8,${encodeURIComponent(content)}`);
+  element.setAttribute('download', 'DUT-Awards-2026-Program-Complete.txt');
+  element.style.display = 'none';
+  document.body.appendChild(element);
+  element.click();
+  document.body.removeChild(element);
+};
+
 export default function EventProgram() {
   const [activeSession, setActiveSession] = useState("session1");
   const isMobile = useIsMobile();
@@ -195,12 +219,15 @@ export default function EventProgram() {
           )}
 
           <a
-            href="/DUT-Awards-2026-Program.pdf"
-            download
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              downloadBothSessions();
+            }}
             className="mt-6 inline-block"
           >
             <Button size="lg" className="bg-gold text-primary-foreground shadow-gold hover:opacity-95">
-              <Download className="mr-2 h-4 w-4" /> Download Full Programme (PDF)
+              <Download className="mr-2 h-4 w-4" /> Download Full Programme (Session 1 & 2)
             </Button>
           </a>
         </div>
