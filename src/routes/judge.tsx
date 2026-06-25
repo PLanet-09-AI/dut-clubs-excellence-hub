@@ -553,6 +553,7 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
 
   // Listen for real judging activation status
   useEffect(() => {
+    if (typeof window === "undefined") return; // Skip on server to prevent hydration mismatch
     const unsub = onSnapshot(doc(db, "admin_settings", "judging"), (snap) => {
       if (snap.exists()) {
         setRealJudgingActive(snap.data()?.active ?? false);
