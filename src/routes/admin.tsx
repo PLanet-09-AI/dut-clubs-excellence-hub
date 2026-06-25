@@ -612,6 +612,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
   >([]);
   const [newCat, setNewCat] = useState({ name: "", tagline: "" });
   const [activeSection, setActiveSection] = useState<"nominations" | "categories" | "winners" | "judges" | "leaderboard">("nominations");
+  const [showMobileNav, setShowMobileNav] = useState(false);
   const [judgeScores, setJudgeScores] = useState<
     Array<{
       id: string;
@@ -951,30 +952,59 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       </div>
 
       {/* Sidebar + Content layout */}
-      {/* Mobile tab strip — sits above content, outside the flex row */}
-      <div className="md:hidden flex gap-1 overflow-x-auto pb-1 w-full">
-        {([
-          { key: "nominations" as const, label: "Nominations" },
-          ...(canManage ? [
-            { key: "categories" as const, label: "Categories" },
-            { key: "winners" as const, label: "Winners" },
-            { key: "judges" as const, label: "Judges" },
-            { key: "leaderboard" as const, label: "Leaderboard" },
-          ] : [])
-        ]).map((item) => (
+      {/* Mobile navigation sheet — replaced tab strip for better UX */}
+      <Sheet open={showMobileNav} onOpenChange={setShowMobileNav}>
+        <div className="md:hidden mb-4">
           <button
-            key={item.key}
-            onClick={() => setActiveSection(item.key)}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-              activeSection === item.key
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted/40 text-muted-foreground hover:text-foreground"
-            }`}
+            onClick={() => setShowMobileNav(true)}
+            className="w-full flex items-center justify-between gap-2 rounded-lg border border-primary/20 bg-background px-4 py-2.5 text-sm font-medium text-foreground hover:bg-primary/5 transition"
           >
-            {item.label}
+            <span className="flex-1 text-left">
+              {([
+                { key: "nominations" as const, label: "Nominations" },
+                ...(canManage ? [
+                  { key: "categories" as const, label: "Categories" },
+                  { key: "winners" as const, label: "Winners" },
+                  { key: "judges" as const, label: "Judge Activity" },
+                  { key: "leaderboard" as const, label: "Leaderboard" },
+                ] : [])
+              ]).find(item => item.key === activeSection)?.label || "Select section"}
+            </span>
+            <ChevronDown className="h-4 w-4" />
           </button>
-        ))}
-      </div>
+        </div>
+        <SheetContent side="top" className="md:hidden">
+          <SheetHeader>
+            <SheetTitle>Select a section</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6 space-y-2">
+            {([
+              { key: "nominations" as const, label: "Nominations" },
+              ...(canManage ? [
+                { key: "categories" as const, label: "Categories" },
+                { key: "winners" as const, label: "Winners" },
+                { key: "judges" as const, label: "Judge Activity" },
+                { key: "leaderboard" as const, label: "Leaderboard" },
+              ] : [])
+            ]).map((item) => (
+              <button
+                key={item.key}
+                onClick={() => {
+                  setActiveSection(item.key);
+                  setShowMobileNav(false);
+                }}
+                className={`block w-full text-left px-4 py-3 rounded-lg font-medium transition ${
+                  activeSection === item.key
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground hover:bg-muted"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <div className="flex gap-6">
         {/* Sidebar — desktop only */}
