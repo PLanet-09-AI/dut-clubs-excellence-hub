@@ -504,10 +504,12 @@ function LeaderboardContent({ role }: { role: string | null }) {
     return all.map((n, i) => ({ ...n, rank: i + 1 }));
   }, [categories]);
 
-  // Apply category filter
+  // Apply category filter with dynamic ranking
   const filteredRanking = useMemo(() => {
     if (!selectedCategory) return unifiedRanking;
-    return unifiedRanking.filter((n) => n.categoryName === selectedCategory);
+    // Get nominees in selected category and re-rank them (1, 2, 3, ... within category)
+    const categoryNominees = unifiedRanking.filter((n) => n.categoryName === selectedCategory);
+    return categoryNominees.map((n, idx) => ({ ...n, rank: idx + 1 }));
   }, [unifiedRanking, selectedCategory]);
 
   // Get list of all judges and their scores
