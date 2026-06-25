@@ -418,6 +418,9 @@ function LeaderboardPage() {
 // ─── Leaderboard content (rendered once access is granted) ─────────────────────
 function LeaderboardContent({ role }: { role: string | null }) {
   const [allScores, setAllScores] = useState<JudgeScoreDoc[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"unified" | "bycategory">("unified");
+  const [expandedJudges, setExpandedJudges] = useState<Set<string>>(new Set());
   const status = getScoringStatus();
 
   useEffect(() => {
@@ -491,6 +494,40 @@ function LeaderboardContent({ role }: { role: string | null }) {
     });
   }, [allScores]);
 
+  // For unified view: flatten all nominees and rank globally
+  const unifiedRanking = useMemo(() => {
+    const all: (NomineeEntry & { rank: number })[] = [];
+    for (const [, nominees] of categories) {
+      all.push(...nominees);
+    }
+    all.sort((a, b) => b.totalScore - a.totalScore || b.avgScore - a.avgScore);
+    return all.map((n, i) => ({ ...n, rank: i + 1 }));
+  }, [categories]);
+
+  // Apply category filter
+  const filteredRanking = useMemo(() => {
+    if (!selectedCategory) return unifiedRanking;
+    return unifiedRanking.filter((n) => n.categoryName === selectedCategory);
+  }, [unifiedRanking, selectedCategory]);
+
+  // Get list of all judges and their scores
+  const judgeActivity = useMemo(() => {
+    const judges = new Map<string, { email: string; scores: JudgeScoreDoc[] }>();
+    for (const score of allScores) {
+      if (!judges.has(score.judgeUid)) {
+        judges.set(score.judgeUid, { email: score.judgeEmail, scores: [] });
+      }
+      judges.get(score.judgeUid)!.scores.push(score);
+    }
+    return Array.from(judges.entries()).map(([uid, data]) => ({
+      uid,
+      email: data.email,
+      scoreCount: data.scores.length,
+      avgScore: data.scores.reduce((sum, s) => sum + s.score, 0) / (data.scores.length || 1),
+      scores: data.scores.sort((a, b) => (b.updatedAt?.toDate?.()?.getTime() ?? 0) - (a.updatedAt?.toDate?.()?.getTime() ?? 0)),
+    })).sort((a, b) => b.scoreCount - a.scoreCount);
+  }, [allScores]);
+
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-hero">
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,oklch(0.90_0.04_260)_0%,transparent_60%)]" />
@@ -520,7 +557,71 @@ function LeaderboardContent({ role }: { role: string | null }) {
           </motion.div>
         </div>
 
-        {/* Scoring window status */}
+        {/* View mode toggle + Category filters */}
+        <div className="mb-8 space-y-4">
+          {/* View mode tabs */}
+          <div className="flex gap-2 border-b border-primary/10">
+            <button
+              onClick={() => setViewMode("unified")}
+              className={`px-4 py-2 text-sm font-medium transition ${
+                viewMode === "unified"
+                  ? "border-b-2 border-gold text-gold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Unified Leaderboard
+            </button>
+            <button
+              onClick={() => setViewMode("bycategory")}
+              className={`px-4 py-2 text-sm font-medium transition ${
+                viewMode === "bycategory"
+                  ? "border-b-2 border-gold text-gold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              By Category
+            </button>
+            <button
+              onClick={() => setViewMode("judges" as any)}
+              className={`px-4 py-2 text-sm font-medium transition ${
+                (viewMode as any) === "judges"
+                  ? "border-b-2 border-gold text-gold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Judge Activity
+            </button>
+          </div>
+
+          {/* Category filter buttons - show for unified view */}
+          {viewMode === "unified" && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
+                  selectedCategory === null
+                    ? "bg-gold text-primary-foreground"
+                    : "border border-primary/20 bg-white text-muted-foreground hover:border-primary/40"
+                }`}
+              >
+                All Categories
+              </button>
+              {categories.map(([catName]) => (
+                <button
+                  key={catName}
+                  onClick={() => setSelectedCategory(catName)}
+                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
+                    selectedCategory === catName
+                      ? "bg-gold text-primary-foreground"
+                      : "border border-primary/20 bg-white text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {catName}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {status === "before" && (
           <div className="mb-8 flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <Clock className="h-5 w-5 shrink-0" />
@@ -549,9 +650,145 @@ function LeaderboardContent({ role }: { role: string | null }) {
           </Card>
         )}
 
-        {/* Per-category leaderboards */}
-        <div className="space-y-10">
-          {categories.map(([catName, nominees], ci) => (
+        {/* Unified leaderboard view */}
+        {viewMode === "unified" && categories.length > 0 && (
+          <div className="space-y-3">
+            {filteredRanking.length === 0 ? (
+              <Card className="p-8 text-center text-muted-foreground">
+                No nominees in this category yet.
+              </Card>
+            ) : (
+              filteredRanking.map((nominee, idx) => {
+                const maxPossible = nominee.judgeCount * 5;
+                const pct = maxPossible > 0 ? (nominee.totalScore / maxPossible) * 100 : 0;
+                const isExpanded = expandedJudges.has(nominee.nominationId);
+                const judgeScoresForNominee = allScores.filter(
+                  (s) => s.nominationId === nominee.nominationId
+                );
+
+                return (
+                  <motion.div
+                    key={nominee.nominationId}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`rounded-2xl border px-4 py-4 transition ${
+                      nominee.rank === 1
+                        ? "border-yellow-400/50 bg-yellow-50/60 shadow-sm"
+                        : nominee.rank === 2
+                        ? "border-slate-300/60 bg-slate-50/60"
+                        : nominee.rank === 3
+                        ? "border-amber-600/40 bg-amber-50/50"
+                        : "border-primary/10 bg-white"
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                      <RankBadge rank={nominee.rank} />
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                          <div>
+                            <p className={`font-semibold ${nominee.rank <= 3 ? "text-base" : "text-sm"}`}>
+                              {nominee.nomineeName}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {nominee.categoryName}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <Stars value={nominee.avgScore} />
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-foreground leading-none">
+                                {nominee.totalScore.toFixed(1)}{" "}
+                                <span className="text-xs font-normal text-muted-foreground">
+                                  / {maxPossible} pts
+                                </span>
+                              </p>
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                {nominee.avgScore.toFixed(2)}/5 avg
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60 mb-2">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              nominee.rank === 1
+                                ? "bg-yellow-400"
+                                : nominee.rank === 2
+                                ? "bg-slate-400"
+                                : nominee.rank === 3
+                                ? "bg-amber-600"
+                                : "bg-primary/50"
+                            }`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+
+                        <p className="text-[11px] text-muted-foreground mb-2">
+                          {nominee.judgeCount} judge{nominee.judgeCount !== 1 ? "s" : ""} rated
+                        </p>
+
+                        {/* Judge scores breakdown */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isExpanded) {
+                              expandedJudges.delete(nominee.nominationId);
+                            } else {
+                              expandedJudges.add(nominee.nominationId);
+                            }
+                            setExpandedJudges(new Set(expandedJudges));
+                          }}
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                        >
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                          />
+                          {isExpanded ? "Hide" : "Show"} judge scores
+                        </button>
+
+                        {isExpanded && (
+                          <div className="mt-2 space-y-1.5 rounded-lg border border-primary/10 bg-muted/30 p-3">
+                            {judgeScoresForNominee.map((score, si) => (
+                              <div key={si} className="flex items-center justify-between gap-2 py-1">
+                                <span className="text-[11px] text-muted-foreground truncate">
+                                  {score.judgeEmail}
+                                </span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Stars value={score.score} />
+                                  <span className="w-12 text-right text-[11px] font-semibold">
+                                    {score.score.toFixed(1)}/5
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <CriteriaBreakdown totals={nominee.criteriaTotals} categoryId={nominee.categoryId} />
+
+                        {/* Declare winner — admin only, top 3 */}
+                        {role === "admin" && nominee.rank <= 3 && (
+                          <DeclareWinnerButton
+                            nominee={nominee}
+                            autoTier={nominee.rank === 1 ? "platinum" : nominee.rank === 2 ? "gold" : "silver"}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* By-category leaderboard view */}
+        {viewMode === "bycategory" && categories.length > 0 && (
+          <div className="space-y-10">
+            {categories.map(([catName, nominees], ci) => (
             <motion.section
               key={catName}
               initial={{ opacity: 0, y: 30 }}
@@ -575,6 +812,11 @@ function LeaderboardContent({ role }: { role: string | null }) {
                   const maxPossible = nominee.judgeCount * 5;
                   const pct = maxPossible > 0 ? (nominee.totalScore / maxPossible) * 100 : 0;
                   const isTop = rank <= 3;
+                  const isExpanded = expandedJudges.has(nominee.nominationId);
+                  const judgeScoresForNominee = allScores.filter(
+                    (s) => s.nominationId === nominee.nominationId
+                  );
+
                   return (
                     <div
                       key={nominee.nominationId}
@@ -636,6 +878,43 @@ function LeaderboardContent({ role }: { role: string | null }) {
                           {nominee.judgeCount} judge{nominee.judgeCount !== 1 ? "s" : ""} rated · max {maxPossible} pts
                         </p>
 
+                        {/* Judge scores breakdown */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isExpanded) {
+                              expandedJudges.delete(nominee.nominationId);
+                            } else {
+                              expandedJudges.add(nominee.nominationId);
+                            }
+                            setExpandedJudges(new Set(expandedJudges));
+                          }}
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                        >
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                          />
+                          {isExpanded ? "Hide" : "Show"} judge scores
+                        </button>
+
+                        {isExpanded && (
+                          <div className="mt-2 space-y-1.5 rounded-lg border border-primary/10 bg-muted/30 p-3">
+                            {judgeScoresForNominee.map((score, si) => (
+                              <div key={si} className="flex items-center justify-between gap-2 py-1">
+                                <span className="text-[11px] text-muted-foreground truncate">
+                                  {score.judgeEmail}
+                                </span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Stars value={score.score} />
+                                  <span className="w-12 text-right text-[11px] font-semibold">
+                                    {score.score.toFixed(1)}/5
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         <CriteriaBreakdown totals={nominee.criteriaTotals} categoryId={nominee.categoryId} />
 
                         {/* Declare winner — admin only, top 3 */}
@@ -652,7 +931,70 @@ function LeaderboardContent({ role }: { role: string | null }) {
               </div>
             </motion.section>
           ))}
-        </div>
+            </div>
+        )}
+
+        {/* Judge Activity view */}
+        {(viewMode as any) === "judges" && judgeActivity.length > 0 && (
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {judgeActivity.map((judge) => (
+                <motion.div
+                  key={judge.uid}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-2xl border border-primary/10 bg-white p-4"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="font-semibold text-sm">{judge.email}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {judge.scoreCount} score{judge.scoreCount !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <Stars value={judge.avgScore} />
+                      <p className="text-[11px] font-semibold mt-0.5">
+                        {judge.avgScore.toFixed(2)}/5
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2 border-t border-primary/10 pt-3">
+                    {judge.scores.slice(0, 5).map((score, si) => (
+                      <div key={si} className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate">{score.nomineeName}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {score.categoryName}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-[11px] font-semibold">{score.score.toFixed(1)}/5</p>
+                          {score.updatedAt && (
+                            <p className="text-[10px] text-muted-foreground">
+                              {(score.updatedAt as any).toDate?.()?.toLocaleDateString?.("en-ZA") || ""}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {judge.scoreCount > 5 && (
+                      <p className="text-[11px] text-muted-foreground pt-1">
+                        +{judge.scoreCount - 5} more score{judge.scoreCount - 5 !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(viewMode as any) === "judges" && judgeActivity.length === 0 && (
+          <Card className="p-8 text-center text-muted-foreground">
+            No judges have submitted scores yet.
+          </Card>
+        )}
 
         {/* Legend */}
         <div className="mt-12 flex flex-wrap items-center justify-center gap-5 text-xs text-muted-foreground">
