@@ -819,6 +819,7 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
               scoringOpen={scoringOpen}
               scoringStatus={scoringStatus}
               hasScore={!!myScores[detail.id]}
+              realJudgingActive={realJudgingActive}
               onSave={saveScore}
             />
           )}
@@ -839,6 +840,7 @@ function JudgeNominationDetail({
   scoringOpen,
   scoringStatus,
   hasScore,
+  realJudgingActive,
   onSave,
 }: {
   nom: Nomination;
@@ -850,6 +852,7 @@ function JudgeNominationDetail({
   scoringOpen: boolean;
   scoringStatus: "before" | "open" | "closed";
   hasScore: boolean;
+  realJudgingActive: boolean;
   onSave: () => void;
 }) {
   const catData = AWARD_CATEGORIES.find((c) => c.id === nom.categoryId);
