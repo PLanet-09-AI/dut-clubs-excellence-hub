@@ -419,7 +419,7 @@ function LeaderboardPage() {
 function LeaderboardContent({ role }: { role: string | null }) {
   const [allScores, setAllScores] = useState<JudgeScoreDoc[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"unified" | "bycategory">("unified");
+  const [viewMode, setViewMode] = useState<"unified" | "bycategory">(role === "admin" ? "unified" : "bycategory");
   const [expandedJudges, setExpandedJudges] = useState<Set<string>>(new Set());
   const status = getScoringStatus();
 
@@ -557,71 +557,73 @@ function LeaderboardContent({ role }: { role: string | null }) {
           </motion.div>
         </div>
 
-        {/* View mode toggle + Category filters */}
-        <div className="mb-8 space-y-4">
-          {/* View mode tabs */}
-          <div className="flex gap-2 border-b border-primary/10">
-            <button
-              onClick={() => setViewMode("unified")}
-              className={`px-4 py-2 text-sm font-medium transition ${
-                viewMode === "unified"
-                  ? "border-b-2 border-gold text-gold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Unified Leaderboard
-            </button>
-            <button
-              onClick={() => setViewMode("bycategory")}
-              className={`px-4 py-2 text-sm font-medium transition ${
-                viewMode === "bycategory"
-                  ? "border-b-2 border-gold text-gold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              By Category
-            </button>
-            <button
-              onClick={() => setViewMode("judges" as any)}
-              className={`px-4 py-2 text-sm font-medium transition ${
-                (viewMode as any) === "judges"
-                  ? "border-b-2 border-gold text-gold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Judge Activity
-            </button>
-          </div>
-
-          {/* Category filter buttons - show for unified view */}
-          {viewMode === "unified" && (
-            <div className="flex flex-wrap gap-2">
+        {/* View mode toggle + Category filters — ADMIN ONLY */}
+        {role === "admin" && (
+          <div className="mb-8 space-y-4">
+            {/* View mode tabs */}
+            <div className="flex gap-2 border-b border-primary/10">
               <button
-                onClick={() => setSelectedCategory(null)}
-                className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
-                  selectedCategory === null
-                    ? "bg-gold text-primary-foreground"
-                    : "border border-primary/20 bg-white text-muted-foreground hover:border-primary/40"
+                onClick={() => setViewMode("unified")}
+                className={`px-4 py-2 text-sm font-medium transition ${
+                  viewMode === "unified"
+                    ? "border-b-2 border-gold text-gold"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                All Categories
+                Unified Leaderboard
               </button>
-              {categories.map(([catName]) => (
+              <button
+                onClick={() => setViewMode("bycategory")}
+                className={`px-4 py-2 text-sm font-medium transition ${
+                  viewMode === "bycategory"
+                    ? "border-b-2 border-gold text-gold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                By Category
+              </button>
+              <button
+                onClick={() => setViewMode("judges" as any)}
+                className={`px-4 py-2 text-sm font-medium transition ${
+                  (viewMode as any) === "judges"
+                    ? "border-b-2 border-gold text-gold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Judge Activity
+              </button>
+            </div>
+
+            {/* Category filter buttons - show for unified view */}
+            {viewMode === "unified" && (
+              <div className="flex flex-wrap gap-2">
                 <button
-                  key={catName}
-                  onClick={() => setSelectedCategory(catName)}
+                  onClick={() => setSelectedCategory(null)}
                   className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
-                    selectedCategory === catName
+                    selectedCategory === null
                       ? "bg-gold text-primary-foreground"
                       : "border border-primary/20 bg-white text-muted-foreground hover:border-primary/40"
                   }`}
                 >
-                  {catName}
+                  All Categories
                 </button>
-              ))}
-            </div>
-          )}
-        </div>
+                {categories.map(([catName]) => (
+                  <button
+                    key={catName}
+                    onClick={() => setSelectedCategory(catName)}
+                    className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
+                      selectedCategory === catName
+                        ? "bg-gold text-primary-foreground"
+                        : "border border-primary/20 bg-white text-muted-foreground hover:border-primary/40"
+                    }`}
+                  >
+                    {catName}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {status === "before" && (
           <div className="mb-8 flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <Clock className="h-5 w-5 shrink-0" />

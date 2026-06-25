@@ -611,7 +611,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     { id: string; name: string; tagline: string }[]
   >([]);
   const [newCat, setNewCat] = useState({ name: "", tagline: "" });
-  const [activeSection, setActiveSection] = useState<"nominations" | "categories" | "winners" | "judges">("nominations");
+  const [activeSection, setActiveSection] = useState<"nominations" | "categories" | "winners" | "judges" | "leaderboard">("nominations");
   const [judgeScores, setJudgeScores] = useState<
     Array<{
       id: string;
@@ -1251,57 +1251,81 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                 No judge scores submitted yet.
               </Card>
             ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  All judge evaluations in real time — sorted newest first. Each entry is
-                  timestamped.
-                </p>
-                {judgeScores.map((s) => (
-                  <div
-                    key={s.id}
-                    className="rounded-2xl border border-primary/15 bg-white px-5 py-4"
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-muted-foreground">
+                    All judge evaluations in real time — sorted newest first. Each entry is
+                    timestamped.
+                  </p>
+                  <button
+                    onClick={() => setActiveSection("leaderboard")}
+                    className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-gold/90 transition"
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <p className="font-semibold text-sm">{s.nomineeName}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{s.categoryName}</p>
+                    <Trophy className="h-4 w-4" />
+                    View Leaderboard
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {judgeScores.map((s) => (
+                    <div
+                      key={s.id}
+                      className="rounded-2xl border border-primary/15 bg-white px-5 py-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-sm">{s.nomineeName}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{s.categoryName}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-0.5 rounded-full bg-gold/10 px-3 py-1 font-bold text-yellow-700">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`h-4 w-4 ${i < Math.round(s.score) ? "fill-yellow-500 text-yellow-500" : "fill-muted text-muted-foreground/20"}`}
+                              />
+                            ))}
+                            <span className="ml-1 text-sm">{s.score.toFixed(1)}/5</span>
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-0.5 rounded-full bg-gold/10 px-3 py-1 font-bold text-yellow-700">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`h-4 w-4 ${i < Math.round(s.score) ? "fill-yellow-500 text-yellow-500" : "fill-muted text-muted-foreground/20"}`}
-                            />
-                          ))}
-                          <span className="ml-1 text-sm">{s.score.toFixed(1)}/5</span>
+                      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+                        <span>
+                          <span className="font-medium text-foreground/70">Judge</span> {s.judgeEmail}
+                        </span>
+                        <span>
+                          <span className="font-medium text-foreground/70">Submitted</span>{" "}
+                          {s.updatedAt && typeof s.updatedAt === "object" && s.updatedAt.toDate
+                            ? s.updatedAt
+                                .toDate()
+                                .toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })
+                            : "—"}
                         </span>
                       </div>
+                      {s.comment && (
+                        <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2">
+                          <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-600">Judge's comment</p>
+                          <p className="text-sm italic text-foreground/80">"{s.comment}"</p>
+                        </div>
+                      )}
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-                      <span>
-                        <span className="font-medium text-foreground/70">Judge</span> {s.judgeEmail}
-                      </span>
-                      <span>
-                        <span className="font-medium text-foreground/70">Submitted</span>{" "}
-                        {s.updatedAt && typeof s.updatedAt === "object" && s.updatedAt.toDate
-                          ? s.updatedAt
-                              .toDate()
-                              .toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })
-                          : "—"}
-                      </span>
-                    </div>
-                    {s.comment && (
-                      <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2">
-                        <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-600">Judge's comment</p>
-                        <p className="text-sm italic text-foreground/80">"{s.comment}"</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>}
+
+        {/* ── Leaderboard section ─── */}
+        {canManage && activeSection === "leaderboard" && (
+          <div>
+            <button
+              onClick={() => setActiveSection("judges")}
+              className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition"
+            >
+              <ChevronLeft className="h-4 w-4" /> Back to Judge Activity
+            </button>
+            <LeaderboardAdminPanel />
+          </div>
+        )}
 
         </div>{/* end content area */}
       </div>{/* end sidebar layout */}
@@ -2869,6 +2893,168 @@ function NominationDetail({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Leaderboard Admin Panel ──────────────────────────────────────────── */
+
+function LeaderboardAdminPanel() {
+  const [allScores, setAllScores] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = query(collection(db, "judge_scores"), orderBy("updatedAt", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setAllScores(snap.docs.map((d) => ({ ...d.data() } as any)));
+    });
+    return () => unsub();
+  }, []);
+
+  // Build ranking with all nominees
+  const ranking = useMemo(() => {
+    const nomineeMap = new Map<string, any>();
+
+    for (const s of allScores) {
+      if (s.score === 0) continue;
+      const key = s.nominationId;
+      if (!nomineeMap.has(key)) {
+        const catMatch = AWARD_CATEGORIES.find((c) => c.name === s.categoryName);
+        nomineeMap.set(key, {
+          nominationId: key,
+          nomineeName: s.nomineeName,
+          categoryId: s.categoryId ?? catMatch?.id ?? s.categoryName,
+          categoryName: s.categoryName,
+          scores: [],
+          totalScore: 0,
+          avgScore: 0,
+          judgeCount: 0,
+        });
+      }
+      const entry = nomineeMap.get(key)!;
+      entry.scores.push(s.score);
+      entry.totalScore = entry.scores.reduce((a: number, b: number) => a + b, 0);
+      entry.avgScore = entry.totalScore / entry.scores.length;
+      entry.judgeCount = entry.scores.length;
+    }
+
+    const all: any[] = Array.from(nomineeMap.values());
+    all.sort((a, b) => b.totalScore - a.totalScore || b.avgScore - a.avgScore);
+    return all.map((n, i) => ({ ...n, rank: i + 1 }));
+  }, [allScores]);
+
+  const filtered = useMemo(() => {
+    if (!selectedCategory) return ranking;
+    return ranking.filter((n) => n.categoryName === selectedCategory);
+  }, [ranking, selectedCategory]);
+
+  const categories = useMemo(() => {
+    return Array.from(new Set(ranking.map((n) => n.categoryName))).sort();
+  }, [ranking]);
+
+  if (ranking.length === 0) {
+    return <Card className="p-8 text-center text-muted-foreground">No scores yet.</Card>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Category filter */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setSelectedCategory(null)}
+          className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
+            selectedCategory === null
+              ? "bg-gold text-primary-foreground"
+              : "border border-primary/20 bg-white text-muted-foreground hover:border-primary/40"
+          }`}
+        >
+          All Categories
+        </button>
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setSelectedCategory(cat)}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
+              selectedCategory === cat
+                ? "bg-gold text-primary-foreground"
+                : "border border-primary/20 bg-white text-muted-foreground hover:border-primary/40"
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Leaderboard rows */}
+      <div className="space-y-2">
+        {filtered.length === 0 ? (
+          <Card className="p-6 text-center text-sm text-muted-foreground">
+            No nominees in this category.
+          </Card>
+        ) : (
+          filtered.map((nominee) => {
+            const maxPossible = nominee.judgeCount * 5;
+            const pct = maxPossible > 0 ? (nominee.totalScore / maxPossible) * 100 : 0;
+
+            return (
+              <div
+                key={nominee.nominationId}
+                className={`rounded-xl border px-4 py-3 transition ${
+                  nominee.rank === 1
+                    ? "border-yellow-400/50 bg-yellow-50/60"
+                    : nominee.rank === 2
+                    ? "border-slate-300/60 bg-slate-50/60"
+                    : nominee.rank === 3
+                    ? "border-amber-600/40 bg-amber-50/50"
+                    : "border-primary/10 bg-white"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`h-7 w-7 rounded-full grid place-items-center text-xs font-bold ${
+                        nominee.rank === 1
+                          ? "bg-yellow-400 text-white"
+                          : nominee.rank === 2
+                          ? "bg-slate-300 text-white"
+                          : nominee.rank === 3
+                          ? "bg-amber-600 text-white"
+                          : "border border-primary/20 bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {nominee.rank}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">{nominee.nomineeName}</p>
+                      <p className="text-xs text-muted-foreground">{nominee.categoryName}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold">
+                      {nominee.totalScore.toFixed(1)} <span className="text-xs font-normal text-muted-foreground">/ {maxPossible}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">{nominee.judgeCount} judges</p>
+                  </div>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      nominee.rank === 1
+                        ? "bg-yellow-400"
+                        : nominee.rank === 2
+                        ? "bg-slate-400"
+                        : nominee.rank === 3
+                        ? "bg-amber-600"
+                        : "bg-primary/50"
+                    }`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
