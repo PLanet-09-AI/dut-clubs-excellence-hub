@@ -633,23 +633,42 @@ function DemoPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">SALEA 2026 · Demo Sandbox</p>
             </div>
             <h1 className="font-serif text-4xl font-bold sm:text-5xl">
-              Practice <span className="text-gradient-gold">Voting</span>
+              Practice <span className="text-gradient-gold">Judge Scoring</span>
             </h1>
-            <p className="mt-3 max-w-lg text-base text-muted-foreground">
-              Five realistic dummy nominees — read their full submissions and rate each criterion exactly as you would in the live judge panel. Nothing is saved to the database.
+            <p className="mt-3 max-w-xl text-base text-muted-foreground">
+              Test-drive the full judge panel with five realistic demo nominees. Read their complete nomination submissions, rate each criterion, and see your scores update live on the leaderboard. <strong className="text-foreground">All data stays in this sandbox — nothing is saved to Firestore.</strong>
             </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-                <AlertCircle className="h-3.5 w-3.5" /> Demo mode — no real data affected
+
+            {/* Features explanation */}
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <FileText className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">Real Demo Data</p>
+                  <p className="text-xs text-blue-700 mt-1">Complete nomination submissions with realistic answers copied from actual award submissions</p>
+                </div>
               </div>
-              <Badge variant="outline" className="border-green-300 text-green-700">{totalRated}/{DEMO_NOMINEES.length} rated</Badge>
+              <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-3">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+                <div>
+                  <p className="text-sm font-semibold text-green-900">No Firestore Persistence</p>
+                  <p className="text-xs text-green-700 mt-1">All ratings and comments exist only in your browser. Close the page and they're gone</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                <AlertCircle className="h-3.5 w-3.5" /> Sandbox mode active
+              </div>
+              <Badge variant="outline" className="border-green-300 text-green-700">{totalRated}/{DEMO_NOMINEES.length} nominees rated</Badge>
               {totalRated > 0 && (
                 <button type="button" onClick={resetAll} className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 transition">
-                  <RotateCcw className="h-3 w-3" /> Reset
+                  <RotateCcw className="h-3 w-3" /> Clear all scores
                 </button>
               )}
               <Link to="/guide" className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-white px-3 py-1 text-xs font-semibold text-primary hover:bg-muted/30 transition">
-                <BookOpen className="h-3 w-3" /> View guide
+                <BookOpen className="h-3 w-3" /> Judge guide
               </Link>
             </div>
           </motion.div>
