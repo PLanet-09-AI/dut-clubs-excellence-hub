@@ -40,5 +40,5 @@ export const downloadGuidePDF = async () => {
  * Download the judge programme PDF from Firebase Storage.
  */
 export const downloadProgrammePDF = async () => {
-  downloadFromUrl(PDF_URLS.programme, "SALEA-2026-Judge-Programme.pdf");
+  downloadFromUrl(PDF_URLS.programme, "SALEA-2026-Programme.pdf");
 };

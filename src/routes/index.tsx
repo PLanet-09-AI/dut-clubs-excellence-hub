@@ -498,9 +498,9 @@ function Index() {
           <div className="rounded-2xl border border-primary/20 bg-white/80 backdrop-blur p-8 sm:p-12">
             <div className="grid gap-8 sm:grid-cols-2 items-center">
               <div>
-                <h3 className="font-serif text-3xl font-bold text-foreground mb-4">Judge Programme</h3>
+                <h3 className="font-serif text-3xl font-bold text-foreground mb-4">Event Programme</h3>
                 <p className="text-muted-foreground mb-6">
-                  Download the complete event programme with clear session times and schedule details for all judges.
+                  Download the complete event programme with clear session times and schedule details.
                 </p>
                 <ul className="space-y-3 text-sm mb-6">
                   <li className="flex items-start gap-3">
