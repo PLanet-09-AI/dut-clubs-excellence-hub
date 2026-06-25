@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import SiteNav from "@/components/SiteNav";
 import EventProgram from "@/components/EventProgram";
 import { RouteTransitionLoader } from "@/components/RouteTransitionLoader";
-import { downloadGuidePDF } from "@/lib/pdf-download";
+import { downloadGuidePDF, downloadProgrammePDF } from "@/lib/pdf-download";
 import { AWARD_CATEGORIES, AWARD_THEME } from "@/data/awards";
 
 const AwardScene = lazy(() => import("@/components/AwardScene"));
@@ -85,6 +85,18 @@ function Index() {
     } finally {
       setIsDownloading(false);
       setDownloadProgress(0);
+    }
+  };
+
+  const handleDownloadProgrammePDF = async () => {
+    setIsDownloading(true);
+    try {
+      await downloadProgrammePDF();
+    } catch (error) {
+      console.error("Failed to download programme PDF:", error);
+      alert("Failed to download programme. Please try again.");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -480,6 +492,62 @@ function Index() {
       {/* Detailed Programme & Venue */}
       <EventProgram />
 
+      {/* Download Programme */}
+      <section className="relative z-10 border-t border-primary/10 bg-gradient-to-b from-background to-white/50 py-16">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="rounded-2xl border border-primary/20 bg-white/80 backdrop-blur p-8 sm:p-12">
+            <div className="grid gap-8 sm:grid-cols-2 items-center">
+              <div>
+                <h3 className="font-serif text-3xl font-bold text-foreground mb-4">Judge Programme</h3>
+                <p className="text-muted-foreground mb-6">
+                  Download the complete event programme with clear session times and schedule details for all judges.
+                </p>
+                <ul className="space-y-3 text-sm mb-6">
+                  <li className="flex items-start gap-3">
+                    <span className="text-primary font-bold mt-1">✓</span>
+                    <span><strong>Session 1:</strong> 10:00 – 13:00 (Morning Awards)</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="text-primary font-bold mt-1">✓</span>
+                    <span><strong>Session 2:</strong> 16:00 – 22:00 (Evening Gala & Awards)</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="text-primary font-bold mt-1">✓</span>
+                    <span><strong>Venue:</strong> DUT Sports Center, 76 Steve Biko Road</span>
+                  </li>
+                </ul>
+              </div>
+              <div className="flex justify-center">
+                <motion.button 
+                  onClick={handleDownloadProgrammePDF} 
+                  disabled={isDownloading}
+                  whileHover={!isDownloading ? { scale: 1.05 } : {}}
+                  whileTap={!isDownloading ? { scale: 0.95 } : {}}
+                >
+                  <Button className="bg-gold text-primary-foreground hover:bg-gold/90 flex items-center justify-center gap-3 transition-all disabled:opacity-70 h-14 px-8 text-base" disabled={isDownloading}>
+                    {isDownloading ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        >
+                          <Loader className="h-5 w-5" />
+                        </motion.div>
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-5 w-5" />
+                        <span>Download Programme</span>
+                      </>
+                    )}
+                  </Button>
+                </motion.button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
 
       <footer className="relative z-10 border-t border-primary/10 bg-background/60 backdrop-blur">
