@@ -117,7 +117,7 @@ export const downloadPageAsPDF = async (fileName = "SALEA-2026-Guide.pdf") => {
       filename: fileName,
       image: { type: "jpeg" as const, quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, allowTaint: true },
-      jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
+      jsPDF: { orientation: "portrait" as const, unit: "mm", format: "a4" },
     };
 
     // Use html2pdf to generate and download
@@ -392,7 +392,7 @@ export const downloadProgrammePDF = async () => {
       filename: "SALEA-2026-Judge-Programme.pdf",
       image: { type: "jpeg" as const, quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, allowTaint: true },
-      jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
+      jsPDF: { orientation: "portrait" as const, unit: "mm", format: "a4" },
     };
 
     await html2pdf().set(opt).from(element).save();
