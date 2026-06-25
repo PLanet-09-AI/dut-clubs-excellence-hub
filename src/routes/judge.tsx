@@ -508,6 +508,7 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
   const [criteriaInput, setCriteriaInput] = useState<Record<string, number>>({});
   const [commentInput, setCommentInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [realJudgingActive, setRealJudgingActive] = useState(false);
 
   const scoringStatus = getScoringStatus();
   const scoringOpen = scoringStatus === "open";
@@ -549,6 +550,18 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
     });
     return () => unsub();
   }, [uid]);
+
+  // Listen for real judging activation status
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "admin_settings", "judging"), (snap) => {
+      if (snap.exists()) {
+        setRealJudgingActive(snap.data()?.active ?? false);
+      } else {
+        setRealJudgingActive(false);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const categories = useMemo(() => {
     const seen = new Map<string, string>();
@@ -1542,7 +1555,7 @@ function JudgeNominationDetail({
 
             <Button
               onClick={onSave}
-              disabled={saving || !scoringOpen || ratedCount === 0}
+              disabled={saving || !scoringOpen || ratedCount === 0 || !realJudgingActive}
               className="w-full bg-gold text-primary-foreground disabled:opacity-50"
               size="lg"
             >
@@ -1562,7 +1575,12 @@ function JudgeNominationDetail({
                 </>
               )}
             </Button>
-            {ratedCount === 0 && scoringOpen && (
+            {!realJudgingActive && (
+              <p className="text-center text-xs text-amber-600">
+                ⏸ Real judging is not active. Admin must activate it to submit scores.
+              </p>
+            )}
+            {ratedCount === 0 && scoringOpen && realJudgingActive && (
               <p className="text-center text-xs text-amber-600">
                 Rate at least one criterion to submit your evaluation.
               </p>

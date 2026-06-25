@@ -626,6 +626,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       updatedAt: { toDate?: () => Date } | null;
     }>
   >([]);
+  const [realJudgingActive, setRealJudgingActive] = useState(false);
 
   // All categories = static + admin-added (from Firestore)
   const allCategories = useMemo(
@@ -687,6 +688,29 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     });
     return () => unsub();
   }, []);
+
+  // Real-time Firestore listener — admin settings (judging activation)
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "admin_settings", "judging"), (snap) => {
+      if (snap.exists()) {
+        setRealJudgingActive(snap.data()?.active ?? false);
+      } else {
+        setRealJudgingActive(false);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  async function toggleRealJudging() {
+    try {
+      await setDoc(doc(db, "admin_settings", "judging"), {
+        active: !realJudgingActive,
+        activatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("Error toggling judging:", err);
+    }
+  }
 
   async function addCategory(e: React.FormEvent) {
     e.preventDefault();
@@ -861,7 +885,21 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
             {canManage ? "Administration Panel" : "Review Panel"}
           </h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 items-end">
+          {canManage && (
+            <button
+              onClick={toggleRealJudging}
+              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                realJudgingActive
+                  ? "bg-green-100 text-green-700 border border-green-300 hover:bg-green-200"
+                  : "bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+              }`}
+            >
+              <div className={`h-2 w-2 rounded-full ${realJudgingActive ? "bg-green-600" : "bg-amber-600"}`} />
+              {realJudgingActive ? "Real Judging Active" : "Activate Real Judging"}
+            </button>
+          )}
+          <div className="flex gap-2">
           {canManage && (
             <Button
               onClick={exportCsv}
@@ -880,6 +918,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
           >
             <LogOut className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Sign out</span>
           </Button>
+        </div>
         </div>
       </div>
 

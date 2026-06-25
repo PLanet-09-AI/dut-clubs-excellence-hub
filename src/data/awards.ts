@@ -151,6 +151,11 @@ export const AWARD_THEME = {
   openingAddressTitle: "Welcome & Opening Address",
   openingAddressRemarks: "Dean's remarks",
   yearsBadge: "Student Academic & Leadership Excellence Awards 2026",
+  /** Judge session times */
+  judgeSessions: [
+    { name: "Session 1", startTime: "10:00", endTime: "13:00" },
+    { name: "Session 2", startTime: "16:00", endTime: "22:00" },
+  ],
 };
 
 export const AWARD_CATEGORIES: AwardCategory[] = [
