@@ -484,19 +484,19 @@ function Index() {
 
       <footer className="relative z-10 border-t border-primary/10 bg-background/60 backdrop-blur">
         <div className="mx-auto max-w-7xl px-6 py-12">
-          <div className="mb-8 rounded-2xl border border-primary/20 bg-white/50 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
+          <div className="mb-8 rounded-2xl border border-primary/20 bg-white/50 p-4 sm:p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex-1">
               <p className="font-semibold text-foreground">Need Help with Your Nomination?</p>
               <p className="text-sm text-muted-foreground mt-1">Download the complete guide with criteria and Portfolio of Evidence requirements.</p>
             </div>
             <motion.button 
               onClick={handleDownloadPDF} 
               disabled={isDownloading}
-              whileHover={!isDownloading ? { scale: 1.05 } : {}}
-              whileTap={!isDownloading ? { scale: 0.95 } : {}}
-              className="shrink-0"
+              whileHover={!isDownloading ? { scale: 1.02 } : {}}
+              whileTap={!isDownloading ? { scale: 0.98 } : {}}
+              className="w-full sm:w-auto sm:shrink-0"
             >
-              <Button className="bg-gold text-primary-foreground hover:bg-gold/90 flex items-center gap-2 whitespace-nowrap transition-all disabled:opacity-70" disabled={isDownloading}>
+              <Button className="w-full sm:w-auto bg-gold text-primary-foreground hover:bg-gold/90 flex items-center justify-center gap-2 transition-all disabled:opacity-70 h-11" disabled={isDownloading}>
                 {isDownloading ? (
                   <motion.div
                     animate={{ rotate: 360 }}
@@ -512,7 +512,7 @@ function Index() {
                     <FileText className="h-4 w-4" />
                   </motion.div>
                 )}
-                {isDownloading ? "Generating PDF..." : "Download Guide"}
+                <span>{isDownloading ? "Generating PDF..." : "Download Guide"}</span>
               </Button>
             </motion.button>
           </div>
