@@ -1,51 +1,18 @@
 import html2pdf from "html2pdf.js";
 
 /**
- * Converts OKLCH color values to RGB hex format.
- * Pattern: oklch(L C H) → #RRGGBB
+ * Inline all computed styles to isolate from CSS variables
+ * and convert OKLCH to RGB format for html2canvas compatibility.
  */
-function convertOklchToRgb(oklchStr: string): string {
-  const match = oklchStr.match(/oklch\(([\d.]+)\s+([\d.]+)\s+([\d.]+)\)/);
-  if (!match) return oklchStr; // Return unchanged if not oklch
-  
-  // Create a temporary canvas to leverage browser's color conversion
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return oklchStr;
-  
-  try {
-    // Set a temporary fill style with the oklch color
-    ctx.fillStyle = oklchStr;
-    // Get computed style which browser converts to rgb
-    const computed = ctx.fillStyle;
-    // If browser understands oklch, it will convert to rgb hex
-    if (computed.startsWith("#")) return computed;
-    if (computed.startsWith("rgb")) {
-      // Convert rgb(r, g, b) to #RRGGBB
-      const rgbMatch = computed.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-      if (rgbMatch) {
-        const [_, r, g, b] = rgbMatch.map(Number);
-        return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
-      }
-    }
-  } catch (e) {
-    // If conversion fails, return original
-  }
-  return oklchStr;
-}
-
-/**
- * Converts all OKLCH colors in computed styles to RGB hex.
- * Necessary because html2canvas doesn't support OKLCH color format.
- */
-function convertElementStylesToSupportedFormat(element: Element): void {
-  // Recursively process all elements
+function inlineAllStyles(element: Element): void {
   const walk = (el: Element) => {
-    const computed = window.getComputedStyle(el);
-    const style = el as HTMLElement;
+    if (el.nodeType !== 1) return; // Skip non-element nodes
     
-    // List of CSS properties that may contain colors
-    const colorProps = [
+    const computed = window.getComputedStyle(el);
+    const htmlEl = el as HTMLElement;
+    
+    // Properties to inline (colors + layout critical for rendering)
+    const propsToInline = [
       "color",
       "backgroundColor",
       "borderColor",
@@ -56,19 +23,43 @@ function convertElementStylesToSupportedFormat(element: Element): void {
       "outlineColor",
       "textDecorationColor",
       "caretColor",
+      "opacity",
+      "display",
+      "visibility",
+      "width",
+      "height",
+      "margin",
+      "marginTop",
+      "marginRight",
+      "marginBottom",
+      "marginLeft",
+      "padding",
+      "paddingTop",
+      "paddingRight",
+      "paddingBottom",
+      "paddingLeft",
+      "fontSize",
+      "fontWeight",
+      "lineHeight",
+      "textAlign",
+      "fontFamily",
     ];
     
-    colorProps.forEach((prop) => {
-      const value = computed.getPropertyValue(prop);
+    propsToInline.forEach((prop) => {
+      let value = computed.getPropertyValue(prop);
+      
+      // Convert OKLCH to RGB
       if (value && value.includes("oklch")) {
-        const converted = convertOklchToRgb(value);
-        if (converted !== value) {
-          style.style.setProperty(prop, converted);
-        }
+        value = convertOklchToRgb(value) || value;
+      }
+      
+      // Inline the style
+      if (value) {
+        htmlEl.style.setProperty(prop, value, "important");
       }
     });
     
-    // Process child elements
+    // Recursively process children
     for (let i = 0; i < el.children.length; i++) {
       walk(el.children[i]);
     }
@@ -77,12 +68,49 @@ function convertElementStylesToSupportedFormat(element: Element): void {
   walk(element);
 }
 
+/**
+ * Converts OKLCH color values to RGB hex format.
+ * Uses the browser's canvas context to leverage native color parsing.
+ */
+function convertOklchToRgb(oklchStr: string): string | null {
+  if (!oklchStr.includes("oklch")) return null;
+  
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  
+  try {
+    // Use canvas to convert oklch to rgb
+    ctx.fillStyle = oklchStr;
+    const computed = ctx.fillStyle;
+    
+    // Canvas converts to hex if supported
+    if (computed.startsWith("#")) return computed;
+    
+    // Convert rgb/rgba to hex
+    if (computed.startsWith("rgb")) {
+      const match = computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (match) {
+        const [_, r, g, b] = match.map(Number);
+        return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+      }
+    }
+  } catch (e) {
+    console.warn("Color conversion failed for:", oklchStr);
+  }
+  
+  return null;
+}
+
 export const downloadPageAsPDF = async (fileName = "SALEA-2026-Guide.pdf") => {
   try {
     const element = document.body.cloneNode(true) as HTMLElement;
     
-    // Convert all OKLCH colors to RGB hex before rendering
-    convertElementStylesToSupportedFormat(element);
+    // Remove style and link tags from clone to prevent stylesheet inheritance
+    element.querySelectorAll("style, link[rel='stylesheet']").forEach((el) => el.remove());
+    
+    // Inline all computed styles and convert OKLCH to RGB
+    inlineAllStyles(element);
     
     const opt = {
       margin: 10,
