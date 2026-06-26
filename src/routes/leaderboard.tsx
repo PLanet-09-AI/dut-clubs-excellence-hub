@@ -36,6 +36,23 @@ function getScoringStatus(): "before" | "open" | "closed" {
   return "open";
 }
 
+// ─── Category color mapping ──────────────────────────────────────────────────
+const CATEGORY_COLORS = [
+  { bg: "bg-blue-50", border: "border-blue-300/50", text: "text-blue-700" },
+  { bg: "bg-purple-50", border: "border-purple-300/50", text: "text-purple-700" },
+  { bg: "bg-pink-50", border: "border-pink-300/50", text: "text-pink-700" },
+  { bg: "bg-green-50", border: "border-green-300/50", text: "text-green-700" },
+  { bg: "bg-orange-50", border: "border-orange-300/50", text: "text-orange-700" },
+  { bg: "bg-teal-50", border: "border-teal-300/50", text: "text-teal-700" },
+  { bg: "bg-indigo-50", border: "border-indigo-300/50", text: "text-indigo-700" },
+  { bg: "bg-red-50", border: "border-red-300/50", text: "text-red-700" },
+];
+
+function getCategoryColor(categoryName: string) {
+  const hash = categoryName.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return CATEGORY_COLORS[hash % CATEGORY_COLORS.length];
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 type JudgeScoreDoc = {
   nominationId: string;
@@ -423,6 +440,8 @@ function LeaderboardContent({ role }: { role: string | null }) {
   const [expandedJudges, setExpandedJudges] = useState<Set<string>>(new Set());
   const status = getScoringStatus();
 
+  console.log("🔷 LeaderboardContent rendered - viewMode:", viewMode, "selectedCategory:", selectedCategory);
+
   useEffect(() => {
     const q = query(collection(db, "judge_scores"), orderBy("updatedAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
@@ -484,7 +503,7 @@ function LeaderboardContent({ role }: { role: string | null }) {
 
     // Return sorted by known category order first, then alphabetical
     const knownOrder = AWARD_CATEGORIES.map((c) => c.name);
-    return Array.from(catMap.entries()).sort(([a], [b]) => {
+    const result = Array.from(catMap.entries()).sort(([a], [b]) => {
       const ai = knownOrder.indexOf(a);
       const bi = knownOrder.indexOf(b);
       if (ai !== -1 && bi !== -1) return ai - bi;
@@ -492,6 +511,11 @@ function LeaderboardContent({ role }: { role: string | null }) {
       if (bi !== -1) return 1;
       return a.localeCompare(b);
     });
+    console.log(`📊 Categories built: ${result.length} categories, ${nomineeMap.size} total nominees`);
+    result.forEach(([catName, nominees]) => {
+      console.log(`   - ${catName}: ${nominees.length} nominees`);
+    });
+    return result;
   }, [allScores]);
 
   // For unified view: flatten all nominees and rank globally
@@ -507,24 +531,20 @@ function LeaderboardContent({ role }: { role: string | null }) {
   // Apply category filter with dynamic ranking
   const filteredRanking = useMemo(() => {
     if (!selectedCategory) {
-      console.log("❌ No category selected, returning unified ranking");
       return unifiedRanking;
     }
-    // Filter nominees to selected category (case-insensitive)
-    // Then re-rank them locally starting from 1
+    
+    // Filter and re-rank within the selected category
+    const categoryNorm = selectedCategory.toLowerCase().trim();
     const filtered = unifiedRanking.filter(
-      (n) => n.categoryName?.toLowerCase().trim() === selectedCategory.toLowerCase().trim()
+      (n) => (n.categoryName?.toLowerCase().trim() || "") === categoryNorm
     );
-    console.log(`✅ Filtered "${selectedCategory}": found ${filtered.length} nominees`);
-    console.log("   Nominees:", filtered.map(n => `${n.nomineeName} (${n.totalScore})`));
-    // Re-rank the filtered nominees
-    const reranked: (NomineeEntry & { rank: number })[] = filtered.map((n, idx) => {
-      const newRank = idx + 1;
-      console.log(`   Re-ranking: ${n.nomineeName} rank ${n.rank} → ${newRank}`);
-      return { ...n, rank: newRank };
-    });
-    console.log("   Final:", reranked.map(n => `${n.nomineeName} (rank ${n.rank})`));
-    return reranked;
+    
+    // Sort by total score
+    const sorted = filtered
+      .sort((a, b) => b.totalScore - a.totalScore || b.avgScore - a.avgScore);
+    
+    return sorted;
   }, [unifiedRanking, selectedCategory]) as (NomineeEntry & { rank: number })[];
 
   // Get list of all judges and their scores
@@ -631,7 +651,6 @@ function LeaderboardContent({ role }: { role: string | null }) {
                   <button
                     key={catName}
                     onClick={() => {
-                      console.log(`📌 Filtering by category: "${catName}"`);
                       setSelectedCategory(catName.trim());
                     }}
                     className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
@@ -684,27 +703,21 @@ function LeaderboardContent({ role }: { role: string | null }) {
               </Card>
             ) : (
               filteredRanking.map((nominee, idx) => {
+                console.log(`� RENDER: ${nominee.nomineeName} - RANK: ${nominee.rank} (idx=${idx}, category=${nominee.categoryName})`);
                 const maxPossible = nominee.judgeCount * 5;
                 const pct = maxPossible > 0 ? (nominee.totalScore / maxPossible) * 100 : 0;
                 const isExpanded = expandedJudges.has(nominee.nominationId);
                 const judgeScoresForNominee = allScores.filter(
                   (s) => s.nominationId === nominee.nominationId
                 );
+                const categoryColor = getCategoryColor(nominee.categoryName);
 
                 return (
                   <motion.div
                     key={nominee.nominationId}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`rounded-2xl border px-4 py-4 transition ${
-                      nominee.rank === 1
-                        ? "border-yellow-400/50 bg-yellow-50/60 shadow-sm"
-                        : nominee.rank === 2
-                        ? "border-slate-300/60 bg-slate-50/60"
-                        : nominee.rank === 3
-                        ? "border-amber-600/40 bg-amber-50/50"
-                        : "border-primary/10 bg-white"
-                    }`}
+                    className={`rounded-2xl border px-4 py-4 transition ${categoryColor.border} ${categoryColor.bg}`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start gap-3">
                       <RankBadge rank={nominee.rank} />
@@ -715,7 +728,7 @@ function LeaderboardContent({ role }: { role: string | null }) {
                             <p className={`font-semibold ${nominee.rank <= 3 ? "text-base" : "text-sm"}`}>
                               {nominee.nomineeName}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
+                            <p className={`text-xs font-medium ${getCategoryColor(nominee.categoryName).text} mt-0.5`}>
                               {nominee.categoryName}
                             </p>
                           </div>
@@ -830,9 +843,11 @@ function LeaderboardContent({ role }: { role: string | null }) {
                 </Badge>
               </div>
 
-              {/* Nominee rows */}
+              {/* Nominee rows - re-rank within category */}
               <div className="space-y-2">
-                {nominees.map((nominee, idx) => {
+                {nominees
+                  .sort((a, b) => b.totalScore - a.totalScore || b.avgScore - a.avgScore)
+                  .map((nominee, idx) => {
                   const rank = idx + 1;
                   const maxPossible = nominee.judgeCount * 5;
                   const pct = maxPossible > 0 ? (nominee.totalScore / maxPossible) * 100 : 0;
