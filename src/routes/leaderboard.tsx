@@ -496,13 +496,13 @@ function LeaderboardContent({ role }: { role: string | null }) {
 
   // For unified view: flatten all nominees and rank globally
   const unifiedRanking = useMemo(() => {
-    const all: (NomineeEntry & { rank: number })[] = [];
+    const all: NomineeEntry[] = [];
     for (const [, nominees] of categories) {
       all.push(...nominees);
     }
     all.sort((a, b) => b.totalScore - a.totalScore || b.avgScore - a.avgScore);
-    return all.map((n, i) => ({ ...n, rank: i + 1 }));
-  }, [categories]);
+    return all.map((n, i): NomineeEntry & { rank: number } => ({ ...n, rank: i + 1 }));
+  }, [categories]) as (NomineeEntry & { rank: number })[];
 
   // Apply category filter with dynamic ranking
   const filteredRanking = useMemo(() => {
@@ -518,14 +518,14 @@ function LeaderboardContent({ role }: { role: string | null }) {
     console.log(`✅ Filtered "${selectedCategory}": found ${filtered.length} nominees`);
     console.log("   Nominees:", filtered.map(n => `${n.nomineeName} (${n.totalScore})`));
     // Re-rank the filtered nominees
-    const reranked = filtered.map((n, idx) => {
+    const reranked: (NomineeEntry & { rank: number })[] = filtered.map((n, idx) => {
       const newRank = idx + 1;
       console.log(`   Re-ranking: ${n.nomineeName} rank ${n.rank} → ${newRank}`);
       return { ...n, rank: newRank };
     });
     console.log("   Final:", reranked.map(n => `${n.nomineeName} (rank ${n.rank})`));
     return reranked;
-  }, [unifiedRanking, selectedCategory]);
+  }, [unifiedRanking, selectedCategory]) as (NomineeEntry & { rank: number })[];
 
   // Get list of all judges and their scores
   const judgeActivity = useMemo(() => {
