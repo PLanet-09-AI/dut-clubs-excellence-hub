@@ -31,7 +31,7 @@ const session2Schedule = [
 ];
 
 const venueFacts = [
-  { icon: MapPin, label: "Address", value: "45 Bram Fischer Road, Durban Central, 4001" },
+  { icon: MapPin, label: "Address", value: "DUT Sports Field, Steve Biko Campus, Musgrave, Berea, 4001" },
   { icon: Car, label: "Parking", value: "Secure on-site · Shuttle from Steve Biko Campus from 17:30" },
   { icon: Accessibility, label: "Access", value: "Step-free access · BSL interpreter on stage" },
   { icon: Shirt, label: "Dress code", value: "Black tie · Traditional attire warmly welcomed" },
@@ -195,7 +195,7 @@ export default function EventProgram() {
               <div className="relative aspect-[4/3] overflow-hidden">
                 <iframe
                   title="Fred Crookes Sports Centre map"
-                  src="https://www.openstreetmap.org/export/embed.html?bbox=31.015%2C-29.865%2C31.035%2C-29.855&layer=mapnik&marker=-29.860%2C31.025"
+                  src="https://www.openstreetmap.org/export/embed.html?bbox=31.020%2C-29.877%2C31.030%2C-29.870&layer=mapnik&marker=-29.8734%2C31.0247"
                   className="h-full w-full opacity-90 grayscale"
                   loading="lazy"
                 />
