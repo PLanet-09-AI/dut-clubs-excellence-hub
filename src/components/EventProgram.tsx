@@ -43,7 +43,7 @@ Student Services Awards 2026
 A Night Where Excellence Wears a Crown · 21st Annual Gala
 
 DATE: 14 NOVEMBER 2026
-VENUE: DURBAN ICC, HALL 3
+VENUE: FRED CROOKES SPORTS CENTRE
 DRESS: BLACK TIE
 
 ===============================================
@@ -58,9 +58,9 @@ ${session2Schedule.map(s => `${s.time} — ${s.title}\n         ${s.desc}`).join
 
 VENUE DETAILS
 ===============================================
-DURBAN ICC, HALL 3
-45 Bram Fischer Road
-Durban Central, 4001
+FRED CROOKES SPORTS CENTRE
+76 Steve Biko Road
+Durban, 4001
 
 Secure parking available
 Shuttle service from DUT Steve Biko Campus from 17:30
@@ -194,7 +194,7 @@ export default function EventProgram() {
             <div className="overflow-hidden rounded-3xl border border-primary/30 bg-gradient-to-br from-card to-secondary/40">
               <div className="relative aspect-[4/3] overflow-hidden">
                 <iframe
-                  title="Durban ICC map"
+                  title="Fred Crookes Sports Centre map"
                   src="https://www.openstreetmap.org/export/embed.html?bbox=31.015%2C-29.865%2C31.035%2C-29.855&layer=mapnik&marker=-29.860%2C31.025"
                   className="h-full w-full opacity-90 grayscale"
                   loading="lazy"
@@ -203,7 +203,7 @@ export default function EventProgram() {
               </div>
               <div className="p-6">
                 <p className="text-xs uppercase tracking-[0.25em] text-primary">The Venue</p>
-                <h3 className="mt-2 font-serif text-3xl font-bold">Durban ICC, Hall 3</h3>
+                <h3 className="mt-2 font-serif text-3xl font-bold">Fred Crookes Sports Centre</h3>
                 <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4 text-primary" />
                   Session 1: 10:00–13:00 · Session 2: 16:00–22:00

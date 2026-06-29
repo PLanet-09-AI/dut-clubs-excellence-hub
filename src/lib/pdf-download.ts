@@ -88,7 +88,7 @@ export const downloadProgrammePDF = async () => {
     yPosition += 12;
     doc.setFontSize(11);
     doc.setFont("Helvetica", "normal");
-    doc.text("DUT Sports Center, 76 Steve Biko Road", margin, yPosition);
+    doc.text("Fred Crookes Sports Centre, 76 Steve Biko Road", margin, yPosition);
 
     // Venue info
     yPosition += 8;

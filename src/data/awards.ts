@@ -147,7 +147,7 @@ export const AWARD_THEME = {
   /** ISO date strings for judge scoring window */
   scoringOpenDate: "2026-08-01", // day after nominations close
   scoringDeadline: "2026-08-15", // judges must submit by this date
-  venue: "76 Steve Biko Road, DUT Sports Center",
+  venue: "76 Steve Biko Road, Fred Crookes Sports Centre",
   openingAddressTitle: "Welcome & Opening Address",
   openingAddressRemarks: "Dean's remarks",
   yearsBadge: "Student Academic & Leadership Excellence Awards 2026",

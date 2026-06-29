@@ -511,7 +511,7 @@ function Index() {
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="text-primary font-bold mt-1">✓</span>
-                    <span><strong>Venue:</strong> DUT Sports Center, 76 Steve Biko Road</span>
+                    <span><strong>Venue:</strong> Fred Crookes Sports Centre, 76 Steve Biko Road</span>
                   </li>
                 </ul>
               </div>
