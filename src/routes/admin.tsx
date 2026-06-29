@@ -46,6 +46,7 @@ import {
   query,
   orderBy,
   where,
+  getDocs,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -628,6 +629,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     }>
   >([]);
   const [realJudgingActive, setRealJudgingActive] = useState(false);
+  const [resettingVotes, setResettingVotes] = useState(false);
 
   // All categories = static + admin-added (from Firestore)
   const allCategories = useMemo(
@@ -710,6 +712,28 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       });
     } catch (err) {
       console.error("Error toggling judging:", err);
+    }
+  }
+
+  async function resetVotes() {
+    if (!confirm("Are you sure you want to clear ALL judge votes? This cannot be undone. Judges will need to re-score all nominations.")) {
+      return;
+    }
+    if (!confirm("This will permanently delete all " + judgeScores.length + " judge scores. Are you absolutely sure?")) {
+      return;
+    }
+    
+    setResettingVotes(true);
+    try {
+      const q = query(collection(db, "judge_scores"));
+      const snapshot = await getDocs(q);
+      const deletePromises = snapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
+      await Promise.all(deletePromises);
+      console.log("All judge votes cleared successfully");
+    } catch (err) {
+      console.error("Error resetting votes:", err);
+    } finally {
+      setResettingVotes(false);
     }
   }
 
@@ -888,17 +912,33 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
         </div>
         <div className="flex flex-col gap-2 items-end">
           {canManage && (
-            <button
-              onClick={toggleRealJudging}
-              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                realJudgingActive
-                  ? "bg-green-100 text-green-700 border border-green-300 hover:bg-green-200"
-                  : "bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
-              }`}
-            >
-              <div className={`h-2 w-2 rounded-full ${realJudgingActive ? "bg-green-600" : "bg-amber-600"}`} />
-              {realJudgingActive ? "Real Judging Active" : "Activate Real Judging"}
-            </button>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <button
+                onClick={toggleRealJudging}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                  realJudgingActive
+                    ? "bg-green-100 text-green-700 border border-green-300 hover:bg-green-200"
+                    : "bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+                }`}
+              >
+                <div className={`h-2 w-2 rounded-full ${realJudgingActive ? "bg-green-600" : "bg-amber-600"}`} />
+                {realJudgingActive ? "Real Judging Active" : "Activate Real Judging"}
+              </button>
+              <button
+                onClick={resetVotes}
+                disabled={resettingVotes || judgeScores.length === 0}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                  resettingVotes
+                    ? "bg-gray-100 text-gray-700 border border-gray-300 cursor-not-allowed"
+                    : judgeScores.length === 0
+                      ? "bg-gray-100 text-gray-500 border border-gray-300 cursor-not-allowed"
+                      : "bg-red-100 text-red-700 border border-red-300 hover:bg-red-200"
+                }`}
+              >
+                <Trash2 className="h-4 w-4" />
+                {resettingVotes ? "Clearing votes…" : "Reset All Votes"}
+              </button>
+            </div>
           )}
           <div className="flex gap-2">
           {canManage && (
