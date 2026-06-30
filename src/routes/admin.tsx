@@ -437,19 +437,10 @@ function AdminPage() {
               >
                 Sign in
               </button>
-              <button
-                type="button"
-                onClick={() => switchMode("register")}
-                className={`flex-1 py-2 text-sm font-medium transition ${mode === "register" ? "bg-gold text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                Create account
-              </button>
             </div>
 
             <p className="mt-3 text-center text-xs text-muted-foreground">
-              {mode === "signin"
-                ? "Sign in with your Student Services administrator account."
-                : "Register a new administrator account."}
+              Sign in with your Student Services administrator account.
             </p>
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -573,13 +564,7 @@ function AdminPage() {
                 disabled={loading}
                 className="w-full bg-gold text-primary-foreground"
               >
-                {loading
-                  ? mode === "signin"
-                    ? "Signing in…"
-                    : "Creating account…"
-                  : mode === "signin"
-                    ? "Sign in"
-                    : "Create account"}
+                {loading ? "Signing in…" : "Sign in"}
               </Button>
               {mode === "signin" && (
                 <button
@@ -630,6 +615,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
   >([]);
   const [realJudgingActive, setRealJudgingActive] = useState(false);
   const [resettingVotes, setResettingVotes] = useState(false);
+  const [resettingNominations, setResettingNominations] = useState(false);
 
   // All categories = static + admin-added (from Firestore)
   const allCategories = useMemo(
@@ -735,6 +721,85 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     } finally {
       setResettingVotes(false);
     }
+  }
+
+  async function resetNominations() {
+    if (!confirm("Are you sure you want to DELETE ALL nominations? This cannot be undone.")) {
+      return;
+    }
+    if (!confirm("This will permanently delete all " + nominations.length + " nominations. Judge scores will also be cleared. Are you absolutely sure?")) {
+      return;
+    }
+    
+    setResettingNominations(true);
+    try {
+      // Delete all nominations
+      const nominationsQuery = query(collection(db, "nominations"));
+      const nominationsSnapshot = await getDocs(nominationsQuery);
+      const nominationPromises = nominationsSnapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
+      await Promise.all(nominationPromises);
+      
+      // Also delete all judge scores when resetting nominations
+      const scoresQuery = query(collection(db, "judge_scores"));
+      const scoresSnapshot = await getDocs(scoresQuery);
+      const scorePromises = scoresSnapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
+      await Promise.all(scorePromises);
+      
+      console.log("All nominations and associated scores cleared successfully");
+    } catch (err) {
+      console.error("Error resetting nominations:", err);
+    } finally {
+      setResettingNominations(false);
+    }
+  }
+
+  function exportResults() {
+    const rows = judgeScores;
+    if (rows.length === 0) {
+      alert("No scores to export yet.");
+      return;
+    }
+
+    const headers = [
+      "Judge Email",
+      "Nominee Name",
+      "Category",
+      "Overall Score",
+      "Criteria Scores (JSON)",
+      "Judge Comments",
+      "Updated",
+    ];
+
+    const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+    const csv = [
+      headers.map(escape).join(","),
+      ...rows.map((r) => {
+        const date =
+          r.updatedAt && typeof r.updatedAt === "object" && r.updatedAt.toDate
+            ? r.updatedAt.toDate().toISOString()
+            : String(r.updatedAt ?? "");
+        return [
+          r.judgeEmail,
+          r.nomineeName,
+          r.categoryName,
+          r.score.toFixed(2),
+          JSON.stringify(r.criteriaScores ?? {}),
+          r.comment,
+          date,
+        ]
+          .map(escape)
+          .join(",");
+      }),
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `salea-judge-results-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function addCategory(e: React.FormEvent) {
@@ -938,19 +1003,44 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                 <Trash2 className="h-4 w-4" />
                 {resettingVotes ? "Clearing votes…" : "Reset All Votes"}
               </button>
+              <button
+                onClick={resetNominations}
+                disabled={resettingNominations || nominations.length === 0}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                  resettingNominations
+                    ? "bg-gray-100 text-gray-700 border border-gray-300 cursor-not-allowed"
+                    : nominations.length === 0
+                      ? "bg-gray-100 text-gray-500 border border-gray-300 cursor-not-allowed"
+                      : "bg-red-100 text-red-700 border border-red-300 hover:bg-red-200"
+                }`}
+              >
+                <Trash2 className="h-4 w-4" />
+                {resettingNominations ? "Clearing…" : "Reset All Nominations"}
+              </button>
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
           {canManage && (
-            <Button
-              onClick={exportCsv}
-              disabled={stats.shortlisted === 0}
-              variant="outline"
-              className="border-primary/40 text-primary"
-            >
-              <Download className="mr-2 h-4 w-4" />{" "}
-              <span className="hidden sm:inline">Export shortlisted</span> ({stats.shortlisted})
-            </Button>
+            <>
+              <Button
+                onClick={exportResults}
+                disabled={judgeScores.length === 0}
+                variant="outline"
+                className="border-primary/40 text-primary"
+              >
+                <Download className="mr-2 h-4 w-4" />{" "}
+                <span className="hidden sm:inline">Download Results</span> ({judgeScores.length})
+              </Button>
+              <Button
+                onClick={exportCsv}
+                disabled={stats.shortlisted === 0}
+                variant="outline"
+                className="border-primary/40 text-primary"
+              >
+                <Download className="mr-2 h-4 w-4" />{" "}
+                <span className="hidden sm:inline">Export Shortlisted</span> ({stats.shortlisted})
+              </Button>
+            </>
           )}
           <Button
             variant="outline"
