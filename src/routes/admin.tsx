@@ -597,7 +597,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     { id: string; name: string; tagline: string }[]
   >([]);
   const [newCat, setNewCat] = useState({ name: "", tagline: "" });
-  const [activeSection, setActiveSection] = useState<"nominations" | "categories" | "winners" | "judges" | "leaderboard">("nominations");
+  const [activeSection, setActiveSection] = useState<"nominations" | "categories" | "winners" | "judges" | "leaderboard" | "accounts">("nominations");
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [judgeScores, setJudgeScores] = useState<
     Array<{
@@ -616,6 +616,15 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
   const [realJudgingActive, setRealJudgingActive] = useState(false);
   const [resettingVotes, setResettingVotes] = useState(false);
   const [resettingNominations, setResettingNominations] = useState(false);
+  const [newAccountEmail, setNewAccountEmail] = useState("");
+  const [newAccountPassword, setNewAccountPassword] = useState("");
+  const [newAccountConfirm, setNewAccountConfirm] = useState("");
+  const [newAccountRole, setNewAccountRole] = useState<"admin" | "judge">("judge");
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  const [accountError, setAccountError] = useState("");
+  const [accountSuccess, setAccountSuccess] = useState("");
+  const [showNewAccountPassword, setShowNewAccountPassword] = useState(false);
+  const [showNewAccountConfirm, setShowNewAccountConfirm] = useState(false);
 
   // All categories = static + admin-added (from Firestore)
   const allCategories = useMemo(
@@ -689,6 +698,55 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     });
     return () => unsub();
   }, []);
+
+  async function handleCreateAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setAccountError("");
+    setAccountSuccess("");
+    
+    if (!newAccountEmail.trim()) {
+      setAccountError("Email is required.");
+      return;
+    }
+    if (newAccountPassword.length < 8) {
+      setAccountError("Password must be at least 8 characters.");
+      return;
+    }
+    if (newAccountPassword !== newAccountConfirm) {
+      setAccountError("Passwords do not match.");
+      return;
+    }
+    
+    setCreatingAccount(true);
+    try {
+      const cred = await registerUser(newAccountEmail, newAccountPassword);
+      await setDoc(doc(db, "users", cred.user.uid), {
+        email: cred.user.email,
+        role: newAccountRole,
+        createdAt: serverTimestamp(),
+      });
+      setAccountSuccess(`✓ Account created successfully for ${newAccountRole === "admin" ? "Administrator" : "Judge"} (${newAccountEmail})`);
+      setNewAccountEmail("");
+      setNewAccountPassword("");
+      setNewAccountConfirm("");
+      setNewAccountRole("judge");
+    } catch (ex: unknown) {
+      const code = (ex as { code?: string }).code ?? "";
+      if (code === "auth/email-already-in-use") {
+        setAccountError("An account with this email already exists.");
+      } else if (code === "auth/weak-password") {
+        setAccountError("Password is too weak. Use at least 8 characters.");
+      } else if (code === "auth/invalid-email") {
+        setAccountError("Invalid email address.");
+      } else if (code === "auth/too-many-requests") {
+        setAccountError("Too many attempts. Please try again later.");
+      } else {
+        setAccountError("Failed to create account. Please try again.");
+      }
+    } finally {
+      setCreatingAccount(false);
+    }
+  }
 
   async function toggleRealJudging() {
     try {
@@ -1097,6 +1155,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                   { key: "winners" as const, label: "Winners" },
                   { key: "judges" as const, label: "Judge Activity" },
                   { key: "leaderboard" as const, label: "Leaderboard" },
+                  { key: "accounts" as const, label: "Create Account" },
                 ] : [])
               ]).find(item => item.key === activeSection)?.label || "Select section"}
             </span>
@@ -1115,6 +1174,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                 { key: "winners" as const, label: "Winners" },
                 { key: "judges" as const, label: "Judge Activity" },
                 { key: "leaderboard" as const, label: "Leaderboard" },
+                { key: "accounts" as const, label: "Create Account" },
               ] : [])
             ]).map((item) => (
               <button
@@ -1146,6 +1206,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
               { key: "winners" as const, label: "Winners", icon: <Trophy className="h-4 w-4" /> },
               { key: "judges" as const, label: "Judge Activity", icon: <Users2 className="h-4 w-4" />, badge: judgeScores.length > 0 ? judgeScores.length : undefined },
               { key: "leaderboard" as const, label: "Leaderboard", icon: <Trophy className="h-4 w-4" /> },
+              { key: "accounts" as const, label: "Create Account", icon: <Users2 className="h-4 w-4" /> },
             ] : [])
           ]).map((item) => (
             <button
@@ -1471,6 +1532,169 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
         {canManage && activeSection === "leaderboard" && (
           <div>
             <LeaderboardAdminPanel />
+          </div>
+        )}
+
+        {/* ── Create Account section ─── */}
+        {canManage && activeSection === "accounts" && (
+          <div className="space-y-6">
+            <Card className="p-6">
+              <h3 className="font-serif text-lg font-bold mb-1">Create new account</h3>
+              <p className="text-xs text-muted-foreground mb-6">
+                Create new judge or admin accounts here. All accounts must use a strong password of at least 8 characters.
+              </p>
+
+              {accountSuccess && (
+                <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900 flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{accountSuccess}</span>
+                </div>
+              )}
+
+              {accountError && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900 flex items-start gap-2">
+                  <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{accountError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleCreateAccount} className="space-y-4">
+                <div>
+                  <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">
+                    Email address
+                  </Label>
+                  <Input
+                    type="email"
+                    placeholder="judge@example.com"
+                    value={newAccountEmail}
+                    onChange={(e) => setNewAccountEmail(e.target.value)}
+                    disabled={creatingAccount}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">
+                    Password
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type={showNewAccountPassword ? "text" : "password"}
+                      placeholder="At least 8 characters"
+                      value={newAccountPassword}
+                      onChange={(e) => setNewAccountPassword(e.target.value)}
+                      disabled={creatingAccount}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewAccountPassword(!showNewAccountPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition"
+                      disabled={creatingAccount}
+                    >
+                      {showNewAccountPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">
+                    Confirm password
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type={showNewAccountConfirm ? "text" : "password"}
+                      placeholder="Re-enter password"
+                      value={newAccountConfirm}
+                      onChange={(e) => setNewAccountConfirm(e.target.value)}
+                      disabled={creatingAccount}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewAccountConfirm(!showNewAccountConfirm)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition"
+                      disabled={creatingAccount}
+                    >
+                      {showNewAccountConfirm ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="mb-1.5 block text-xs uppercase tracking-wider text-muted-foreground">
+                    Account type
+                  </Label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setNewAccountRole("judge")}
+                      className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition border ${
+                        newAccountRole === "judge"
+                          ? "bg-primary text-primary-foreground border-primary shadow"
+                          : "bg-white border-primary/20 text-foreground hover:border-primary/40"
+                      }`}
+                      disabled={creatingAccount}
+                    >
+                      Judge
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewAccountRole("admin")}
+                      className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition border ${
+                        newAccountRole === "admin"
+                          ? "bg-primary text-primary-foreground border-primary shadow"
+                          : "bg-white border-primary/20 text-foreground hover:border-primary/40"
+                      }`}
+                      disabled={creatingAccount}
+                    >
+                      Administrator
+                    </button>
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={creatingAccount}
+                  className="w-full bg-gold text-primary-foreground hover:bg-gold/90"
+                >
+                  {creatingAccount ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating account...
+                    </>
+                  ) : (
+                    <>
+                      <Users2 className="mr-2 h-4 w-4" />
+                      Create account
+                    </>
+                  )}
+                </Button>
+              </form>
+            </Card>
+
+            <Card className="p-6 border-blue-200 bg-blue-50">
+              <div className="flex gap-3">
+                <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-900 space-y-2">
+                  <p className="font-semibold">Tips for creating accounts:</p>
+                  <ul className="list-disc list-inside space-y-1 text-xs">
+                    <li>Use strong passwords with at least 8 characters</li>
+                    <li>Judges can score nominations once real judging is activated</li>
+                    <li>Only administrators can manage categories and reset votes</li>
+                    <li>Share login credentials securely with new account holders</li>
+                  </ul>
+                </div>
+              </div>
+            </Card>
           </div>
         )}
 
