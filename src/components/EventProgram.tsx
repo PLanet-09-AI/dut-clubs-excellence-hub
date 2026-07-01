@@ -31,7 +31,7 @@ const session2Schedule = [
 ];
 
 const venueFacts = [
-  { icon: MapPin, label: "Address", value: "DUT Sports Field, Steve Biko Campus, Musgrave, Berea, 4001" },
+  { icon: MapPin, label: "Address", value: "76 Steve Biko Road, Fred Crookes Sports Centre" },
   { icon: Car, label: "Parking", value: "Secure on-site · Shuttle from Steve Biko Campus from 17:30" },
   { icon: Accessibility, label: "Access", value: "Step-free access · BSL interpreter on stage" },
   { icon: Shirt, label: "Dress code", value: "Black tie · Traditional attire warmly welcomed" },

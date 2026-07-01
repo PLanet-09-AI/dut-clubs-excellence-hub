@@ -600,7 +600,7 @@ function InfoChip({ icon: Icon, title, value }: { icon: typeof Award; title: str
       </div>
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-black">{title}</p>
-        <p className="mt-0.5 truncate font-semibold text-foreground">{value}</p>
+        <p className="mt-0.5 font-semibold text-foreground">{value}</p>
       </div>
     </div>
   );

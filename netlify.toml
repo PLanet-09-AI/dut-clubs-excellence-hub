@@ -26,3 +26,22 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Security Headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Content Security Policy (CSP) — prevent XSS and injection attacks
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebasestorage.googleapis.com https://storage.googleapis.com; media-src 'self' https:; frame-ancestors 'none';"
+    # Prevent clickjacking
+    X-Frame-Options = "DENY"
+    # Disable MIME type sniffing
+    X-Content-Type-Options = "nosniff"
+    # Enable XSS protection (legacy header, still useful)
+    X-XSS-Protection = "1; mode=block"
+    # Enforce HTTPS
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    # Referrer policy — don't send referrer to external sites
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # Feature policy / Permissions policy
+    Permissions-Policy = "geolocation=(), microphone=(), camera=(), payment=()"

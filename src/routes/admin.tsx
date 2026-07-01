@@ -55,6 +55,17 @@ import {
   IMAGE_FILE_PATTERN,
 } from "@/lib/office-to-pdf";
 import {
+  logCreateAccount,
+  logResetVotes,
+  logResetNominations,
+  logExportResults,
+  logExportShortlisted,
+  logToggleJudging,
+  logReportIssue,
+  logAuditActionError,
+  type AuditAction,
+} from "@/lib/audit-logging";
+import {
   signIn,
   signOut as firebaseSignOut,
   subscribeToAuthState,
@@ -730,6 +741,9 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       setNewAccountPassword("");
       setNewAccountConfirm("");
       setNewAccountRole("judge");
+      
+      // Log audit action
+      await logCreateAccount(newAccountEmail, newAccountRole);
     } catch (ex: unknown) {
       const code = (ex as { code?: string }).code ?? "";
       if (code === "auth/email-already-in-use") {
@@ -742,6 +756,9 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
         setAccountError("Too many attempts. Please try again later.");
       } else {
         setAccountError("Failed to create account. Please try again.");
+        if (ex instanceof Error) {
+          await logAuditActionError('CREATE_ACCOUNT', `Failed to create account: ${newAccountEmail}`, ex);
+        }
       }
     } finally {
       setCreatingAccount(false);
@@ -750,12 +767,19 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
 
   async function toggleRealJudging() {
     try {
+      const newActive = !realJudgingActive;
       await setDoc(doc(db, "admin_settings", "judging"), {
-        active: !realJudgingActive,
+        active: newActive,
         activatedAt: serverTimestamp(),
       });
+      
+      // Log audit action
+      await logToggleJudging(newActive);
     } catch (err) {
       console.error("Error toggling judging:", err);
+      if (err instanceof Error) {
+        await logAuditActionError('TOGGLE_JUDGING', 'Failed to toggle judging', err);
+      }
     }
   }
 
@@ -773,9 +797,16 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       const snapshot = await getDocs(q);
       const deletePromises = snapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
       await Promise.all(deletePromises);
+      const deletedCount = snapshot.docs.length;
       console.log("All judge votes cleared successfully");
+      
+      // Log audit action
+      await logResetVotes(deletedCount);
     } catch (err) {
       console.error("Error resetting votes:", err);
+      if (err instanceof Error) {
+        await logAuditActionError('RESET_VOTES', 'Failed to reset votes', err);
+      }
     } finally {
       setResettingVotes(false);
     }
@@ -795,17 +826,25 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       const nominationsQuery = query(collection(db, "nominations"));
       const nominationsSnapshot = await getDocs(nominationsQuery);
       const nominationPromises = nominationsSnapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
+      const deletedNominations = nominationsSnapshot.docs.length;
       await Promise.all(nominationPromises);
       
       // Also delete all judge scores when resetting nominations
       const scoresQuery = query(collection(db, "judge_scores"));
       const scoresSnapshot = await getDocs(scoresQuery);
       const scorePromises = scoresSnapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
+      const deletedScores = scoresSnapshot.docs.length;
       await Promise.all(scorePromises);
       
       console.log("All nominations and associated scores cleared successfully");
+      
+      // Log audit action
+      await logResetNominations(deletedNominations, deletedScores);
     } catch (err) {
       console.error("Error resetting nominations:", err);
+      if (err instanceof Error) {
+        await logAuditActionError('RESET_NOMINATIONS', 'Failed to reset nominations', err);
+      }
     } finally {
       setResettingNominations(false);
     }
@@ -858,6 +897,9 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     a.download = `salea-judge-results-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    
+    // Log audit action
+    logExportResults(rows.length).catch((err) => console.error("Failed to log export:", err));
   }
 
   async function addCategory(e: React.FormEvent) {
@@ -1005,6 +1047,9 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     a.download = `salea-shortlist-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    
+    // Log audit action
+    logExportShortlisted(rows.length).catch((err) => console.error("Failed to log export:", err));
   }
 
   function formatDate(ts: Nomination["createdAt"]) {
