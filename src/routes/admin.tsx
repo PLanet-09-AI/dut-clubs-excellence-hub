@@ -32,6 +32,7 @@ import {
   Pencil,
   ImageIcon,
   Loader2,
+  Shield,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -63,6 +64,8 @@ import {
   logToggleJudging,
   logReportIssue,
   logAuditActionError,
+  getRecentAuditLogs,
+  type AuditLog,
   type AuditAction,
 } from "@/lib/audit-logging";
 import {
@@ -608,7 +611,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     { id: string; name: string; tagline: string }[]
   >([]);
   const [newCat, setNewCat] = useState({ name: "", tagline: "" });
-  const [activeSection, setActiveSection] = useState<"nominations" | "categories" | "winners" | "judges" | "leaderboard" | "accounts">("nominations");
+  const [activeSection, setActiveSection] = useState<"nominations" | "categories" | "winners" | "judges" | "leaderboard" | "accounts" | "audit-logs">("nominations");
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [judgeScores, setJudgeScores] = useState<
     Array<{
@@ -636,6 +639,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
   const [accountSuccess, setAccountSuccess] = useState("");
   const [showNewAccountPassword, setShowNewAccountPassword] = useState(false);
   const [showNewAccountConfirm, setShowNewAccountConfirm] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
   // All categories = static + admin-added (from Firestore)
   const allCategories = useMemo(
@@ -709,6 +713,20 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     });
     return () => unsub();
   }, []);
+
+  // Load audit logs for admin users
+  useEffect(() => {
+    if (!canManage) return;
+    const loadLogs = async () => {
+      try {
+        const logs = await getRecentAuditLogs(100);
+        setAuditLogs(logs);
+      } catch (err) {
+        console.error("Failed to load audit logs:", err);
+      }
+    };
+    loadLogs();
+  }, [canManage]);
 
   async function handleCreateAccount(e: React.FormEvent) {
     e.preventDefault();
@@ -1201,6 +1219,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                   { key: "judges" as const, label: "Judge Activity" },
                   { key: "leaderboard" as const, label: "Leaderboard" },
                   { key: "accounts" as const, label: "Create Account" },
+                  { key: "audit-logs" as const, label: "Audit Logs" },
                 ] : [])
               ]).find(item => item.key === activeSection)?.label || "Select section"}
             </span>
@@ -1220,6 +1239,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                 { key: "judges" as const, label: "Judge Activity" },
                 { key: "leaderboard" as const, label: "Leaderboard" },
                 { key: "accounts" as const, label: "Create Account" },
+                { key: "audit-logs" as const, label: "Audit Logs" },
               ] : [])
             ]).map((item) => (
               <button
@@ -1252,6 +1272,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
               { key: "judges" as const, label: "Judge Activity", icon: <Users2 className="h-4 w-4" />, badge: judgeScores.length > 0 ? judgeScores.length : undefined },
               { key: "leaderboard" as const, label: "Leaderboard", icon: <Trophy className="h-4 w-4" /> },
               { key: "accounts" as const, label: "Create Account", icon: <Users2 className="h-4 w-4" /> },
+              { key: "audit-logs" as const, label: "Audit Logs", icon: <Shield className="h-4 w-4" />, badge: auditLogs.length > 0 ? auditLogs.length : undefined },
             ] : [])
           ]).map((item) => (
             <button
@@ -1740,6 +1761,88 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                 </div>
               </div>
             </Card>
+          </div>
+        )}
+
+        {/* ── Audit Logs section ─── */}
+        {canManage && activeSection === "audit-logs" && (
+          <div className="space-y-6">
+            <Card className="p-6">
+              <h3 className="font-serif text-lg font-bold mb-1">Audit Logs</h3>
+              <p className="text-xs text-muted-foreground mb-6">
+                All administrative actions are logged for security and compliance. View recent activity including account creation, vote resets, exports, and configuration changes.
+              </p>
+            </Card>
+
+            {auditLogs.length === 0 ? (
+              <Card className="p-12 text-center text-muted-foreground">
+                <Shield className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                <p>No audit logs yet. Admin actions will appear here.</p>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {auditLogs.map((log) => {
+                  const dateObj = log.timestamp?.toDate?.() || new Date(log.timestamp);
+                  const formatted = new Intl.DateTimeFormat("en-ZA", {
+                    month: "short",
+                    day: "numeric",
+                    year: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  }).format(dateObj);
+
+                  return (
+                    <div
+                      key={log.id}
+                      className="rounded-2xl border border-primary/15 bg-white px-5 py-4"
+                    >
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <p className="font-semibold text-sm capitalize">
+                              {log.action.toLowerCase().replace(/_/g, " ")}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{log.adminEmail}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {log.status === "success" ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Success
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">
+                                <XCircle className="h-3 w-3" />
+                                Failed
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <p className="text-sm text-foreground">{log.description}</p>
+
+                        {log.affectedCount !== undefined && (
+                          <p className="text-xs text-muted-foreground">
+                            Affected items: <span className="font-semibold text-foreground">{log.affectedCount}</span>
+                          </p>
+                        )}
+
+                        {log.errorMessage && (
+                          <div className="rounded-lg bg-red-50 border border-red-200 p-3">
+                            <p className="text-xs text-red-700 font-mono">
+                              {log.errorMessage}
+                            </p>
+                          </div>
+                        )}
+
+                        <p className="text-xs text-muted-foreground">{formatted}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
