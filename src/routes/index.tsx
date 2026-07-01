@@ -125,8 +125,8 @@ function Index() {
             </p>
 
             <div className="mt-10 flex flex-col sm:flex-row gap-4 lg:hidden">
-               <Link to="/winners">
-                <Button variant="outline" className="w-full sm:w-auto h-12 border-primary/20">View Winners</Button>
+               <Link to="/winners" className="w-full sm:w-auto">
+                <div className="h-12 border border-primary/20 rounded-md flex items-center justify-center bg-background hover:bg-accent transition-colors text-foreground font-medium">View Winners</div>
                </Link>
                <motion.button 
                  onClick={handleDownloadPDF} 
@@ -233,8 +233,8 @@ function Index() {
               <p className="mb-4 text-sm text-muted-foreground">
                 Sign in to approve nominations, manage categories, and supervise judge activity.
               </p>
-              <Link to="/admin">
-                <Button className="w-full bg-gold text-primary-foreground">Go to Admin Panel</Button>
+              <Link to="/admin" className="w-full">
+                <div className="w-full bg-gold text-primary-foreground rounded-md px-4 py-2 font-medium flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer">Go to Admin Panel</div>
               </Link>
             </div>
             <div className="rounded-2xl border border-primary/20 bg-card p-5">
@@ -245,8 +245,8 @@ function Index() {
               <p className="mb-4 text-sm text-muted-foreground">
                 Sign in to score shortlisted nominations and add judging comments.
               </p>
-              <Link to="/judge">
-                <Button variant="outline" className="w-full border-primary/30">Go to Judge Panel</Button>
+              <Link to="/judge" className="w-full">
+                <div className="w-full border border-primary/30 bg-background text-foreground rounded-md px-4 py-2 font-medium flex items-center justify-center hover:bg-accent transition-colors cursor-pointer">Go to Judge Panel</div>
               </Link>
             </div>
           </div>
