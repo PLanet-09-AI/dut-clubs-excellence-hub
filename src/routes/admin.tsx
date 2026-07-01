@@ -64,6 +64,11 @@ import {
   logToggleJudging,
   logReportIssue,
   logAuditActionError,
+  logUpdateNominationStatus,
+  logDeleteNomination,
+  logAddCategory,
+  logDeleteCategory,
+  logDeleteWinner,
   getRecentAuditLogs,
   type AuditLog,
   type AuditAction,
@@ -923,18 +928,39 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
   async function addCategory(e: React.FormEvent) {
     e.preventDefault();
     if (!newCat.name.trim()) return;
-    const id = `custom_${crypto.randomUUID()}`;
-    await setDoc(doc(db, "admin_categories", id), {
-      name: newCat.name.trim(),
-      tagline: newCat.tagline.trim(),
-      createdAt: serverTimestamp(),
-    });
-    setNewCat({ name: "", tagline: "" });
+    try {
+      const id = `custom_${crypto.randomUUID()}`;
+      await setDoc(doc(db, "admin_categories", id), {
+        name: newCat.name.trim(),
+        tagline: newCat.tagline.trim(),
+        createdAt: serverTimestamp(),
+      });
+      
+      // Log the category addition
+      await logAddCategory(newCat.name.trim());
+      
+      setNewCat({ name: "", tagline: "" });
+    } catch (err) {
+      console.error("Failed to add category:", err);
+      await logAuditActionError('ADD_CATEGORY', `Failed to add category: ${newCat.name}`, err as Error);
+    }
   }
 
   async function removeExtraCategory(id: string) {
     if (!confirm("Remove this category? This cannot be undone.")) return;
-    await deleteDoc(doc(db, "admin_categories", id));
+    try {
+      const cat = extraCategories.find(c => c.id === id);
+      
+      await deleteDoc(doc(db, "admin_categories", id));
+      
+      // Log the category deletion
+      if (cat) {
+        await logDeleteCategory(cat.name);
+      }
+    } catch (err) {
+      console.error("Failed to remove category:", err);
+      await logAuditActionError('DELETE_CATEGORY', `Failed to delete category ${id}`, err as Error);
+    }
   }
 
   const stats = useMemo(
@@ -979,16 +1005,43 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
 
   async function update(id: string, status: NominationStatus) {
     if (!canManage) return;
-    await updateDoc(doc(db, "nominations", id), { status, updatedAt: serverTimestamp() });
-    // Refresh detail panel if open
-    setDetailNom((prev) => (prev?.id === id ? { ...prev, status } : prev));
+    try {
+      const nom = nominations.find(n => n.id === id);
+      const oldStatus = nom?.status || 'unknown';
+      
+      await updateDoc(doc(db, "nominations", id), { status, updatedAt: serverTimestamp() });
+      
+      // Log the status change
+      if (nom) {
+        await logUpdateNominationStatus(nom.nomineeEmail || '', nom.nomineeName, oldStatus, status);
+      }
+      
+      // Refresh detail panel if open
+      setDetailNom((prev) => (prev?.id === id ? { ...prev, status } : prev));
+    } catch (err) {
+      console.error("Failed to update nomination:", err);
+      await logAuditActionError('UPDATE_NOMINATION_STATUS', `Failed to update nomination ${id}`, err as Error);
+    }
   }
 
   async function remove(id: string) {
     if (!canManage) return;
     if (!confirm("Delete this nomination? This cannot be undone.")) return;
-    await deleteDoc(doc(db, "nominations", id));
-    setDetailNom((prev) => (prev?.id === id ? null : prev));
+    try {
+      const nom = nominations.find(n => n.id === id);
+      
+      await deleteDoc(doc(db, "nominations", id));
+      
+      // Log the deletion
+      if (nom) {
+        await logDeleteNomination(nom.nomineeName, nom.categoryName);
+      }
+      
+      setDetailNom((prev) => (prev?.id === id ? null : prev));
+    } catch (err) {
+      console.error("Failed to delete nomination:", err);
+      await logAuditActionError('DELETE_NOMINATION', `Failed to delete nomination ${id}`, err as Error);
+    }
   }
 
   function exportCsv() {
@@ -2037,7 +2090,15 @@ function WinnersTab() {
 
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Delete winner "${name}"? This cannot be undone.`)) return;
-    await deletePastWinner(id);
+    try {
+      await deletePastWinner(id);
+      
+      // Log the winner deletion
+      await logDeleteWinner(name);
+    } catch (err) {
+      console.error("Failed to delete winner:", err);
+      await logAuditActionError('DELETE_WINNER', `Failed to delete winner ${name}`, err as Error);
+    }
   }
 
   async function handleSeed() {

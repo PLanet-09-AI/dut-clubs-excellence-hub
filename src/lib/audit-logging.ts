@@ -28,6 +28,8 @@ export type AuditAction =
   | 'TOGGLE_JUDGING'
   | 'ADD_CATEGORY'
   | 'DELETE_CATEGORY'
+  | 'UPDATE_NOMINATION_STATUS'
+  | 'DELETE_NOMINATION'
   | 'PROMOTE_WINNER'
   | 'DELETE_WINNER'
   | 'REPORT_ISSUE';
@@ -150,6 +152,83 @@ export async function logToggleJudging(isActive: boolean): Promise<string> {
     action: 'TOGGLE_JUDGING',
     description: `${isActive ? 'Activated' : 'Deactivated'} real judging`,
     metadata: { isActive },
+    status: 'success',
+  });
+}
+
+/**
+ * Log nomination status update
+ */
+export async function logUpdateNominationStatus(
+  nomineeEmail: string,
+  nomineeName: string,
+  oldStatus: string,
+  newStatus: string,
+): Promise<string> {
+  return logAuditAction({
+    action: 'UPDATE_NOMINATION_STATUS',
+    description: `Updated nomination for ${nomineeName} from ${oldStatus} to ${newStatus}`,
+    metadata: { nomineeEmail, nomineeName, oldStatus, newStatus },
+    status: 'success',
+  });
+}
+
+/**
+ * Log nomination deletion
+ */
+export async function logDeleteNomination(nomineeName: string, categoryName: string): Promise<string> {
+  return logAuditAction({
+    action: 'DELETE_NOMINATION',
+    description: `Deleted nomination for ${nomineeName} in category ${categoryName}`,
+    metadata: { nomineeName, categoryName },
+    status: 'success',
+  });
+}
+
+/**
+ * Log category addition
+ */
+export async function logAddCategory(categoryName: string): Promise<string> {
+  return logAuditAction({
+    action: 'ADD_CATEGORY',
+    description: `Added new award category: ${categoryName}`,
+    metadata: { categoryName },
+    status: 'success',
+  });
+}
+
+/**
+ * Log category deletion
+ */
+export async function logDeleteCategory(categoryName: string): Promise<string> {
+  return logAuditAction({
+    action: 'DELETE_CATEGORY',
+    description: `Deleted award category: ${categoryName}`,
+    metadata: { categoryName },
+    status: 'success',
+  });
+}
+
+/**
+ * Log winner promotion
+ */
+export async function logPromoteWinner(winnerName: string, tier: string): Promise<string> {
+  return logAuditAction({
+    action: 'PROMOTE_WINNER',
+    description: `Promoted ${winnerName} to winner tier: ${tier}`,
+    metadata: { winnerName, tier },
+    status: 'success',
+  });
+}
+
+/**
+ * Log winner deletion
+ */
+export async function logDeleteWinner(winnerName: string): Promise<string> {
+  return logAuditAction({
+    action: 'DELETE_WINNER',
+    description: `Deleted winner: ${winnerName}`,
+    metadata: { winnerName },
     status: 'success',
   });
 }
