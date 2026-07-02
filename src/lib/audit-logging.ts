@@ -32,6 +32,9 @@ export type AuditAction =
   | 'DELETE_NOMINATION'
   | 'PROMOTE_WINNER'
   | 'DELETE_WINNER'
+  | 'CLEAR_JUDGE_SCORES'
+  | 'VIEW_JUDGE_ACTIVITY'
+  | 'EXPORT_JUDGE_REPORT'
   | 'REPORT_ISSUE';
 
 export interface AuditLog {
@@ -229,6 +232,45 @@ export async function logDeleteWinner(winnerName: string): Promise<string> {
     action: 'DELETE_WINNER',
     description: `Deleted winner: ${winnerName}`,
     metadata: { winnerName },
+    status: 'success',
+  });
+}
+
+/**
+ * Log judge scores cleared
+ */
+export async function logClearJudgeScores(scoreCount: number): Promise<string> {
+  return logAuditAction({
+    action: 'CLEAR_JUDGE_SCORES',
+    description: `Cleared ${scoreCount} judge score(s) from the system — judges must re-score all nominations`,
+    metadata: { scoreCount },
+    affectedCount: scoreCount,
+    status: 'success',
+  });
+}
+
+/**
+ * Log view judge activity
+ */
+export async function logViewJudgeActivity(judgeCount: number, scoreCount: number): Promise<string> {
+  return logAuditAction({
+    action: 'VIEW_JUDGE_ACTIVITY',
+    description: `Viewed judge activity: ${judgeCount} judge(s) with ${scoreCount} total score(s) submitted`,
+    metadata: { judgeCount, scoreCount },
+    affectedCount: scoreCount,
+    status: 'success',
+  });
+}
+
+/**
+ * Log export judge activity report
+ */
+export async function logExportJudgeReport(reportType: string, judgeCount: number): Promise<string> {
+  return logAuditAction({
+    action: 'EXPORT_JUDGE_REPORT',
+    description: `Exported judge activity report: ${reportType} (${judgeCount} judge(s))`,
+    metadata: { reportType, judgeCount },
+    affectedCount: judgeCount,
     status: 'success',
   });
 }

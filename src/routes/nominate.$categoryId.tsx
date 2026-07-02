@@ -20,11 +20,13 @@ import { db } from "@/lib/firebase";
 import { AWARD_CATEGORIES, FACULTIES, type AwardCategory } from "@/data/awards";
 import { useDraftForm } from "@/hooks/useDraftForm";
 import { EvidenceUploader, type UploadedFile, type EvidenceUploads } from "@/components/EvidenceUploader";
+import { validateDocumentsForCategory, getMissingDocumentsSummary } from "@/lib/document-validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AlertCircle } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -184,6 +186,16 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
     return category.questions.every((q) => (answers[q.id] ?? "").trim().length > 0);
   }
 
+  function validateDocuments() {
+    const validation = validateDocumentsForCategory(category.id, uploads);
+    return validation;
+  }
+
+  function areAllDocumentsComplete() {
+    const validation = validateDocuments();
+    return validation.isValid;
+  }
+
   function nextStep() {
     setError("");
     if (step === 1 && !validateStep1()) {
@@ -219,6 +231,15 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
       setError("Please answer all questions before submitting.");
       return;
     }
+    
+    // Validate that all required documents are uploaded
+    const docValidation = validateDocuments();
+    if (!docValidation.isValid) {
+      setError(`Please upload all required documents before submitting. Missing: ${docValidation.missingDocuments.join(", ")}`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    
     setLoading(true);
     try {
       await addDoc(collection(db, "nominations"), {
@@ -407,6 +428,51 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
           )}
         </AnimatePresence>
 
+        {/* Document validation status on step 3 */}
+        {step === 3 && (
+          <>
+            {!areAllDocumentsComplete() && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="mt-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3"
+              >
+                <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-semibold text-amber-900">
+                    📎 Required Documents Missing
+                  </p>
+                  <p className="mt-1 text-sm text-amber-800">
+                    You cannot submit until all supporting documents have been uploaded. Please scroll down and upload the required files for each question.
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs text-amber-700 list-disc list-inside">
+                    {validateDocuments().missingDocuments.slice(0, 5).map((doc, idx) => (
+                      <li key={idx}>{doc}</li>
+                    ))}
+                    {validateDocuments().missingDocuments.length > 5 && (
+                      <li>... and {validateDocuments().missingDocuments.length - 5} more</li>
+                    )}
+                  </ul>
+                </div>
+              </motion.div>
+            )}
+            {areAllDocumentsComplete() && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="mt-6 flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3"
+              >
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
+                <p className="font-semibold text-green-900">
+                  ✓ All required documents uploaded
+                </p>
+              </motion.div>
+            )}
+          </>
+        )}
+
         {error && (
           <p className="mt-6 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
@@ -428,10 +494,19 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
               Continue <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           ) : (
-            <Button onClick={submit} disabled={loading} className="bg-gold text-primary-foreground min-w-[180px]">
+            <Button 
+              onClick={submit} 
+              disabled={loading || !areAllDocumentsComplete()} 
+              className="bg-gold text-primary-foreground min-w-[180px]"
+              title={!areAllDocumentsComplete() ? "Please upload all required documents before submitting" : ""}
+            >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting…
+                </>
+              ) : !areAllDocumentsComplete() ? (
+                <>
+                  📎 Complete Documents Required
                 </>
               ) : (
                 "Submit Nomination"

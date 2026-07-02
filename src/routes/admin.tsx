@@ -33,6 +33,7 @@ import {
   ImageIcon,
   Loader2,
   Shield,
+  AlertCircle,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -55,6 +56,7 @@ import {
   OFFICE_FILE_PATTERN,
   IMAGE_FILE_PATTERN,
 } from "@/lib/office-to-pdf";
+import { validateDocumentsForCategory, getIncompleteItemsList } from "@/lib/document-validation";
 import {
   logCreateAccount,
   logResetVotes,
@@ -69,6 +71,9 @@ import {
   logAddCategory,
   logDeleteCategory,
   logDeleteWinner,
+  logClearJudgeScores,
+  logViewJudgeActivity,
+  logExportJudgeReport,
   getRecentAuditLogs,
   type AuditLog,
   type AuditAction,
@@ -645,6 +650,9 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
   const [showNewAccountPassword, setShowNewAccountPassword] = useState(false);
   const [showNewAccountConfirm, setShowNewAccountConfirm] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [sendingReminders, setSendingReminders] = useState(false);
+  const [reminderResults, setReminderResults] = useState<{ email: string; success: boolean; error?: string }[]>([]);
 
   // All categories = static + admin-added (from Firestore)
   const allCategories = useMemo(
@@ -732,6 +740,21 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     };
     loadLogs();
   }, [canManage]);
+
+  // Log when admin views judge activity
+  useEffect(() => {
+    if (!canManage || activeSection !== "judges") return;
+    const logJudgeView = async () => {
+      try {
+        // Get unique judge count from judge scores
+        const uniqueJudges = new Set(judgeScores.map(s => s.judgeEmail)).size;
+        await logViewJudgeActivity(uniqueJudges, judgeScores.length);
+      } catch (err) {
+        console.error("Failed to log judge activity view:", err);
+      }
+    };
+    logJudgeView();
+  }, [activeSection, canManage, judgeScores.length]);
 
   async function handleCreateAccount(e: React.FormEvent) {
     e.preventDefault();
@@ -823,12 +846,13 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       const deletedCount = snapshot.docs.length;
       console.log("All judge votes cleared successfully");
       
-      // Log audit action
+      // Log audit action - use both for comprehensive tracking
       await logResetVotes(deletedCount);
+      await logClearJudgeScores(deletedCount);
     } catch (err) {
       console.error("Error resetting votes:", err);
       if (err instanceof Error) {
-        await logAuditActionError('RESET_VOTES', 'Failed to reset votes', err);
+        await logAuditActionError('CLEAR_JUDGE_SCORES', 'Failed to clear judge scores', err);
       }
     } finally {
       setResettingVotes(false);
@@ -1044,6 +1068,75 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     }
   }
 
+  // Get all incomplete nominations (missing required documents)
+  const incompleteNominations = useMemo(() => {
+    return nominations
+      .filter(nom => {
+        const validation = validateDocumentsForCategory(nom.categoryId, nom.uploads || {});
+        return !validation.isValid;
+      })
+      .map(nom => {
+        const incompleteItems = getIncompleteItemsList(nom.categoryId, nom.uploads || {});
+        return {
+          id: nom.id,
+          nominatorEmail: nom.nominatorEmail,
+          nominatorName: nom.nominatorName,
+          nomineeName: nom.nomineeName,
+          categoryName: nom.categoryName,
+          categoryId: nom.categoryId,
+          incompleteItems,
+        };
+      });
+  }, [nominations]);
+
+  async function sendReminders() {
+    if (incompleteNominations.length === 0) {
+      alert("No incomplete nominations found.");
+      return;
+    }
+
+    if (!confirm(`Send reminder emails to ${incompleteNominations.length} nominator(s) with incomplete submissions?`)) {
+      return;
+    }
+
+    setSendingReminders(true);
+    setReminderResults([]);
+
+    try {
+      const response = await fetch('/.netlify/functions/send-reminders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          recipients: incompleteNominations.map(nom => ({
+            nominatorEmail: nom.nominatorEmail,
+            nominatorName: nom.nominatorName,
+            nomineeName: nom.nomineeName,
+            categoryName: nom.categoryName,
+            categoryId: nom.categoryId,
+            incompleteItems: nom.incompleteItems,
+          })),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setReminderResults(result.results || []);
+        alert(`✓ Reminders sent! ${result.successCount || 0} successful, ${result.failureCount || 0} failed.`);
+      } else {
+        alert(`Error: ${result.error || 'Failed to send reminders'}`);
+        console.error('Reminder send error:', result);
+      }
+    } catch (err) {
+      console.error("Failed to send reminders:", err);
+      alert("Failed to send reminders. Please check the console for details.");
+    } finally {
+      setSendingReminders(false);
+    }
+  }
+
   function exportCsv() {
     const rows = nominations.filter((n) => n.status === "shortlisted");
     if (rows.length === 0) return;
@@ -1197,6 +1290,16 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
           {canManage && (
             <>
               <Button
+                onClick={() => setShowReminderModal(true)}
+                disabled={incompleteNominations.length === 0}
+                variant="outline"
+                className="border-amber-400 text-amber-700 hover:bg-amber-50"
+                title={incompleteNominations.length === 0 ? "No incomplete nominations" : `Send reminders to ${incompleteNominations.length} nominator(s)`}
+              >
+                <Mail className="mr-2 h-4 w-4" />{" "}
+                <span className="hidden sm:inline">Send Reminders</span> ({incompleteNominations.length})
+              </Button>
+              <Button
                 onClick={exportResults}
                 disabled={judgeScores.length === 0}
                 variant="outline"
@@ -1213,6 +1316,19 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
               >
                 <Download className="mr-2 h-4 w-4" />{" "}
                 <span className="hidden sm:inline">Export Shortlisted</span> ({stats.shortlisted})
+              </Button>
+            </>
+          )}
+          {!canManage && (
+            <>
+              <Button
+                onClick={exportResults}
+                disabled={judgeScores.length === 0}
+                variant="outline"
+                className="border-primary/40 text-primary"
+              >
+                <Download className="mr-2 h-4 w-4" />{" "}
+                <span className="hidden sm:inline">Download Results</span> ({judgeScores.length})
               </Button>
             </>
           )}
@@ -1901,6 +2017,117 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
 
         </div>{/* end content area */}
       </div>{/* end sidebar layout */}
+
+      {/* Reminder Modal */}
+      <Sheet open={showReminderModal} onOpenChange={setShowReminderModal}>
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-xl">Send Reminder Emails</SheetTitle>
+            <SheetDescription>
+              Send reminder emails to nominators with incomplete nominations (missing required documents)
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-6">
+            {/* Summary Card */}
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-900">
+                    {incompleteNominations.length} incomplete nomination(s) found
+                  </p>
+                  <p className="mt-1 text-sm text-amber-800">
+                    {incompleteNominations.length > 0
+                      ? `These nominators haven't uploaded all required documents yet.`
+                      : 'All nominations have complete documents!'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Recipients List */}
+            {incompleteNominations.length > 0 && (
+              <>
+                <div>
+                  <h4 className="font-semibold text-foreground mb-3">Recipients:</h4>
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto rounded-lg border border-gray-200 p-3 bg-gray-50">
+                    {incompleteNominations.map((nom, idx) => (
+                      <div key={idx} className="rounded-lg bg-white p-3 border border-gray-100">
+                        <p className="text-sm font-medium text-foreground">{nom.nominatorName}</p>
+                        <p className="text-xs text-muted-foreground">{nom.nominatorEmail}</p>
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          <span className="font-medium">Nominee:</span> {nom.nomineeName} • <span className="font-medium">Category:</span> {nom.categoryName}
+                        </p>
+                        <div className="mt-2 text-xs space-y-1">
+                          <p className="font-medium text-amber-700">Missing documents:</p>
+                          <ul className="list-disc list-inside text-amber-600 space-y-0.5">
+                            {nom.incompleteItems.map((item, itemIdx) => (
+                              <li key={itemIdx} className="text-[11px]">{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Send Button */}
+                <div className="flex gap-3 pt-4 border-t">
+                  <Button
+                    onClick={sendReminders}
+                    disabled={sendingReminders}
+                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+                  >
+                    {sendingReminders ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="mr-2 h-4 w-4" />
+                        Send {incompleteNominations.length} Reminder Email{incompleteNominations.length !== 1 ? 's' : ''}
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => setShowReminderModal(false)}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+
+                {/* Results */}
+                {reminderResults.length > 0 && (
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                    <p className="font-semibold text-green-900 mb-3">Send Results:</p>
+                    <div className="space-y-2">
+                      {reminderResults.map((result, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm">
+                          {result.success ? (
+                            <>
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <span className="text-green-800">{result.email}</span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="h-4 w-4 text-red-600" />
+                              <span className="text-red-800">{result.email}: {result.error}</span>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Detail slide-over */}
       <Sheet
