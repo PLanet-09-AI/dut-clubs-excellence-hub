@@ -31,7 +31,7 @@ const session2Schedule = [
 ];
 
 const venueFacts = [
-  { icon: MapPin, label: "Address", value: "76 Steve Biko Road, Fred Crookes Sports Centre" },
+  { icon: MapPin, label: "Address", value: "47 Botanic Gardens Rd, Musgrave, Berea, 4001" },
   { icon: Car, label: "Parking", value: "Secure on-site · Shuttle from Steve Biko Campus from 17:30" },
   { icon: Accessibility, label: "Access", value: "Step-free access · BSL interpreter on stage" },
   { icon: Shirt, label: "Dress code", value: "Black tie · Traditional attire warmly welcomed" },
@@ -194,8 +194,8 @@ export default function EventProgram() {
             <div className="overflow-hidden rounded-3xl border border-primary/30 bg-gradient-to-br from-card to-secondary/40">
               <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
                 <iframe
-                  title="76 Steve Biko Road on OpenStreetMap"
-                  src="https://www.openstreetmap.org/export/embed.html?bbox=31.02,−29.88,31.03,−29.87&layer=mapnik&marker=-29.873456,31.024695"
+                  title="Fred Crookes Sports Centre on OpenStreetMap"
+                  src="https://www.openstreetmap.org/export/embed.html?bbox=31.01,-29.88,31.04,-29.85&layer=mapnik&marker=-29.8657,31.0247"
                   className="h-full w-full opacity-90 grayscale"
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
