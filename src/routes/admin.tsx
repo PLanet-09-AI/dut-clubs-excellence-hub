@@ -58,7 +58,6 @@ import {
   IMAGE_FILE_PATTERN,
 } from "@/lib/office-to-pdf";
 import { validateDocumentsForCategory, getIncompleteItemsList } from "@/lib/document-validation";
-import { sendNomineeReminderEmail } from "@/lib/emailjs-config";
 import {
   logCreateAccount,
   logResetVotes,
@@ -1153,16 +1152,24 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     setNomineeEmailResults(prev => ({ ...prev, [nomineeId]: { success: false, message: "Sending..." } }));
 
     try {
-      const result = await sendNomineeReminderEmail(
-        incomplete.nomineeEmail,
-        incomplete.nomineeName,
-        incomplete.nominatorName,
-        incomplete.categoryName,
-        incomplete.categoryId,
-        incomplete.incompleteItems
-      );
+      const response = await fetch('/.netlify/functions/send-nominee-reminder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nomineeEmail: incomplete.nomineeEmail,
+          nomineeName: incomplete.nomineeName,
+          nominatorName: incomplete.nominatorName,
+          categoryName: incomplete.categoryName,
+          categoryId: incomplete.categoryId,
+          incompleteItems: incomplete.incompleteItems,
+        }),
+      });
 
-      if (result.success) {
+      const result = await response.json();
+
+      if (response.ok && result.success) {
         setNomineeEmailResults(prev => ({ 
           ...prev, 
           [nomineeId]: { success: true, message: "✓ Email sent to nominee" } 
@@ -1170,7 +1177,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       } else {
         setNomineeEmailResults(prev => ({ 
           ...prev, 
-          [nomineeId]: { success: false, message: `Error: ${result.error}` } 
+          [nomineeId]: { success: false, message: `Error: ${result.error || 'Failed to send'}` } 
         }));
       }
     } catch (err) {
