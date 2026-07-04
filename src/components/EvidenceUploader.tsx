@@ -88,7 +88,7 @@ const ACCEPTED = [
   "video/mp4",
   ".mp4",
 ].join(",");
-const MAX_MB = 10;
+const MAX_MB = 100;
 const MAX_BYTES = MAX_MB * 1024 * 1024;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -97,6 +97,10 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function isVideoFile(fileName: string): boolean {
+  return fileName.toLowerCase().endsWith(".mp4") || fileName.toLowerCase().endsWith(".webm") || fileName.toLowerCase().endsWith(".mov");
 }
 
 // ─── SharePoint link preview modal ───────────────────────────────────────────
@@ -301,8 +305,11 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
 
   return (
     <div className="rounded-lg border border-primary/15 bg-background/40">
-      {preview && (
+      {preview && preview.type === "sharepoint" && (
         <SharePointPreview url={preview.url} name={preview.name} onClose={() => setPreview(null)} />
+      )}
+      {preview && preview.type === "video" && (
+        <VideoPreview url={preview.url} name={preview.name} onClose={() => setPreview(null)} />
       )}
       {/* Label row */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-primary/10">
@@ -318,38 +325,68 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
       {/* Uploaded files + links */}
       {files.length > 0 && (
         <div className="space-y-1 px-3 pt-2">
-          {files.map((file, i) =>
-            file.type === "sharepoint" ? (
-              <div key={i} className="flex items-center gap-2 rounded-md bg-blue-500/10 border border-blue-500/20 px-2 py-1.5">
-                <Link2 className="h-3 w-3 shrink-0 text-blue-500" />
-                <span className="min-w-0 flex-1 truncate text-xs text-foreground">{file.name}</span>
-                <button
-                  type="button"
-                  onClick={() => setPreview({ url: file.url, name: file.name })}
-                  className="shrink-0 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-500/10 transition"
-                  title="Preview"
-                >
-                  <Eye className="h-3 w-3" /> Preview
-                </button>
-                <a
-                  href={file.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-primary transition"
-                  title="Open in SharePoint"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-                <button
-                  type="button"
-                  onClick={() => removeFile(file)}
-                  className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
-                  title="Remove"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ) : (
+          {files.map((file, i) => {
+            if (file.type === "sharepoint") {
+              return (
+                <div key={i} className="flex items-center gap-2 rounded-md bg-blue-500/10 border border-blue-500/20 px-2 py-1.5">
+                  <Link2 className="h-3 w-3 shrink-0 text-blue-500" />
+                  <span className="min-w-0 flex-1 truncate text-xs text-foreground">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPreview({ url: file.url, name: file.name, type: "sharepoint" })}
+                    className="shrink-0 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-500/10 transition"
+                    title="Preview"
+                  >
+                    <Eye className="h-3 w-3" /> Preview
+                  </button>
+                  <a
+                    href={file.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-primary transition"
+                    title="Open in SharePoint"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(file)}
+                    className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
+                    title="Remove"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            }
+            if (isVideoFile(file.name)) {
+              return (
+                <div key={file.path} className="flex items-center gap-2 rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-1.5">
+                  <Play className="h-3 w-3 shrink-0 text-purple-600" />
+                  <span className="min-w-0 flex-1 truncate text-xs text-foreground">{file.name}</span>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    {formatFileSize(file.size)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPreview({ url: file.url, name: file.name, type: "video" })}
+                    className="shrink-0 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-purple-600 hover:bg-purple-500/10 transition"
+                    title="Preview video"
+                  >
+                    <Eye className="h-3 w-3" /> Preview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(file)}
+                    className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
+                    title="Remove"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            }
+            return (
               <div key={file.path} className="flex items-center gap-2 rounded-md bg-primary/5 px-2 py-1.5">
                 <FileText className="h-3 w-3 shrink-0 text-primary" />
                 <a
@@ -372,8 +409,8 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
                   <X className="h-3 w-3" />
                 </button>
               </div>
-            )
-          )}
+            );
+          })}
         </div>
       )}
 
@@ -437,7 +474,7 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
         <span className="text-muted-foreground">
           Drop or <span className="font-medium text-primary">browse</span>
           <span className="ml-1.5 text-muted-foreground/60">
-            · PDF, Word, Images · max {MAX_MB} MB
+            · PDF, Word, Images, MP4 · max {MAX_MB} MB
           </span>
         </span>
         <input
