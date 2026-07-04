@@ -195,7 +195,7 @@ export default function EventProgram() {
               <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
                 <iframe
                   title="Fred Crookes Sports Centre on OpenStreetMap"
-                  src="https://www.openstreetmap.org/export/embed.html?bbox=31.01,-29.88,31.04,-29.85&layer=mapnik&marker=-29.8657,31.0247"
+                  src="https://www.openstreetmap.org/export/embed.html?bbox=31.0015,-29.8588,31.0115,-29.8488&layer=mapnik&marker=-29.8538852,31.0065325"
                   className="h-full w-full opacity-90 grayscale"
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
