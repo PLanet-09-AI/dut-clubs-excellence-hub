@@ -82,6 +82,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
         }
       );
 
+      console.log(`✓ Email sent to ${nomineeEmail}`, { messageId: response.status });
+
       return {
         statusCode: 200,
         body: JSON.stringify({
@@ -91,12 +93,26 @@ export const handler: Handler = async (event: HandlerEvent) => {
         }),
       };
     } catch (error) {
-      console.error(`Failed to send email to ${nomineeEmail}:`, error);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`✗ Failed to send email to ${nomineeEmail}:`, {
+        error: errorMsg,
+        nomineeEmail,
+        categoryId,
+        serviceId: EMAILJS_SERVICE_ID,
+        templateId: EMAILJS_TEMPLATE_ID,
+      });
       return {
         statusCode: 500,
         body: JSON.stringify({
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error sending email',
+          email: nomineeEmail,
+          error: errorMsg,
+          debug: {
+            hasServiceId: !!EMAILJS_SERVICE_ID,
+            hasTemplateId: !!EMAILJS_TEMPLATE_ID,
+            hasPublicKey: !!EMAILJS_PUBLIC_KEY,
+            hasPrivateKey: !!EMAILJS_PRIVATE_KEY,
+          },
         }),
       };
     }
