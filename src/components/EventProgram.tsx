@@ -190,16 +190,16 @@ export default function EventProgram() {
 
         {/* Venue card */}
         <div className="lg:col-span-5">
-          <div className="sticky top-8 space-y-6">
+          <div className="sticky top-8 space-y-6 lg:space-y-4">
             <div className="overflow-hidden rounded-3xl border border-primary/30 bg-gradient-to-br from-card to-secondary/40">
-              <div className="relative aspect-[4/3] overflow-hidden">
+              <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
                 <iframe
-                  title="76 Steve Biko Road map"
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3721.275621845876!2d31.024695!3d-29.873456!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1f0b8e1234567890%3A0x9876543210fedcba!2s76%20Steve%20Biko%20Road%2C%20Durban!5e0!3m2!1sen!2sza!4v1234567890"
+                  title="76 Steve Biko Road on OpenStreetMap"
+                  src="https://www.openstreetmap.org/export/embed.html?bbox=31.02,−29.88,31.03,−29.87&layer=mapnik&marker=-29.873456,31.024695"
                   className="h-full w-full opacity-90 grayscale"
                   loading="lazy"
-                  allowFullScreen
                   referrerPolicy="no-referrer-when-downgrade"
+                  style={{ border: 0 }}
                 />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
               </div>

@@ -34,6 +34,7 @@ import {
   Loader2,
   Shield,
   AlertCircle,
+  MoreVertical,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -148,7 +149,7 @@ type Nomination = {
   status: NominationStatus;
 };
 
-type PreviewKind = "pdf" | "office" | "image";
+type PreviewKind = "pdf" | "office" | "image" | "video";
 
 function hasFileExtension(value: string, extensionPattern: RegExp): boolean {
   if (!value) return false;
@@ -171,6 +172,7 @@ function getPreviewKind(
   previewPdfUrl?: string,
 ): PreviewKind | null {
   if (previewPdfUrl) return "pdf";
+  if (hasFileExtension(fileName, /\.mp4$/i) || hasFileExtension(fileUrl, /\.mp4$/i)) return "video";
   if (hasFileExtension(fileName, /\.pdf$/i) || hasFileExtension(fileUrl, /\.pdf$/i)) return "pdf";
   if (
     hasFileExtension(fileName, OFFICE_FILE_PATTERN) ||
@@ -656,6 +658,8 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
   const [reminderResults, setReminderResults] = useState<{ email: string; success: boolean; error?: string }[]>([]);
   const [sendingToNomineeId, setSendingToNomineeId] = useState<string | null>(null);
   const [nomineeEmailResults, setNomineeEmailResults] = useState<{ [key: string]: { success: boolean; message: string } }>({});
+  const [showAdminMenu, setShowAdminMenu] = useState(false);
+  const [showVideoPreview, setShowVideoPreview] = useState<{ url: string; name: string } | null>(null);
 
   // All categories = static + admin-added (from Firestore)
   const allCategories = useMemo(
@@ -1315,84 +1319,96 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
               {realJudgingActive && <CheckCircle2 className="h-5 w-5" />}
             </button>
 
-            {/* Secondary Actions: Reminders & Exports - Responsive Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <Button
-                onClick={() => setShowReminderModal(true)}
-                disabled={incompleteNominations.length === 0}
-                variant="outline"
-                className="border-amber-400 text-amber-700 hover:bg-amber-50 justify-start sm:justify-center gap-1 sm:gap-2"
-                title={incompleteNominations.length === 0 ? "No incomplete nominations" : `Send reminders to ${incompleteNominations.length} nominator(s)`}
-              >
-                <Mail className="h-4 w-4 flex-shrink-0" />{" "}
-                <span className="hidden sm:inline text-sm">Send Reminders</span>
-                <span className="sm:hidden text-sm">Reminders</span>
-                <Badge variant="secondary" className="ml-auto sm:ml-1 text-xs">
-                  {incompleteNominations.length}
-                </Badge>
-              </Button>
-              <Button
-                onClick={exportResults}
-                disabled={judgeScores.length === 0}
-                variant="outline"
-                className="border-primary/40 text-primary justify-start sm:justify-center gap-1 sm:gap-2"
-              >
-                <Download className="h-4 w-4 flex-shrink-0" />{" "}
-                <span className="hidden sm:inline text-sm">Results</span>
-                <span className="sm:hidden text-sm">Results</span>
-                <Badge variant="secondary" className="ml-auto sm:ml-1 text-xs">
-                  {judgeScores.length}
-                </Badge>
-              </Button>
-              <Button
-                onClick={exportCsv}
-                disabled={stats.shortlisted === 0}
-                variant="outline"
-                className="border-primary/40 text-primary justify-start sm:justify-center gap-1 sm:gap-2"
-              >
-                <Download className="h-4 w-4 flex-shrink-0" />{" "}
-                <span className="hidden sm:inline text-sm">Shortlisted</span>
-                <span className="sm:hidden text-sm">Shortlisted</span>
-                <Badge variant="secondary" className="ml-auto sm:ml-1 text-xs">
-                  {stats.shortlisted}
-                </Badge>
-              </Button>
-            </div>
-
-            {/* Destructive Actions: Reset - Warning style, full width, collapsed on mobile */}
-            <div className="grid grid-cols-2 gap-2">
+            {/* Secondary Actions: Reminders & Exports - Dropdown Menu */}
+            <div className="relative">
               <button
-                onClick={resetVotes}
-                disabled={resettingVotes || judgeScores.length === 0}
-                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs sm:text-sm font-semibold transition ${
-                  resettingVotes
-                    ? "bg-gray-100 text-gray-700 border border-gray-300 cursor-not-allowed"
-                    : judgeScores.length === 0
-                      ? "bg-gray-100 text-gray-500 border border-gray-300 cursor-not-allowed"
-                      : "bg-red-100 text-red-700 border border-red-300 hover:bg-red-200"
-                }`}
-                title="Clear all judge votes - cannot be undone"
+                onClick={() => setShowAdminMenu(!showAdminMenu)}
+                className="w-full flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition border border-primary/20 bg-primary/5 hover:bg-primary/10"
               >
-                <Trash2 className="h-4 w-4" />
-                <span className="hidden sm:inline">{resettingVotes ? "Clearing…" : "Reset Votes"}</span>
-                <span className="sm:hidden">{resettingVotes ? "…" : "Votes"}</span>
+                <div className="flex items-center gap-2">
+                  <MoreVertical className="h-4 w-4" />
+                  <span>Admin Actions</span>
+                </div>
+                <ChevronDown className={`h-4 w-4 transition ${showAdminMenu ? "rotate-180" : ""}`} />
               </button>
-              <button
-                onClick={resetNominations}
-                disabled={resettingNominations || nominations.length === 0}
-                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs sm:text-sm font-semibold transition ${
-                  resettingNominations
-                    ? "bg-gray-100 text-gray-700 border border-gray-300 cursor-not-allowed"
-                    : nominations.length === 0
-                      ? "bg-gray-100 text-gray-500 border border-gray-300 cursor-not-allowed"
-                      : "bg-red-100 text-red-700 border border-red-300 hover:bg-red-200"
-                }`}
-                title="Clear all nominations - cannot be undone"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span className="hidden sm:inline">{resettingNominations ? "Clearing…" : "Reset Noms"}</span>
-                <span className="sm:hidden">{resettingNominations ? "…" : "Noms"}</span>
-              </button>
+              
+              {/* Dropdown menu */}
+              {showAdminMenu && (
+                <div className="absolute top-full mt-2 left-0 right-0 z-50 rounded-lg border border-primary/20 bg-white shadow-lg">
+                  <div className="p-2 space-y-1">
+                    <button
+                      onClick={() => {
+                        setShowReminderModal(true);
+                        setShowAdminMenu(false);
+                      }}
+                      disabled={incompleteNominations.length === 0}
+                      className="w-full flex items-center justify-start gap-3 rounded-lg px-4 py-2.5 text-sm transition hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Mail className="h-4 w-4 flex-shrink-0 text-amber-600" />
+                      <span className="flex-1 text-left">Send Reminders</span>
+                      <Badge variant="secondary" className="ml-auto text-xs">
+                        {incompleteNominations.length}
+                      </Badge>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        exportResults();
+                        setShowAdminMenu(false);
+                      }}
+                      disabled={judgeScores.length === 0}
+                      className="w-full flex items-center justify-start gap-3 rounded-lg px-4 py-2.5 text-sm transition hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Download className="h-4 w-4 flex-shrink-0 text-primary" />
+                      <span className="flex-1 text-left">Download Results</span>
+                      <Badge variant="secondary" className="ml-auto text-xs">
+                        {judgeScores.length}
+                      </Badge>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        exportCsv();
+                        setShowAdminMenu(false);
+                      }}
+                      disabled={stats.shortlisted === 0}
+                      className="w-full flex items-center justify-start gap-3 rounded-lg px-4 py-2.5 text-sm transition hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Download className="h-4 w-4 flex-shrink-0 text-primary" />
+                      <span className="flex-1 text-left">Export Shortlisted</span>
+                      <Badge variant="secondary" className="ml-auto text-xs">
+                        {stats.shortlisted}
+                      </Badge>
+                    </button>
+                    
+                    <div className="border-t border-primary/10 my-1" />
+                    
+                    <button
+                      onClick={() => {
+                        resetVotes();
+                        setShowAdminMenu(false);
+                      }}
+                      disabled={resettingVotes || judgeScores.length === 0}
+                      className="w-full flex items-center justify-start gap-3 rounded-lg px-4 py-2.5 text-sm transition hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4 flex-shrink-0" />
+                      <span className="flex-1 text-left">{resettingVotes ? "Clearing Votes…" : "Reset All Votes"}</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        resetNominations();
+                        setShowAdminMenu(false);
+                      }}
+                      disabled={resettingNominations || nominations.length === 0}
+                      className="w-full flex items-center justify-start gap-3 rounded-lg px-4 py-2.5 text-sm transition hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4 flex-shrink-0" />
+                      <span className="flex-1 text-left">{resettingNominations ? "Clearing Nominations…" : "Reset All Nominations"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2252,10 +2268,63 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
               onDelete={remove}
               formatDate={formatDate}
               canManage={canManage}
+              setShowVideoPreview={setShowVideoPreview}
             />
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Video Preview Modal */}
+      {showVideoPreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowVideoPreview(null)}
+        >
+          <div
+            className="w-full max-w-3xl rounded-lg bg-white shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-primary/15 px-6 py-4">
+              <p className="truncate text-sm font-semibold">{showVideoPreview.name}</p>
+              <button
+                onClick={() => setShowVideoPreview(null)}
+                className="rounded-lg p-2 hover:bg-gray-100 transition"
+                aria-label="Close video preview"
+              >
+                <XIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="bg-black aspect-video">
+              <video
+                src={showVideoPreview.url}
+                controls
+                autoPlay
+                className="h-full w-full"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-2 border-t border-primary/15 bg-gray-50 px-6 py-4">
+              <a href={showVideoPreview.url} download>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                >
+                  <Download className="mr-2 h-4 w-4" /> Download
+                </Button>
+              </a>
+              <a href={showVideoPreview.url} target="_blank" rel="noopener noreferrer">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" /> Open
+                </Button>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2820,12 +2889,14 @@ function NominationDetail({
   onDelete,
   formatDate,
   canManage,
+  setShowVideoPreview,
 }: {
   nom: Nomination;
   onUpdate: (id: string, s: NominationStatus) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   formatDate: (ts: Nomination["createdAt"]) => string;
   canManage: boolean;
+  setShowVideoPreview: (state: { url: string; name: string } | null) => void;
 }) {
   const catData = AWARD_CATEGORIES.find((c) => c.id === nom.categoryId);
   const totalFiles = nom.uploads
@@ -3452,6 +3523,10 @@ function NominationDetail({
                                       <button
                                         type="button"
                                         onClick={() => {
+                                          if (previewKind === "video") {
+                                            setShowVideoPreview({ url: file.url, name: file.name });
+                                            return;
+                                          }
                                           if (isPreviewable) {
                                             openPreview(file.path);
                                             return;
