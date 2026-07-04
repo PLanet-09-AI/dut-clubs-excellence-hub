@@ -24,7 +24,7 @@ import {
   isOfficeFileName,
   stripExtension,
 } from "@/lib/office-to-pdf";
-import { Upload, X, FileText, AlertCircle, Paperclip, Link2, ExternalLink, Eye } from "lucide-react";
+import { Upload, X, FileText, AlertCircle, Paperclip, Link2, ExternalLink, Eye, Play } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // ─── Exported types ───────────────────────────────────────────────────────────
@@ -84,6 +84,9 @@ const ACCEPTED = [
   ".ppsx",
   // Images
   "image/*",
+  // Video
+  "video/mp4",
+  ".mp4",
 ].join(",");
 const MAX_MB = 10;
 const MAX_BYTES = MAX_MB * 1024 * 1024;
@@ -139,6 +142,40 @@ function SharePointPreview({ url, name, onClose }: { url: string; name: string; 
   );
 }
 
+// ─── Video preview modal ──────────────────────────────────────────────────────
+
+function VideoPreview({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex flex-col w-full max-w-2xl rounded-xl overflow-hidden border border-primary/20 bg-background shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-primary/10 bg-primary/5 shrink-0">
+          <Play className="h-4 w-4 text-primary" />
+          <span className="flex-1 min-w-0 truncate text-sm font-medium">{name}</span>
+          <a href={url} target="_blank" rel="noopener noreferrer" download className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0">
+            <ExternalLink className="h-3.5 w-3.5" /> Download
+          </a>
+          <button type="button" onClick={onClose} className="ml-2 rounded p-1 hover:bg-primary/10 text-muted-foreground hover:text-foreground transition">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <video 
+          src={url} 
+          controls 
+          autoPlay 
+          className="w-full h-auto max-h-[60vh] bg-black"
+          title={name}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ─── Single-label uploader (internal) ────────────────────────────────────────
 
 interface LabelUploaderProps {
@@ -156,7 +193,7 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
   const [linkInput, setLinkInput] = useState("");
   const [linkError, setLinkError] = useState("");
   const [showLinkInput, setShowLinkInput] = useState(false);
-  const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
+  const [preview, setPreview] = useState<{ url: string; name: string; type: "sharepoint" | "video" } | null>(null);
 
   const handleFiles = useCallback(
     (fileList: File[]) => {

@@ -194,10 +194,12 @@ export default function EventProgram() {
             <div className="overflow-hidden rounded-3xl border border-primary/30 bg-gradient-to-br from-card to-secondary/40">
               <div className="relative aspect-[4/3] overflow-hidden">
                 <iframe
-                  title="Fred Crookes Sports Centre map"
-                  src="https://www.openstreetmap.org/export/embed.html?bbox=31.020%2C-29.877%2C31.030%2C-29.870&layer=mapnik&marker=-29.8734%2C31.0247"
+                  title="76 Steve Biko Road map"
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3721.275621845876!2d31.024695!3d-29.873456!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1f0b8e1234567890%3A0x9876543210fedcba!2s76%20Steve%20Biko%20Road%2C%20Durban!5e0!3m2!1sen!2sza!4v1234567890"
                   className="h-full w-full opacity-90 grayscale"
                   loading="lazy"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
                 />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
               </div>

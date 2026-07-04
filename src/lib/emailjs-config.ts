@@ -13,6 +13,9 @@ const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'YOUR_PUBL
 const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'YOUR_SERVICE_ID';
 const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'YOUR_TEMPLATE_ID';
 
+// Production site URL for nomination links
+const SITE_URL = 'https://salea2026.netlify.app';
+
 let initialized = false;
 
 export function initEmailJS() {
@@ -46,7 +49,7 @@ export async function sendReminderEmail(
       nominee_name: nomineeName,
       category_name: categoryName,
       incomplete_items: incompleteItems.join('\n• '),
-      submission_url: `${window.location.origin}/nominate/${categoryName.toLowerCase().replace(/\s+/g, '-')}`,
+      submission_url: `${SITE_URL}/nominate/${categoryName.toLowerCase().replace(/\s+/g, '-')}#documents`,
       current_year: new Date().getFullYear(),
     };
 
@@ -92,4 +95,51 @@ export async function sendBulkReminderEmails(
   }
 
   return results;
+}
+
+/**
+ * Send a reminder email directly to the nominee about incomplete documents
+ */
+export async function sendNomineeReminderEmail(
+  nomineeEmail: string,
+  nomineeName: string,
+  nominatorName: string,
+  categoryName: string,
+  categoryId: string,
+  incompleteItems: string[]
+) {
+  try {
+    initEmailJS();
+
+    if (!initialized || EMAILJS_SERVICE_ID === 'YOUR_SERVICE_ID') {
+      console.warn('EmailJS not configured. Set environment variables VITE_EMAILJS_PUBLIC_KEY, VITE_EMAILJS_SERVICE_ID, and VITE_EMAILJS_TEMPLATE_ID');
+      return { success: false, error: 'EmailJS not configured' };
+    }
+
+    const incompleteItemsHtml = incompleteItems
+      .map(item => `<li>${item}</li>`)
+      .join('');
+
+    const templateParams = {
+      to_email: nomineeEmail,
+      nominator_name: nominatorName,
+      nominee_name: nomineeName,
+      category_name: categoryName,
+      incomplete_items: incompleteItems.join('\n• '),
+      incomplete_items_html: incompleteItemsHtml,
+      submission_url: `${SITE_URL}/nominate/${categoryId}#documents`,
+      current_year: new Date().getFullYear(),
+    };
+
+    const response = await emailjs.send(
+      EMAILJS_SERVICE_ID,
+      EMAILJS_TEMPLATE_ID,
+      templateParams
+    );
+
+    return { success: true, data: response };
+  } catch (error) {
+    console.error('Failed to send nominee reminder email:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
 }

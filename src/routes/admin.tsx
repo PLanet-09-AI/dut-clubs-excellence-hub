@@ -57,6 +57,7 @@ import {
   IMAGE_FILE_PATTERN,
 } from "@/lib/office-to-pdf";
 import { validateDocumentsForCategory, getIncompleteItemsList } from "@/lib/document-validation";
+import { sendNomineeReminderEmail } from "@/lib/emailjs-config";
 import {
   logCreateAccount,
   logResetVotes,
@@ -653,6 +654,8 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
   const [reminderResults, setReminderResults] = useState<{ email: string; success: boolean; error?: string }[]>([]);
+  const [sendingToNomineeId, setSendingToNomineeId] = useState<string | null>(null);
+  const [nomineeEmailResults, setNomineeEmailResults] = useState<{ [key: string]: { success: boolean; message: string } }>({});
 
   // All categories = static + admin-added (from Firestore)
   const allCategories = useMemo(
@@ -1082,6 +1085,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
           nominatorEmail: nom.nominatorEmail,
           nominatorName: nom.nominatorName,
           nomineeName: nom.nomineeName,
+          nomineeEmail: nom.nomineeEmail,
           categoryName: nom.categoryName,
           categoryId: nom.categoryId,
           incompleteItems,
@@ -1134,6 +1138,45 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
       alert("Failed to send reminders. Please check the console for details.");
     } finally {
       setSendingReminders(false);
+    }
+  }
+
+  async function sendReminderToNominee(nomineeId: string) {
+    const incomplete = incompleteNominations.find(n => n.id === nomineeId);
+    if (!incomplete) return;
+
+    setSendingToNomineeId(nomineeId);
+    setNomineeEmailResults(prev => ({ ...prev, [nomineeId]: { success: false, message: "Sending..." } }));
+
+    try {
+      const result = await sendNomineeReminderEmail(
+        incomplete.nomineeEmail,
+        incomplete.nomineeName,
+        incomplete.nominatorName,
+        incomplete.categoryName,
+        incomplete.categoryId,
+        incomplete.incompleteItems
+      );
+
+      if (result.success) {
+        setNomineeEmailResults(prev => ({ 
+          ...prev, 
+          [nomineeId]: { success: true, message: "✓ Email sent to nominee" } 
+        }));
+      } else {
+        setNomineeEmailResults(prev => ({ 
+          ...prev, 
+          [nomineeId]: { success: false, message: `Error: ${result.error}` } 
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to send reminder to nominee:", err);
+      setNomineeEmailResults(prev => ({ 
+        ...prev, 
+        [nomineeId]: { success: false, message: "Failed to send email" } 
+      }));
+    } finally {
+      setSendingToNomineeId(null);
     }
   }
 
@@ -1235,112 +1278,140 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-primary">SALEA 2026</p>
-          <h1 className="font-serif text-3xl font-bold sm:text-4xl">
-            {canManage ? "Administration Panel" : "Review Panel"}
-          </h1>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-primary">SALEA 2026</p>
+            <h1 className="font-serif text-3xl font-bold sm:text-4xl">
+              {canManage ? "Administration Panel" : "Review Panel"}
+            </h1>
+          </div>
+          {/* Sign Out - Always in top right on desktop, in action bar on mobile */}
+          <Button
+            variant="outline"
+            onClick={onLogout}
+            className="border-primary/40 bg-primary/5 text-primary sm:w-auto w-full justify-start sm:justify-center"
+          >
+            <LogOut className="h-4 w-4" /> <span className="ml-2 sm:ml-2">Sign out</span>
+          </Button>
         </div>
-        <div className="flex flex-col gap-2 items-end">
-          {canManage && (
-            <div className="flex flex-wrap gap-2 justify-end">
-              <button
-                onClick={toggleRealJudging}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                  realJudgingActive
-                    ? "bg-green-100 text-green-700 border border-green-300 hover:bg-green-200"
-                    : "bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
-                }`}
+
+        {/* Admin Actions Grid - Organized by category */}
+        {canManage && (
+          <div className="space-y-3">
+            {/* Primary Action: Activate Real Judging */}
+            <button
+              onClick={toggleRealJudging}
+              className={`w-full flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                realJudgingActive
+                  ? "bg-green-100 text-green-700 border border-green-300 hover:bg-green-200"
+                  : "bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <div className={`h-3 w-3 rounded-full ${realJudgingActive ? "bg-green-600" : "bg-amber-600"}`} />
+                <span>{realJudgingActive ? "Real Judging Active" : "Activate Real Judging"}</span>
+              </div>
+              {realJudgingActive && <CheckCircle2 className="h-5 w-5" />}
+            </button>
+
+            {/* Secondary Actions: Reminders & Exports - Responsive Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <Button
+                onClick={() => setShowReminderModal(true)}
+                disabled={incompleteNominations.length === 0}
+                variant="outline"
+                className="border-amber-400 text-amber-700 hover:bg-amber-50 justify-start sm:justify-center gap-1 sm:gap-2"
+                title={incompleteNominations.length === 0 ? "No incomplete nominations" : `Send reminders to ${incompleteNominations.length} nominator(s)`}
               >
-                <div className={`h-2 w-2 rounded-full ${realJudgingActive ? "bg-green-600" : "bg-amber-600"}`} />
-                {realJudgingActive ? "Real Judging Active" : "Activate Real Judging"}
-              </button>
+                <Mail className="h-4 w-4 flex-shrink-0" />{" "}
+                <span className="hidden sm:inline text-sm">Send Reminders</span>
+                <span className="sm:hidden text-sm">Reminders</span>
+                <Badge variant="secondary" className="ml-auto sm:ml-1 text-xs">
+                  {incompleteNominations.length}
+                </Badge>
+              </Button>
+              <Button
+                onClick={exportResults}
+                disabled={judgeScores.length === 0}
+                variant="outline"
+                className="border-primary/40 text-primary justify-start sm:justify-center gap-1 sm:gap-2"
+              >
+                <Download className="h-4 w-4 flex-shrink-0" />{" "}
+                <span className="hidden sm:inline text-sm">Results</span>
+                <span className="sm:hidden text-sm">Results</span>
+                <Badge variant="secondary" className="ml-auto sm:ml-1 text-xs">
+                  {judgeScores.length}
+                </Badge>
+              </Button>
+              <Button
+                onClick={exportCsv}
+                disabled={stats.shortlisted === 0}
+                variant="outline"
+                className="border-primary/40 text-primary justify-start sm:justify-center gap-1 sm:gap-2"
+              >
+                <Download className="h-4 w-4 flex-shrink-0" />{" "}
+                <span className="hidden sm:inline text-sm">Shortlisted</span>
+                <span className="sm:hidden text-sm">Shortlisted</span>
+                <Badge variant="secondary" className="ml-auto sm:ml-1 text-xs">
+                  {stats.shortlisted}
+                </Badge>
+              </Button>
+            </div>
+
+            {/* Destructive Actions: Reset - Warning style, full width, collapsed on mobile */}
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={resetVotes}
                 disabled={resettingVotes || judgeScores.length === 0}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs sm:text-sm font-semibold transition ${
                   resettingVotes
                     ? "bg-gray-100 text-gray-700 border border-gray-300 cursor-not-allowed"
                     : judgeScores.length === 0
                       ? "bg-gray-100 text-gray-500 border border-gray-300 cursor-not-allowed"
                       : "bg-red-100 text-red-700 border border-red-300 hover:bg-red-200"
                 }`}
+                title="Clear all judge votes - cannot be undone"
               >
                 <Trash2 className="h-4 w-4" />
-                {resettingVotes ? "Clearing votes…" : "Reset All Votes"}
+                <span className="hidden sm:inline">{resettingVotes ? "Clearing…" : "Reset Votes"}</span>
+                <span className="sm:hidden">{resettingVotes ? "…" : "Votes"}</span>
               </button>
               <button
                 onClick={resetNominations}
                 disabled={resettingNominations || nominations.length === 0}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs sm:text-sm font-semibold transition ${
                   resettingNominations
                     ? "bg-gray-100 text-gray-700 border border-gray-300 cursor-not-allowed"
                     : nominations.length === 0
                       ? "bg-gray-100 text-gray-500 border border-gray-300 cursor-not-allowed"
                       : "bg-red-100 text-red-700 border border-red-300 hover:bg-red-200"
                 }`}
+                title="Clear all nominations - cannot be undone"
               >
                 <Trash2 className="h-4 w-4" />
-                {resettingNominations ? "Clearing…" : "Reset All Nominations"}
+                <span className="hidden sm:inline">{resettingNominations ? "Clearing…" : "Reset Noms"}</span>
+                <span className="sm:hidden">{resettingNominations ? "…" : "Noms"}</span>
               </button>
             </div>
-          )}
-          <div className="flex gap-2 flex-wrap justify-end">
-          {canManage && (
-            <>
-              <Button
-                onClick={() => setShowReminderModal(true)}
-                disabled={incompleteNominations.length === 0}
-                variant="outline"
-                className="border-amber-400 text-amber-700 hover:bg-amber-50"
-                title={incompleteNominations.length === 0 ? "No incomplete nominations" : `Send reminders to ${incompleteNominations.length} nominator(s)`}
-              >
-                <Mail className="mr-2 h-4 w-4" />{" "}
-                <span className="hidden sm:inline">Send Reminders</span> ({incompleteNominations.length})
-              </Button>
-              <Button
-                onClick={exportResults}
-                disabled={judgeScores.length === 0}
-                variant="outline"
-                className="border-primary/40 text-primary"
-              >
-                <Download className="mr-2 h-4 w-4" />{" "}
-                <span className="hidden sm:inline">Download Results</span> ({judgeScores.length})
-              </Button>
-              <Button
-                onClick={exportCsv}
-                disabled={stats.shortlisted === 0}
-                variant="outline"
-                className="border-primary/40 text-primary"
-              >
-                <Download className="mr-2 h-4 w-4" />{" "}
-                <span className="hidden sm:inline">Export Shortlisted</span> ({stats.shortlisted})
-              </Button>
-            </>
-          )}
-          {!canManage && (
-            <>
-              <Button
-                onClick={exportResults}
-                disabled={judgeScores.length === 0}
-                variant="outline"
-                className="border-primary/40 text-primary"
-              >
-                <Download className="mr-2 h-4 w-4" />{" "}
-                <span className="hidden sm:inline">Download Results</span> ({judgeScores.length})
-              </Button>
-            </>
-          )}
+          </div>
+        )}
+
+        {/* Judge Review - Export Results only */}
+        {!canManage && (
           <Button
+            onClick={exportResults}
+            disabled={judgeScores.length === 0}
             variant="outline"
-            onClick={onLogout}
-            className="border-primary/40 bg-primary/5 text-primary"
+            className="w-full border-primary/40 text-primary justify-start gap-2"
           >
-            <LogOut className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Sign out</span>
+            <Download className="h-4 w-4" />{" "}
+            <span>Download Results</span>
+            <Badge variant="secondary" className="ml-auto text-xs">
+              {judgeScores.length}
+            </Badge>
           </Button>
-        </div>
-        </div>
+        )}
       </div>
 
       {!canManage && (
@@ -2052,23 +2123,57 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                 <div>
                   <h4 className="font-semibold text-foreground mb-3">Recipients:</h4>
                   <div className="space-y-2 max-h-[400px] overflow-y-auto rounded-lg border border-gray-200 p-3 bg-gray-50">
-                    {incompleteNominations.map((nom, idx) => (
-                      <div key={idx} className="rounded-lg bg-white p-3 border border-gray-100">
-                        <p className="text-sm font-medium text-foreground">{nom.nominatorName}</p>
-                        <p className="text-xs text-muted-foreground">{nom.nominatorEmail}</p>
-                        <p className="mt-1.5 text-xs text-muted-foreground">
-                          <span className="font-medium">Nominee:</span> {nom.nomineeName} • <span className="font-medium">Category:</span> {nom.categoryName}
-                        </p>
-                        <div className="mt-2 text-xs space-y-1">
-                          <p className="font-medium text-amber-700">Missing documents:</p>
-                          <ul className="list-disc list-inside text-amber-600 space-y-0.5">
-                            {nom.incompleteItems.map((item, itemIdx) => (
-                              <li key={itemIdx} className="text-[11px]">{item}</li>
-                            ))}
-                          </ul>
+                    {incompleteNominations.map((nom) => {
+                      const emailResult = nomineeEmailResults[nom.id];
+                      return (
+                        <div key={nom.id} className="rounded-lg bg-white p-3 border border-gray-100">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-foreground">{nom.nominatorName}</p>
+                              <p className="text-xs text-muted-foreground">{nom.nominatorEmail}</p>
+                              <p className="mt-1.5 text-xs text-muted-foreground">
+                                <span className="font-medium">Nominee:</span> {nom.nomineeName} ({nom.nomineeEmail}) • <span className="font-medium">Category:</span> {nom.categoryName}
+                              </p>
+                              <div className="mt-2 text-xs space-y-1">
+                                <p className="font-medium text-amber-700">Missing documents:</p>
+                                <ul className="list-disc list-inside text-amber-600 space-y-0.5">
+                                  {nom.incompleteItems.map((item, itemIdx) => (
+                                    <li key={itemIdx} className="text-[11px]">{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                            <Button
+                              onClick={() => sendReminderToNominee(nom.id)}
+                              disabled={sendingToNomineeId === nom.id}
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700 text-white shrink-0"
+                            >
+                              {sendingToNomineeId === nom.id ? (
+                                <>
+                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                  Sending...
+                                </>
+                              ) : (
+                                <>
+                                  <Mail className="mr-1 h-3 w-3" />
+                                  Send to Nominee
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                          {emailResult && (
+                            <div className={`mt-2 px-2 py-1 rounded text-xs ${
+                              emailResult.success 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-red-100 text-red-700'
+                            }`}>
+                              {emailResult.message}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 

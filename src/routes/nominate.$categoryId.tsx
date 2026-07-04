@@ -1,6 +1,6 @@
 // /nominate/$categoryId — Dedicated nomination page, decoupled from homepage
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -157,6 +157,21 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
         .flatMap((slots) => Object.values(slots))
         .flat().length
     : 0;
+
+  // Handle hash-based navigation (e.g., #documents jumps directly to upload section)
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash === "#documents") {
+      setStep(3);
+      // Scroll to documents section after a brief delay for render
+      setTimeout(() => {
+        const docsSection = document.getElementById("documents-section");
+        if (docsSection) {
+          docsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 100);
+    }
+  }, []);
 
   // Group questions by section for display
   const sections = category.questions.reduce<Record<string, typeof category.questions>>(
@@ -430,7 +445,7 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
 
         {/* Document validation status on step 3 */}
         {step === 3 && (
-          <>
+          <div id="documents-section">
             {!areAllDocumentsComplete() && (
               <motion.div
                 initial={{ opacity: 0, y: -8 }}
@@ -470,7 +485,7 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
                 </p>
               </motion.div>
             )}
-          </>
+          </div>
         )}
 
         {error && (
