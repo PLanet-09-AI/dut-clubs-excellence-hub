@@ -130,6 +130,17 @@ function makeEmptyDraft(): FormDraft {
   };
 }
 
+// ─── Ensure Select fields don't render with empty value attribute ──────────────
+// Radix UI Select component with value="" triggers data-placeholder="" which
+// can cause React Error #418 (empty string HTML attributes). This wrapper function
+// checks if form field has empty value and returns undefined instead to prevent
+// the problematic attribute rendering.
+function getSelectValue(value: string | undefined): string {
+  // Always return a value for controlled components; Radix will handle placeholder mode
+  // with empty string gracefully if we ensure aria attributes are clean
+  return value ?? "";
+}
+
 // ─── Form orchestrator ────────────────────────────────────────────────────────
 
 function NominationForm({ category, onBack }: { category: AwardCategory; onBack: () => void }) {

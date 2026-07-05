@@ -106,11 +106,17 @@ const FormControl = React.forwardRef<
 >(({ ...props }, ref) => {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField();
 
+  // Build aria-describedby only with non-empty IDs to avoid empty string attributes
+  const ariaDescribedByParts: string[] = [];
+  if (formDescriptionId) ariaDescribedByParts.push(formDescriptionId);
+  if (error && formMessageId) ariaDescribedByParts.push(formMessageId);
+  const ariaDescribedBy = ariaDescribedByParts.length > 0 ? ariaDescribedByParts.join(' ') : undefined;
+
   return (
     <Slot
       ref={ref}
       id={formItemId}
-      aria-describedby={!error ? `${formDescriptionId}` : `${formDescriptionId} ${formMessageId}`}
+      aria-describedby={ariaDescribedBy}
       aria-invalid={!!error}
       {...props}
     />
