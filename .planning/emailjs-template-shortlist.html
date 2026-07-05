@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Inter', system-ui, sans-serif; font-size: 15px; line-height: 1.6; background-color: #f5f5f5">
+    <div style="max-width: 600px; margin: 0 auto; padding: 24px">
+        
+        <!-- Header with theme colors -->
+        <div style="background: linear-gradient(135deg, #d4a574 0%, #dab68f 100%); padding: 32px 24px; border-radius: 12px; text-align: center; margin-bottom: 24px">
+            <h1 style="margin: 0; color: #1a2b4a; font-family: 'Playfair Display', Georgia, serif; font-size: 28px; letter-spacing: -0.02em">
+                🎉 Congratulations!
+            </h1>
+            <p style="margin: 8px 0 0 0; color: #2a3f5f; font-size: 14px">DUT SALEA 2026 Excellence Awards</p>
+        </div>
+
+        <!-- Main content -->
+        <div style="background: white; padding: 32px 24px; border-radius: 8px; border: 1px solid #e8e8e8">
+            
+            <!-- Greeting -->
+            <p style="margin: 0 0 16px 0; color: #1a2b4a; font-size: 16px">
+                Hello <strong>{{nominee_name}}</strong>,
+            </p>
+
+            <!-- Main message -->
+            <p style="margin: 0 0 20px 0; color: #3a4a6a">
+                Excellent news! <strong>{{nominator_name}}</strong> nominated you for the <strong>{{category_name}}</strong> award, and your nomination has been <strong style="color: #d4a574;">SHORTLISTED</strong> for the awards ceremony! 🏆
+            </p>
+
+            <p style="margin: 0 0 20px 0; color: #3a4a6a">
+                Your nomination has advanced to the next round and will be reviewed by our judging panel. This is a significant achievement, and you should be proud of your accomplishments.
+            </p>
+
+            <!-- Shortlist highlight -->
+            <div style="background: linear-gradient(135deg, #fff8f1 0%, #fff4e6 100%); border-left: 4px solid #d4a574; padding: 16px; margin: 20px 0; border-radius: 4px">
+                <p style="margin: 0 0 12px 0; color: #1a2b4a; font-weight: 600; font-size: 14px">
+                    ✨ Nomination Status
+                </p>
+                <p style="margin: 0; color: #3a4a6a; font-size: 14px">
+                    Your nomination for <strong>{{category_name}}</strong> has been shortlisted and is now under review by the awards committee.
+                </p>
+            </div>
+
+            <!-- What's next -->
+            <h3 style="margin: 24px 0 12px 0; color: #1a2b4a; font-size: 16px;">What's Next?</h3>
+            <p style="margin: 0 0 12px 0; color: #3a4a6a">
+                The judging panel will review all shortlisted nominations and announce the final winners at the awards ceremony. You will be notified of the outcome once judging is complete.
+            </p>
+
+            <!-- Call to action -->
+            <div style="text-align: center; margin: 28px 0">
+                <a 
+                    href="{{submission_url}}"
+                    style="
+                        display: inline-block;
+                        background: linear-gradient(135deg, #d4a574 0%, #dab68f 100%);
+                        color: #362222;
+                        text-decoration: none;
+                        padding: 14px 32px;
+                        border-radius: 6px;
+                        font-weight: 600;
+                        font-size: 16px;
+                        border: none;
+                        box-shadow: 0 4px 12px rgba(212, 165, 116, 0.3);
+                    "
+                >
+                    View Award Details
+                </a>
+            </div>
+
+            <!-- Recognition message -->
+            <div style="background: #f0f4f8; padding: 16px; border-radius: 6px; margin: 24px 0">
+                <p style="margin: 0; color: #3a4a6a; font-size: 14px">
+                    <strong>Thank you</strong> for your outstanding contribution to the DUT community and beyond. Your dedication and excellence do not go unnoticed.
+                </p>
+            </div>
+
+            <!-- Deadline/Timeline -->
+            <p style="margin: 20px 0 0 0; padding-top: 20px; border-top: 1px solid #e8e8e8; color: #7a8aaa; font-size: 13px">
+                📅 Award ceremony details will be shared separately. Please watch your email for further updates.
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; padding-top: 24px; color: #7a8aaa; font-size: 12px">
+            <p style="margin: 0">
+                This is an automated notification from the DUT Excellence Awards system.<br>
+                © {{current_year}} DUT SALEA 2026 Excellence Awards. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -203,6 +203,20 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
 
   function validateDocuments() {
     const validation = validateDocumentsForCategory(category.id, uploads);
+    // Debug logging when validation fails
+    if (!validation.isValid) {
+      console.log('📋 [Form] Validation FAILED. Current state:', {
+        categoryId: category.id,
+        uploadKeys: Object.keys(uploads),
+        uploadsStructure: uploads,
+        questions: category.questions.map(q => ({
+          id: q.id,
+          evidence: q.evidence,
+          hasUploads: uploads[q.id] ? Object.keys(uploads[q.id]).length > 0 : false,
+        })),
+        validation,
+      });
+    }
     return validation;
   }
 
@@ -254,12 +268,48 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
+
+    // Check payload size (Firestore has 1MB limit per document)
+    const payload = {
+      categoryId: category.id,
+      categoryName: category.name,
+      nomineeName: nominee.name.trim(),
+      nomineeEmail: nominee.email.trim(),
+      studentNumber: nominee.studentNumber.trim(),
+      faculty: nominee.faculty,
+      yearOfStudy: nominee.year,
+      nominatorName: nominator.name.trim(),
+      nominatorEmail: nominator.email.trim(),
+      nominatorRelationship: nominator.relationship,
+      isSelfNomination,
+      answers,
+      uploads,
+      status: "pending",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    
+    const payloadStr = JSON.stringify(payload);
+    const payloadBytes = new Blob([payloadStr]).size;
+    const payloadMB = (payloadBytes / (1024 * 1024)).toFixed(2);
+    
+    console.log('📊 [Submit] Payload size:', {
+      bytes: payloadBytes,
+      megabytes: payloadMB,
+      limit: '1.0 MB',
+      exceeds: payloadBytes > 1024 * 1024,
+    });
+    
+    if (payloadBytes > 1024 * 1024) {
+      setError(`Submission too large (${payloadMB} MB). The submission exceeds the 1 MB limit. Try uploading fewer or smaller files.`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     
     setLoading(true);
     try {
-      await addDoc(collection(db, "nominations"), {
+      console.log('📤 [Submit] Preparing submission:', {
         categoryId: category.id,
-        categoryName: category.name,
         nomineeName: nominee.name.trim(),
         nomineeEmail: nominee.email.trim(),
         studentNumber: nominee.studentNumber.trim(),
@@ -269,17 +319,52 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
         nominatorEmail: nominator.email.trim(),
         nominatorRelationship: nominator.relationship,
         isSelfNomination,
-        answers,
-        uploads,
-        status: "pending",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        answersCount: Object.keys(answers).length,
+        questionsAnswered: Object.keys(answers),
+        uploadsStructure: Object.keys(uploads),
+        uploadTotals: Object.fromEntries(
+          Object.entries(uploads).map(([qId, slots]) => [
+            qId,
+            Object.fromEntries(
+              Object.entries(slots).map(([slotKey, files]: any) => [slotKey, Array.isArray(files) ? files.length : 0])
+            ),
+          ])
+        ),
       });
+
+      const docRef = await addDoc(collection(db, "nominations"), payload);
+
+      console.log('✅ [Submit] SUCCESS! Document created:', {
+        docId: docRef.id,
+        timestamp: new Date().toISOString(),
+      });
+
       clearDraft(); // wipe the saved draft on success
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch {
-      setError("Submission failed. Please check your connection and try again.");
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      console.error('❌ [Submit] FAILED!', {
+        error: errorMsg,
+        errorStack,
+        errorType: error?.constructor?.name,
+        errorDetails: error,
+        nomineeEmail: nominee.email.trim(),
+        categoryId: category.id,
+      });
+      
+      // Provide more specific error messages based on error type
+      if (errorMsg.includes('permission')) {
+        setError('Permission denied. Your nomination cannot be submitted. Contact support if this persists.');
+      } else if (errorMsg.includes('network') || errorMsg.includes('timeout')) {
+        setError('Network error. Please check your connection and try again.');
+      } else if (errorMsg.includes('quota')) {
+        setError('Database quota exceeded. Please try again later.');
+      } else {
+        setError(`Submission failed: ${errorMsg}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -513,7 +598,7 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
               onClick={submit} 
               disabled={loading || !areAllDocumentsComplete()} 
               className="bg-gold text-primary-foreground min-w-[180px]"
-              title={!areAllDocumentsComplete() ? "Please upload all required documents before submitting" : ""}
+              title={!areAllDocumentsComplete() ? "Please upload all required documents before submitting" : undefined}
             >
               {loading ? (
                 <>

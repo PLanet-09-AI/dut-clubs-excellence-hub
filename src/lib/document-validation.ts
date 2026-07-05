@@ -61,7 +61,7 @@ export function getDocumentRequirements(categoryId: string): DocumentRequirement
  * Check if all required documents have been uploaded
  * Handles both flat uploads (from form) and nested uploads (from Firestore)
  * 
- * When called from nomination form: uploads is flat Record<slotKey, UploadedFile[]>
+ * When called from nomination form: uploads is nested Record<questionId, Record<slotKey, UploadedFile[]>>
  * When called from admin: uploads is nested Record<questionId, Record<slotKey, UploadedFile[]>>
  * 
  * Returns validation result with details about missing documents
@@ -75,11 +75,29 @@ export function validateDocumentsForCategory(
   let uploadedCount = 0;
   let requiredCount = 0;
 
+  // Debug: Log what we received
+  if (typeof window !== 'undefined') {
+    console.log('📋 [Validation] Input uploads structure:', {
+      uploadKeys: Object.keys(uploads),
+      uploadStructure: uploads,
+      requirementCount: requirements.length,
+    });
+  }
+
   for (const req of requirements) {
     // Try to detect if uploads is nested (Firestore) or flat (form)
-    // Nested: uploads[questionId] is an object with slotKey properties
-    // Flat: uploads has slotKey properties directly (e0, e1, etc.)
+    // Both form and admin now send: uploads[questionId] → Record<slotKey, UploadedFile[]>
     const questionUploads = uploads[req.questionId];
+    
+    if (typeof window !== 'undefined') {
+      console.log(`📋 [Validation] Question "${req.questionId}":`, {
+        questionExists: !!questionUploads,
+        questionUploadKeys: questionUploads ? Object.keys(questionUploads) : [],
+        evidenceLabelCount: req.evidenceLabels.length,
+        evidenceLabels: req.evidenceLabels,
+      });
+    }
+
     let isNested = false;
     let flatUploadsBySlot: Record<string, unknown[]> = {};
 
@@ -89,6 +107,15 @@ export function validateDocumentsForCategory(
       if (keys.some(k => k.startsWith('e') && /^\d+$/.test(k.substring(1)))) {
         isNested = true;
         flatUploadsBySlot = questionUploads as Record<string, unknown[]>;
+        
+        if (typeof window !== 'undefined') {
+          console.log(`  ✓ Detected nested structure for "${req.questionId}":`, {
+            slotKeys: Object.keys(flatUploadsBySlot),
+            slotCounts: Object.fromEntries(
+              Object.entries(flatUploadsBySlot).map(([k, v]) => [k, Array.isArray(v) ? v.length : 'not-array'])
+            ),
+          });
+        }
       }
     }
 
@@ -102,11 +129,23 @@ export function validateDocumentsForCategory(
           flatUploadsBySlot[slotKey] = slotFiles as unknown[];
         }
       });
+      
+      if (typeof window !== 'undefined' && Object.keys(flatUploadsBySlot).length > 0) {
+        console.log(`  ⚠️ Using flat structure for "${req.questionId}":`, {
+          slotKeys: Object.keys(flatUploadsBySlot),
+        });
+      }
     }
 
     // Now validate the flattened slots
     if (!flatUploadsBySlot || Object.keys(flatUploadsBySlot).length === 0) {
       // All evidence slots are missing
+      if (typeof window !== 'undefined') {
+        console.log(`  ✗ NO UPLOADS for "${req.questionId}":`, {
+          isEmpty: !flatUploadsBySlot,
+          keyCount: flatUploadsBySlot ? Object.keys(flatUploadsBySlot).length : 0,
+        });
+      }
       req.evidenceLabels.forEach((label) => {
         missingDocuments.push(`${label} (for: "${req.questionPrompt.substring(0, 50)}...")`);
       });
@@ -119,13 +158,35 @@ export function validateDocumentsForCategory(
         
         requiredCount++;
         
-        if (slotFiles && Array.isArray(slotFiles) && slotFiles.length > 0) {
+        const hasFiles = slotFiles && Array.isArray(slotFiles) && slotFiles.length > 0;
+        
+        if (typeof window !== 'undefined') {
+          console.log(`  Slot "${slotKey}" for "${label}":`, {
+            exists: !!slotFiles,
+            isArray: Array.isArray(slotFiles),
+            fileCount: hasFiles ? slotFiles.length : 0,
+            fileNames: hasFiles ? slotFiles.map((f: any) => f.name || f) : [],
+            hasFiles,
+          });
+        }
+        
+        if (hasFiles) {
           uploadedCount++;
         } else {
           missingDocuments.push(`${label} (for: "${req.questionPrompt.substring(0, 50)}...")`);
         }
       });
     }
+  }
+
+  if (typeof window !== 'undefined') {
+    console.log('📊 [Validation] Summary:', {
+      isValid: missingDocuments.length === 0,
+      uploadedCount,
+      requiredCount,
+      missingCount: missingDocuments.length,
+      missingDocuments,
+    });
   }
 
   return {

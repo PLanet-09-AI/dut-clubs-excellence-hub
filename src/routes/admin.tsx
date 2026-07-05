@@ -658,6 +658,8 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
   const [sendingToNomineeId, setSendingToNomineeId] = useState<string | null>(null);
   const [nomineeEmailResults, setNomineeEmailResults] = useState<{ [key: string]: { success: boolean; message: string } }>({});
   const [showAdminMenu, setShowAdminMenu] = useState(false);
+  const [sendingShortlistEmails, setSendingShortlistEmails] = useState(false);
+  const [shortlistEmailResults, setShortlistEmailResults] = useState<{ email: string; success: boolean; error?: string }[]>([]);
   const [showVideoPreview, setShowVideoPreview] = useState<{ url: string; name: string } | null>(null);
 
   // All categories = static + admin-added (from Firestore)
@@ -1191,6 +1193,71 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     }
   }
 
+  async function sendShortlistEmails() {
+    const shortlistedNoms = nominations.filter(n => n.status === "shortlisted");
+    
+    if (shortlistedNoms.length === 0) {
+      alert("No shortlisted nominations to email.");
+      return;
+    }
+
+    if (!confirm(`Send shortlist notification emails to ${shortlistedNoms.length} shortlisted nominees?`)) {
+      return;
+    }
+
+    setSendingShortlistEmails(true);
+    setShortlistEmailResults([]);
+    
+    try {
+      const results: { email: string; success: boolean; error?: string }[] = [];
+
+      for (const nom of shortlistedNoms) {
+        try {
+          const response = await fetch('/.netlify/functions/send-shortlist-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              nomineeName: nom.nomineeName,
+              nomineeEmail: nom.nomineeEmail,
+              nominatorName: nom.nominatorName || 'A nominator',
+              categoryName: nom.categoryName,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok && result.success) {
+            results.push({ email: nom.nomineeEmail, success: true });
+          } else {
+            results.push({ 
+              email: nom.nomineeEmail, 
+              success: false, 
+              error: result.error || 'Failed to send' 
+            });
+          }
+        } catch (err) {
+          results.push({ 
+            email: nom.nomineeEmail, 
+            success: false, 
+            error: err instanceof Error ? err.message : 'Network error' 
+          });
+        }
+      }
+
+      setShortlistEmailResults(results);
+      const successCount = results.filter(r => r.success).length;
+      alert(`Shortlist emails sent: ${successCount}/${results.length} successful`);
+      
+    } catch (err) {
+      console.error("Error sending shortlist emails:", err);
+      alert("Failed to send shortlist emails");
+    } finally {
+      setSendingShortlistEmails(false);
+    }
+  }
+
   function exportCsv() {
     const rows = nominations.filter((n) => n.status === "shortlisted");
     if (rows.length === 0) return;
@@ -1383,6 +1450,21 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                     >
                       <Download className="h-4 w-4 flex-shrink-0 text-primary" />
                       <span className="flex-1 text-left">Export Shortlisted</span>
+                      <Badge variant="secondary" className="ml-auto text-xs">
+                        {stats.shortlisted}
+                      </Badge>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        sendShortlistEmails();
+                        setShowAdminMenu(false);
+                      }}
+                      disabled={stats.shortlisted === 0 || sendingShortlistEmails}
+                      className="w-full flex items-center justify-start gap-3 rounded-lg px-4 py-2.5 text-sm transition hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Mail className="h-4 w-4 flex-shrink-0 text-green-600" />
+                      <span className="flex-1 text-left">{sendingShortlistEmails ? "Sending Emails…" : "Email Shortlisted"}</span>
                       <Badge variant="secondary" className="ml-auto text-xs">
                         {stats.shortlisted}
                       </Badge>
