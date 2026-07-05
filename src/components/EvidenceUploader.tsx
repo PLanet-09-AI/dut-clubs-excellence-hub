@@ -134,7 +134,7 @@ function SharePointPreview({ url, name, onClose }: { url: string; name: string; 
         </div>
         <iframe
           src={embedUrl}
-          title={name}
+          title={name || "SharePoint Document Preview"}
           className="flex-1 w-full border-0"
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
         />
@@ -173,7 +173,7 @@ function VideoPreview({ url, name, onClose }: { url: string; name: string; onClo
           controls 
           autoPlay 
           className="w-full h-auto max-h-[60vh] bg-black"
-          title={name}
+          title={name || "Video Preview"}
         />
       </div>
     </div>
