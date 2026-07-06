@@ -1489,7 +1489,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                         resetNominations();
                         setShowAdminMenu(false);
                       }}
-                      disabled={resettingNominations || nominations.length === 0}
+                      disabled={true}
                       className="w-full flex items-center justify-start gap-3 rounded-lg px-4 py-2.5 text-sm transition hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed text-red-700"
                     >
                       <Trash2 className="h-4 w-4 flex-shrink-0" />
@@ -3048,6 +3048,7 @@ function NominationDetail({
   const [runtimePreviewPdfUrls, setRuntimePreviewPdfUrls] = useState<Record<string, string>>({});
   const [runtimeConvertingPath, setRuntimeConvertingPath] = useState<string | null>(null);
   const [runtimeConversionError, setRuntimeConversionError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     if (previewableFiles.length === 0) {
@@ -3185,6 +3186,7 @@ function NominationDetail({
   }, [activePreview, activePreviewMeta?.kind, runtimePreviewPdfUrls]);
 
   function openPreview(path: string) {
+    setPreviewLoading(true);
     setPreviewPath(path);
     setPreviewPage(1);
     setPreviewZoom(110);
@@ -3202,6 +3204,7 @@ function NominationDetail({
     if (activePreviewIndex < 0) return;
     const next = activePreviewIndex + offset;
     if (next < 0 || next >= previewableFiles.length) return;
+    setPreviewLoading(true);
     setPreviewPath(previewableFiles[next].file.path);
     setPreviewPage(1);
     setPreviewZoom(110);
@@ -3364,7 +3367,7 @@ function NominationDetail({
             </span>
           )}
         </div>
-        <div className="min-h-0 flex-1 px-3 pb-3">
+        <div className="min-h-0 flex-1 px-3 pb-3 relative">
           {activePreview ? (
             runtimeConvertingPath === activePreview.path ? (
               <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
@@ -3373,6 +3376,15 @@ function NominationDetail({
                   <p className="text-xs text-muted-foreground">
                     Preparing a PDF preview for this Office file. This can take a few seconds.
                   </p>
+                </div>
+              </div>
+            ) : previewLoading && runtimeConvertingPath !== activePreview.path ? (
+              <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
+                <div className="max-w-sm space-y-2">
+                  <div className="flex justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">Loading document…</p>
                 </div>
               </div>
             ) : activePreviewMeta?.kind === "office" && !activePdfUrl ? (
@@ -3425,6 +3437,8 @@ function NominationDetail({
                   src={activePreview.url}
                   alt={activePreview.name}
                   className="max-h-full max-w-full rounded object-contain"
+                  onLoad={() => setPreviewLoading(false)}
+                  onError={() => setPreviewLoading(false)}
                 />
               </div>
             ) : resolvedKind === "pdf" && pwaViewer?.kind === "blob" ? (
@@ -3434,6 +3448,7 @@ function NominationDetail({
                 data={pwaViewer.src}
                 type="application/pdf"
                 className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                onLoad={() => setPreviewLoading(false)}
               >
                 <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
                   <div className="space-y-3">
@@ -3454,6 +3469,7 @@ function NominationDetail({
                 src={pwaViewer.src}
                 title={`Document preview for ${activePreview.name}`}
                 className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                onLoad={() => setPreviewLoading(false)}
               />
             ) : (
               <iframe
@@ -3461,7 +3477,9 @@ function NominationDetail({
                 src={activePreviewUrl}
                 title={`Document preview for ${activePreview.name}`}
                 className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                onLoad={() => setPreviewLoading(false)}
                 onError={() => {
+                  setPreviewLoading(false);
                   if (resolvedKind === "office") {
                     setOfficePreviewError(true);
                   }

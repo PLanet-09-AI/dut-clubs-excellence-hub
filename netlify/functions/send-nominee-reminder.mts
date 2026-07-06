@@ -105,13 +105,25 @@ ${incompleteItems.map((item: string) => `  <li style="margin-bottom: 8px; color:
         }),
       };
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      const fullError = error instanceof Error ? error : new Error(String(error));
+      let errorMsg = 'Unknown error';
+      let errorStack = '';
+      let errorObj: Record<string, any> = {};
+
+      if (error instanceof Error) {
+        errorMsg = error.message;
+        errorStack = error.stack || '';
+      } else if (typeof error === 'object' && error !== null) {
+        errorObj = error as Record<string, any>;
+        errorMsg = errorObj.message || errorObj.error || errorObj.toString?.() || 'Unknown error';
+        errorStack = errorObj.stack || '';
+      } else if (typeof error === 'string') {
+        errorMsg = error;
+      }
       
       console.error(`✗ Failed to send email to ${nomineeEmail}:`, {
         error: errorMsg,
-        errorStack: fullError.stack,
-        errorDetails: String(error),
+        errorStack,
+        errorObject: errorObj,
         nomineeEmail,
         categoryId,
         serviceId: EMAILJS_SERVICE_ID,
@@ -129,7 +141,8 @@ ${incompleteItems.map((item: string) => `  <li style="margin-bottom: 8px; color:
             hasTemplateId: !!EMAILJS_TEMPLATE_ID,
             hasPublicKey: !!EMAILJS_PUBLIC_KEY,
             hasPrivateKey: !!EMAILJS_PRIVATE_KEY,
-            errorStack: fullError.stack,
+            errorStack,
+            errorObject: errorObj,
           },
         }),
       };
