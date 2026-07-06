@@ -265,6 +265,27 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  /**
+   * Recursively remove undefined values from an object.
+   * Firestore doesn't support undefined values, so we need to clean them before saving.
+   */
+  function cleanPayload<T extends Record<string, any>>(obj: T): T {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj !== 'object') return obj;
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => cleanPayload(item)) as any;
+    }
+    
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = typeof value === 'object' ? cleanPayload(value) : value;
+      }
+    }
+    return cleaned;
+  }
+
   async function submit() {
     setError("");
     if (!validateStep3()) {
@@ -300,7 +321,10 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
       updatedAt: serverTimestamp(),
     };
     
-    const payloadStr = JSON.stringify(payload);
+    // Clean payload of undefined values before saving to Firestore
+    const cleanedPayload = cleanPayload(payload);
+    
+    const payloadStr = JSON.stringify(cleanedPayload);
     const payloadBytes = new Blob([payloadStr]).size;
     const payloadMB = (payloadBytes / (1024 * 1024)).toFixed(2);
     
@@ -343,7 +367,7 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
         ),
       });
 
-      const docRef = await addDoc(collection(db, "nominations"), payload);
+      const docRef = await addDoc(collection(db, "nominations"), cleanedPayload);
 
       console.log('✅ [Submit] SUCCESS! Document created:', {
         docId: docRef.id,
