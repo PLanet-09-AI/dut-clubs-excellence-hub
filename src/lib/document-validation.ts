@@ -61,7 +61,13 @@ export function getDocumentRequirements(categoryId: string): DocumentRequirement
  * Check if all required documents have been uploaded
  * Handles both flat uploads (from form) and nested uploads (from Firestore)
  * 
- * When called from nomination form: uploads is nested Record<questionId, Record<slotKey, UploadedFile[]>>
+ * VALIDATION STRATEGY:
+ * - For each question with evidence requirements, check if AT LEAST ONE document is provided
+ * - Both file uploads and SharePoint/OneDrive links count as valid evidence
+ * - This allows flexibility: users can upload PDFs, links, or any combination
+ * - Missing: if a question has no documents of any kind
+ * 
+ * When called from nomination form: uploads is Record<questionId, Record<slotKey, UploadedFile[]>>
  * When called from admin: uploads is nested Record<questionId, Record<slotKey, UploadedFile[]>>
  * 
  * Returns validation result with details about missing documents
@@ -73,7 +79,7 @@ export function validateDocumentsForCategory(
   const requirements = getDocumentRequirements(categoryId);
   const missingDocuments: string[] = [];
   let uploadedCount = 0;
-  let requiredCount = 0;
+  let requiredCount = requirements.length;
 
   // Debug: Log what we received
   if (typeof window !== 'undefined') {
@@ -137,45 +143,38 @@ export function validateDocumentsForCategory(
       }
     }
 
-    // Now validate the flattened slots
-    if (!flatUploadsBySlot || Object.keys(flatUploadsBySlot).length === 0) {
-      // All evidence slots are missing
-      if (typeof window !== 'undefined') {
-        console.log(`  ✗ NO UPLOADS for "${req.questionId}":`, {
-          isEmpty: !flatUploadsBySlot,
-          keyCount: flatUploadsBySlot ? Object.keys(flatUploadsBySlot).length : 0,
-        });
+    // Check if ANY evidence has been uploaded for this question
+    // This counts both PDFs/files AND SharePoint/OneDrive links
+    let hasAnyEvidence = false;
+    
+    if (flatUploadsBySlot && Object.keys(flatUploadsBySlot).length > 0) {
+      // Check if any slot has files (regardless of type: file or sharepoint)
+      for (const slotFiles of Object.values(flatUploadsBySlot)) {
+        if (Array.isArray(slotFiles) && slotFiles.length > 0) {
+          hasAnyEvidence = true;
+          break;
+        }
       }
-      req.evidenceLabels.forEach((label) => {
-        missingDocuments.push(`${label} (for: "${req.questionPrompt.substring(0, 50)}...")`);
+    }
+
+    if (typeof window !== 'undefined') {
+      console.log(`  📄 Question "${req.questionId}" evidence check:`, {
+        hasAnyEvidence,
+        slotsWithFiles: Object.entries(flatUploadsBySlot || {}).map(([slot, files]) => ({
+          slot,
+          count: Array.isArray(files) ? files.length : 0,
+          types: Array.isArray(files) ? files.map((f: any) => f.type || 'file') : [],
+        })),
       });
-      requiredCount += req.evidenceLabels.length;
+    }
+
+    // For this question, we need at least ONE evidence slot to have documents
+    // Users can upload PDFs, links, or any combination
+    if (hasAnyEvidence) {
+      uploadedCount++;
     } else {
-      // Check each evidence slot
-      req.evidenceLabels.forEach((label, index) => {
-        const slotKey = `e${index}`;
-        const slotFiles = flatUploadsBySlot[slotKey];
-        
-        requiredCount++;
-        
-        const hasFiles = slotFiles && Array.isArray(slotFiles) && slotFiles.length > 0;
-        
-        if (typeof window !== 'undefined') {
-          console.log(`  Slot "${slotKey}" for "${label}":`, {
-            exists: !!slotFiles,
-            isArray: Array.isArray(slotFiles),
-            fileCount: hasFiles ? slotFiles.length : 0,
-            fileNames: hasFiles ? slotFiles.map((f: any) => f.name || f) : [],
-            hasFiles,
-          });
-        }
-        
-        if (hasFiles) {
-          uploadedCount++;
-        } else {
-          missingDocuments.push(`${label} (for: "${req.questionPrompt.substring(0, 50)}...")`);
-        }
-      });
+      // Mark entire question as missing
+      missingDocuments.push(`${req.questionPrompt.substring(0, 50)}...`);
     }
   }
 
