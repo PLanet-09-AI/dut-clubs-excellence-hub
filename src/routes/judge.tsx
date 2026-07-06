@@ -888,25 +888,10 @@ function JudgeNominationDetail({
       ? "pdf"
       : activePreview?.kind ?? null;
 
-  const canEmbedOfficePreview = !!(
-    activePreview &&
-    activePreview.kind === "office" &&
-    !activePdfUrl &&
-    isOfficeEmbeddableUrl(activePreview.file.url)
-  );
-
-  const shouldEmbedOffice =
-    !!activePreview &&
-    activePreview.kind === "office" &&
-    !activePdfUrl &&
-    canEmbedOfficePreview &&
-    !officePreviewError;
   const activePreviewUrl = activePreview
     ? resolvedKind === "pdf"
       ? `${activePdfUrl ?? activePreview.file.url}#page=${previewPage}&zoom=${previewZoom}`
-      : shouldEmbedOffice
-        ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(activePreview.file.url)}`
-        : activePreview.file.url
+      : activePreview.file.url
     : "";
 
   useEffect(() => {
@@ -1142,7 +1127,7 @@ function JudgeNominationDetail({
                   </p>
                 </div>
               </div>
-            ) : activePreview.kind === "office" && !shouldEmbedOffice && !activePdfUrl ? (
+            ) : activePreview.kind === "office" && !activePdfUrl ? (
               <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
                 <div className="max-w-sm space-y-3">
                   <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>

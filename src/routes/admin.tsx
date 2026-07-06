@@ -3105,26 +3105,10 @@ function NominationDetail({
   const resolvedKind: PreviewKind | null =
     activePreviewMeta?.kind === "office" && activePdfUrl ? "pdf" : activePreviewMeta?.kind ?? null;
 
-  const canEmbedOfficePreview = !!(
-    activePreview &&
-    activePreviewMeta?.kind === "office" &&
-    !activePdfUrl &&
-    isOfficeEmbeddableUrl(activePreview.url)
-  );
-
-  const shouldEmbedOffice =
-    !!activePreview &&
-    activePreviewMeta?.kind === "office" &&
-    !activePdfUrl &&
-    canEmbedOfficePreview &&
-    !officePreviewError;
-
   const activePreviewUrl = activePreview
     ? resolvedKind === "pdf"
       ? `${activePdfUrl ?? activePreview.url}#page=${previewPage}&zoom=${previewZoom}`
-      : shouldEmbedOffice
-        ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(activePreview.url)}`
-        : activePreview.url
+      : activePreview.url
     : "";
 
   /**
@@ -3389,7 +3373,7 @@ function NominationDetail({
                   </p>
                 </div>
               </div>
-            ) : activePreviewMeta?.kind === "office" && !shouldEmbedOffice && !activePdfUrl ? (
+            ) : activePreviewMeta?.kind === "office" && !activePdfUrl ? (
               <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
                 <div className="max-w-sm space-y-3">
                   <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
@@ -3870,7 +3854,7 @@ function NominationDetail({
                     </p>
                   </div>
                 </div>
-              ) : activePreviewMeta?.kind === "office" && !shouldEmbedOffice && !activePdfUrl ? (
+              ) : activePreviewMeta?.kind === "office" && !activePdfUrl ? (
                 <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
                   <div className="max-w-sm space-y-3">
                     <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
