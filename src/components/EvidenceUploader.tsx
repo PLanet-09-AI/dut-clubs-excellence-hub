@@ -24,7 +24,7 @@ import {
   isOfficeFileName,
   stripExtension,
 } from "@/lib/office-to-pdf";
-import { Upload, X, FileText, AlertCircle, Paperclip, Link2, ExternalLink, Eye, Play } from "lucide-react";
+import { Upload, X, FileText, AlertCircle, Paperclip, Link2, ExternalLink, Eye, Play, File } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // ─── Exported types ───────────────────────────────────────────────────────────
@@ -103,6 +103,36 @@ export function isVideoFile(fileName: string): boolean {
   return fileName.toLowerCase().endsWith(".mp4") || fileName.toLowerCase().endsWith(".webm") || fileName.toLowerCase().endsWith(".mov");
 }
 
+// ─── PDF preview modal ────────────────────────────────────────────────────────
+
+function PdfPreview({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex flex-col w-full max-w-5xl h-[85vh] rounded-lg overflow-hidden border border-primary/20 bg-background shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-primary/10 bg-primary/5 shrink-0">
+          <File className="h-3.5 w-3.5 text-primary" />
+          <span className="flex-1 min-w-0 truncate text-xs font-medium">{name}</span>
+          <button type="button" onClick={onClose} className="rounded p-1 hover:bg-primary/10 text-muted-foreground hover:text-foreground transition">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <iframe
+          src={url}
+          title={name}
+          className="flex-1 w-full border-0"
+          sandbox="allow-scripts allow-same-origin"
+        />
+      </div>
+    </div>
+  );
+}
+
 // ─── SharePoint link preview modal ───────────────────────────────────────────
 
 function SharePointPreview({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
@@ -162,7 +192,7 @@ function VideoPreview({ url, name, onClose }: { url: string; name: string; onClo
           <Play className="h-4 w-4 text-primary" />
           <span className="flex-1 min-w-0 truncate text-sm font-medium">{name}</span>
           <a href={url} target="_blank" rel="noopener noreferrer" download className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0">
-            <ExternalLink className="h-3.5 w-3.5" /> Download
+            <ExternalLink className="h-3.5 w-3.5" /> Download| "pdf" 
           </a>
           <button type="button" onClick={onClose} className="ml-2 rounded p-1 hover:bg-primary/10 text-muted-foreground hover:text-foreground transition">
             <X className="h-4 w-4" />
@@ -305,6 +335,9 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
 
   return (
     <div className="rounded-lg border border-primary/15 bg-background/40">
+      {preview && preview.type === "pdf" && (
+        <PdfPreview url={preview.url} name={preview.name} onClose={() => setPreview(null)} />
+      )}
       {preview && preview.type === "sharepoint" && (
         <SharePointPreview url={preview.url} name={preview.name} onClose={() => setPreview(null)} />
       )}
@@ -397,6 +430,16 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
                 >
                   {file.name}
                 </a>
+                {file.previewPdfUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setPreview({ url: file.previewPdfUrl!, name: file.name, type: "pdf" })}
+                    className="shrink-0 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/10 transition"
+                    title="Preview document"
+                  >
+                    <Eye className="h-3 w-3" /> Preview
+                  </button>
+                )}
                 <span className="shrink-0 text-[10px] text-muted-foreground">
                   {formatFileSize(file.size)}
                 </span>
