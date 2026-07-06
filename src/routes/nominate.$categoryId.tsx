@@ -131,10 +131,9 @@ function makeEmptyDraft(): FormDraft {
 }
 
 // ─── Ensure Select fields don't render with empty value attribute ──────────────
-// Radix UI Select component with value="" triggers data-placeholder="" which
-// can cause React Error #418 (empty string HTML attributes). This wrapper function
-// checks if form field has empty value and returns undefined instead to prevent
-// the problematic attribute rendering.
+// React 19 strict validation rejects empty strings on certain HTML attributes.
+// When a Select value is "", Radix UI renders data-placeholder="" which is not allowed.
+// Solution: Pass undefined to Select value when empty string, not the empty string itself.
 function getSelectValue(value: string | undefined): string {
   // Always return a value for controlled components; Radix will handle placeholder mode
   // with empty string gracefully if we ensure aria attributes are clean
@@ -764,7 +763,7 @@ function StepNominee({
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Faculty *">
-          <Select value={nominee.faculty} onValueChange={(v) => set("faculty", v)}>
+          <Select value={nominee.faculty || undefined} onValueChange={(v) => set("faculty", v)}>
             <SelectTrigger>
               <SelectValue placeholder="Select faculty" />
             </SelectTrigger>
@@ -778,7 +777,7 @@ function StepNominee({
           </Select>
         </Field>
         <Field label="Year of Study *">
-          <Select value={nominee.year} onValueChange={(v) => set("year", v)}>
+          <Select value={nominee.year || undefined} onValueChange={(v) => set("year", v)}>
             <SelectTrigger>
               <SelectValue placeholder="Select year" />
             </SelectTrigger>
@@ -867,7 +866,7 @@ function StepNominator({
       </Field>
       <Field label="Your Relationship to the Nominee *">
         <Select
-          value={nominator.relationship}
+          value={nominator.relationship || undefined}
           onValueChange={(v) => set("relationship", v)}
           disabled={isSelfNomination}
         >
