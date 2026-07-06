@@ -3137,7 +3137,9 @@ function NominationDetail({
     const target = activePreview;
     const kind = activePreviewMeta?.kind;
 
-    if (!target || kind !== "office") {
+    // Skip conversion for SharePoint links — they should be opened directly
+    const isSharePointLink = target?.url?.includes("sharepoint.com");
+    if (!target || kind !== "office" || isSharePointLink) {
       setRuntimeConvertingPath(null);
       setRuntimeConversionError(null);
       return;
