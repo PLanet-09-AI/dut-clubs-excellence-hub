@@ -763,7 +763,7 @@ function StepNominee({
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Faculty *">
-          <Select value={nominee.faculty || undefined} onValueChange={(v) => set("faculty", v)}>
+          <Select value={nominee.faculty} onValueChange={(v) => set("faculty", v)}>
             <SelectTrigger>
               <SelectValue placeholder="Select faculty" />
             </SelectTrigger>
@@ -777,7 +777,7 @@ function StepNominee({
           </Select>
         </Field>
         <Field label="Year of Study *">
-          <Select value={nominee.year || undefined} onValueChange={(v) => set("year", v)}>
+          <Select value={nominee.year} onValueChange={(v) => set("year", v)}>
             <SelectTrigger>
               <SelectValue placeholder="Select year" />
             </SelectTrigger>
@@ -866,7 +866,7 @@ function StepNominator({
       </Field>
       <Field label="Your Relationship to the Nominee *">
         <Select
-          value={nominator.relationship || undefined}
+          value={nominator.relationship}
           onValueChange={(v) => set("relationship", v)}
           disabled={isSelfNomination}
         >
