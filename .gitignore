@@ -39,3 +39,7 @@ dist-ssr
 # Firebase service account credentials
 *firebase-adminsdk*.json
 *.serviceaccount.json
+
+# Test scripts with hardcoded credentials
+scripts/test-*.mjs
+scripts/verify-*.mjs
