@@ -3286,12 +3286,13 @@ function NominationDetail({
     };
   }, [activePreview, activePreviewMeta?.kind, runtimePreviewPdfUrls]);
 
-  // Clear loading spinner immediately for images and videos (no conversion needed)
+  // Clear loading spinner for images and videos immediately (no conversion needed)
   useEffect(() => {
     if (activePreviewMeta?.kind === "image" || activePreviewMeta?.kind === "video") {
+      // Videos and images load instantly without conversion
       setPreviewLoading(false);
     }
-  }, [activePreviewMeta?.kind]);
+  }, [activePreviewMeta?.kind, activePreview?.path]);
 
   function openPreview(path: string) {
     setPreviewLoading(true);
@@ -3486,7 +3487,7 @@ function NominationDetail({
                   </p>
                 </div>
               </div>
-            ) : previewLoading && runtimeConvertingPath !== activePreview.path ? (
+            ) : previewLoading && runtimeConvertingPath !== activePreview.path && activePreviewMeta?.kind !== "video" && activePreviewMeta?.kind !== "image" ? (
               <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
                 <div className="max-w-sm space-y-2">
                   <div className="flex justify-center">
