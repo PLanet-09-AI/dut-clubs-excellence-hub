@@ -657,14 +657,14 @@ function AdminPage() {
             </form>
           </div>
         ) : (
-          <Dashboard onLogout={logout} role={userRole ?? "admin"} />
+          <Dashboard onLogout={logout} role={userRole ?? "admin"} loggingOut={loggingOut} />
         )}
       </main>
     </div>
   );
 }
 
-function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "judge" }) {
+function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role: "admin" | "judge"; loggingOut: boolean }) {
   const canManage = role === "admin";
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("__all__");
