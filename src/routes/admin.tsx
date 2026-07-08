@@ -3286,9 +3286,9 @@ function NominationDetail({
     };
   }, [activePreview, activePreviewMeta?.kind, runtimePreviewPdfUrls]);
 
-  // Clear loading spinner immediately for images (no conversion needed)
+  // Clear loading spinner immediately for images and videos (no conversion needed)
   useEffect(() => {
-    if (activePreviewMeta?.kind === "image") {
+    if (activePreviewMeta?.kind === "image" || activePreviewMeta?.kind === "video") {
       setPreviewLoading(false);
     }
   }, [activePreviewMeta?.kind]);
@@ -3579,6 +3579,19 @@ function NominationDetail({
                 className="h-full w-full rounded-lg border border-primary/20 bg-white"
                 onLoad={() => setPreviewLoading(false)}
               />
+            ) : resolvedKind === "video" ? (
+              /* HTML5 video player */
+              <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-black">
+                <video
+                  key={activePreview.path}
+                  src={activePreview.url}
+                  controls
+                  className="max-h-full max-w-full"
+                  onCanPlay={() => setPreviewLoading(false)}
+                  onError={() => setPreviewLoading(false)}
+                  controlsList="nodownload"
+                />
+              </div>
             ) : (
               <iframe
                 key={activePreview.path}
