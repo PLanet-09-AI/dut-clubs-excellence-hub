@@ -3257,17 +3257,15 @@ function NominationDetail({
     };
   }, [activePreview, activePreviewMeta?.kind, runtimePreviewPdfUrls]);
 
-  function openPreview(path: string) {
-    const targetFile = previewableFiles.find(f => f.file.path === path);
-    const kind = targetFile?.kind;
-    
-    // Don't show loading spinner for images — they load immediately
-    if (kind !== 'image') {
-      setPreviewLoading(true);
-    } else {
+  // Clear loading spinner immediately for images (no conversion needed)
+  useEffect(() => {
+    if (activePreviewMeta?.kind === "image") {
       setPreviewLoading(false);
     }
-    
+  }, [activePreviewMeta?.kind]);
+
+  function openPreview(path: string) {
+    setPreviewLoading(true);
     setPreviewPath(path);
     setPreviewPage(1);
     setPreviewZoom(110);
