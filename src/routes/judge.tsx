@@ -226,6 +226,7 @@ function JudgePage() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -381,7 +382,18 @@ function JudgePage() {
             </form>
           </div>
         ) : (
-          <JudgeDashboard onLogout={() => firebaseSignOut()} />
+          <JudgeDashboard
+            onLogout={async () => {
+              setLoggingOut(true);
+              try {
+                await firebaseSignOut();
+                await new Promise((resolve) => setTimeout(resolve, 500));
+              } finally {
+                setLoggingOut(false);
+              }
+            }}
+            loggingOut={loggingOut}
+          />
         )}
       </main>
     </div>
@@ -534,7 +546,7 @@ function JudgeQuickGuide() {
   );
 }
 
-function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
+function JudgeDashboard({ onLogout, loggingOut }: { onLogout: () => void; loggingOut: boolean }) {
   const uid = auth.currentUser?.uid ?? "";
   const judgeEmail = auth.currentUser?.email ?? "";
 
@@ -703,9 +715,19 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
         <Button
           variant="outline"
           onClick={onLogout}
-          className="gap-2 border-primary/40 text-primary"
+          disabled={loggingOut}
+          className="gap-2 border-primary/40 text-primary disabled:opacity-70"
         >
-          <LogOut className="h-4 w-4" /> Sign out
+          {loggingOut ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Signing out...
+            </>
+          ) : (
+            <>
+              <LogOut className="h-4 w-4" /> Sign out
+            </>
+          )}
         </Button>
       </div>
 
