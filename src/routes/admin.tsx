@@ -349,6 +349,7 @@ function AdminPage() {
   const [resetSent, setResetSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -471,9 +472,16 @@ function AdminPage() {
   }
 
   async function logout() {
-    await firebaseSignOut();
-    setUsedTempPassword(false);
-    setPasswordChanged(false);
+    setLoggingOut(true);
+    try {
+      await firebaseSignOut();
+      // Add brief delay for animation effect
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setUsedTempPassword(false);
+      setPasswordChanged(false);
+    } finally {
+      setLoggingOut(false);
+    }
   }
 
   return (
@@ -1413,9 +1421,20 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
           <Button
             variant="outline"
             onClick={onLogout}
-            className="border-primary/40 bg-primary/5 text-primary sm:w-auto w-full justify-start sm:justify-center"
+            disabled={loggingOut}
+            className="border-primary/40 bg-primary/5 text-primary sm:w-auto w-full justify-start sm:justify-center disabled:opacity-70"
           >
-            <LogOut className="h-4 w-4" /> <span className="ml-2 sm:ml-2">Sign out</span>
+            {loggingOut ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="ml-2 sm:ml-2">Signing out...</span>
+              </>
+            ) : (
+              <>
+                <LogOut className="h-4 w-4" />
+                <span className="ml-2 sm:ml-2">Sign out</span>
+              </>
+            )}
           </Button>
         </div>
 
@@ -1610,6 +1629,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                   { key: "leaderboard" as const, label: "Leaderboard" },
                   { key: "accounts" as const, label: "Create Account" },
                   { key: "audit-logs" as const, label: "Audit Logs" },
+                  { key: "settings" as const, label: "Settings" },
                 ] : [])
               ]).find(item => item.key === activeSection)?.label || "Select section"}
             </span>
@@ -1630,6 +1650,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
                 { key: "leaderboard" as const, label: "Leaderboard" },
                 { key: "accounts" as const, label: "Create Account" },
                 { key: "audit-logs" as const, label: "Audit Logs" },
+                { key: "settings" as const, label: "Settings" },
               ] : [])
             ]).map((item) => (
               <button
