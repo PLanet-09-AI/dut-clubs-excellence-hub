@@ -20,6 +20,7 @@ import {
   User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { logPasswordReset } from "@/lib/audit-logging-extended";
 
 interface ForcePasswordChangeModalProps {
   user: User;
@@ -68,6 +69,11 @@ export function ForcePasswordChangeModal({
       setResetEmail(user.email || "");
       setResetLinkSent(true);
       setSuccess("Password reset email sent! Check your inbox.");
+      
+      // Determine user role and log the action
+      const idTokenResult = await user.getIdTokenResult();
+      const role = (idTokenResult.claims?.role as 'admin' | 'judge') || 'judge';
+      await logPasswordReset(role, 'email');
     } catch (err: any) {
       setError(err.message || "Failed to send reset email");
     } finally {
@@ -116,6 +122,12 @@ export function ForcePasswordChangeModal({
       // Update password
       await updatePassword(user, newPassword);
       setSuccess("Password changed successfully!");
+      
+      // Determine user role and log the action
+      const idTokenResult = await user.getIdTokenResult();
+      const role = (idTokenResult.claims?.role as 'admin' | 'judge') || 'judge';
+      await logPasswordReset(role, 'direct');
+      
       setTimeout(() => {
         onPasswordChanged();
       }, 1500);

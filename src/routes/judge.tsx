@@ -39,6 +39,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { signIn, signOut as firebaseSignOut, subscribeToAuthState } from "@/lib/auth-firebase";
+import { getAuditLogsByUser } from "@/lib/audit-logging-extended";
 import { ForcePasswordChangeModal } from "@/components/ForcePasswordChangeModal";
 import { User } from "firebase/auth";
 import {
@@ -546,6 +547,8 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
   const [commentInput, setCommentInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [realJudgingActive, setRealJudgingActive] = useState(false);
+  const [judgeActivityLogs, setJudgeActivityLogs] = useState<any[]>([]);
+  const [showActivity, setShowActivity] = useState(false);
 
   const scoringOpen = realJudgingActive;
 
@@ -599,6 +602,20 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
     });
     return () => unsub();
   }, []);
+
+  // Load judge activity logs (password resets)
+  useEffect(() => {
+    if (!judgeEmail) return;
+    const loadLogs = async () => {
+      try {
+        const logs = await getAuditLogsByUser(judgeEmail, 10);
+        setJudgeActivityLogs(logs.filter((log) => log.action === 'PASSWORD_RESET'));
+      } catch (error) {
+        console.error('Failed to load judge activity logs:', error);
+      }
+    };
+    loadLogs();
+  }, [judgeEmail]);
 
   const categories = useMemo(() => {
     const seen = new Map<string, string>();
@@ -702,6 +719,41 @@ function JudgeDashboard({ onLogout }: { onLogout: () => void }) {
 
       {/* Quick-start guide */}
       <JudgeQuickGuide />
+
+      {/* Judge Activity Section */}
+      {judgeActivityLogs.length > 0 && (
+        <div className="mt-6 rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <button
+            onClick={() => setShowActivity(!showActivity)}
+            className="flex w-full items-center justify-between text-sm font-semibold hover:text-foreground"
+          >
+            <span className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Judge Activity ({judgeActivityLogs.length})
+            </span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${showActivity ? 'rotate-180' : ''}`} />
+          </button>
+          {showActivity && (
+            <div className="mt-3 space-y-2">
+              {judgeActivityLogs.map((log, idx) => (
+                <div key={idx} className="rounded-md border border-primary/10 bg-background/50 p-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-foreground">{log.description}</span>
+                    {log.metadata?.method && (
+                      <Badge variant="outline" className="text-xs">
+                        {log.metadata.method === 'email' ? '📧 Email' : '⚙️ Direct'}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="mt-1 text-muted-foreground">
+                    {log.timestamp?.toDate?.().toLocaleDateString()} at {log.timestamp?.toDate?.().toLocaleTimeString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="mt-6 grid grid-cols-3 gap-3">

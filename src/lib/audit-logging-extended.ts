@@ -33,7 +33,8 @@ export type AdminModuleAction =
   | 'CHANGED_NOMINATION_STATUS'
   | 'SENT_REMINDER_EMAIL'
   | 'MANAGED_CATEGORIES'
-  | 'MANAGED_WINNERS';
+  | 'MANAGED_WINNERS'
+  | 'PASSWORD_RESET';
 
 export type JudgeModuleAction =
   | 'VIEWED_SHORTLISTED'
@@ -41,7 +42,8 @@ export type JudgeModuleAction =
   | 'SUBMITTED_SCORE'
   | 'VIEWED_OWN_SCORES'
   | 'VIEWED_LEADERBOARD'
-  | 'ACCESSED_JUDGE_GUIDE';
+  | 'ACCESSED_JUDGE_GUIDE'
+  | 'PASSWORD_RESET';
 
 export interface ExtendedAuditLog {
   id?: string;
@@ -217,5 +219,38 @@ export async function getRecentActivitySummary(limitCount: number = 50): Promise
   } catch (error) {
     console.error('[Audit] Failed to fetch recent activity:', error);
     return { adminActions: [], judgeActions: [] };
+  }
+}
+
+/**
+ * Log password reset event
+ */
+export async function logPasswordReset(
+  userRole: 'admin' | 'judge',
+  method: 'email' | 'direct',
+): Promise<string | null> {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      console.warn('[Audit] No authenticated user for password reset logging');
+      return null;
+    }
+
+    const methodDescription = method === 'email' ? 'Reset via Email Link' : 'Changed Directly in App';
+
+    return await logModuleInteraction({
+      action: 'PASSWORD_RESET',
+      userRole,
+      description: `Password reset using ${methodDescription} method`,
+      module: 'security',
+      metadata: {
+        method,
+        resetType: 'temporary_to_permanent',
+      },
+      status: 'success',
+    });
+  } catch (error) {
+    console.error('[Audit] Failed to log password reset:', error);
+    return null;
   }
 }

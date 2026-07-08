@@ -266,8 +266,9 @@ export function AdminSettings() {
         </div>
 
         <Tabs defaultValue="password" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="password">Change Password</TabsTrigger>
+            <TabsTrigger value="resets">Password Resets</TabsTrigger>
             <TabsTrigger value="admin">Admin Logs</TabsTrigger>
             <TabsTrigger value="judge">Judge Logs</TabsTrigger>
           </TabsList>
@@ -275,6 +276,44 @@ export function AdminSettings() {
           {/* Password Change Tab */}
           <TabsContent value="password" className="space-y-4">
             <ChangePassword />
+          </TabsContent>
+
+          {/* Password Reset History Tab */}
+          <TabsContent value="resets" className="space-y-3">
+            <div className="rounded-lg border border-primary/20 p-4 bg-primary/5">
+              <p className="text-sm text-foreground mb-3">
+                Password resets performed by admins and judges on this account. This helps track security changes.
+              </p>
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {adminLogs
+                    .filter((log) => log.action === 'PASSWORD_RESET')
+                    .length === 0 && judgeLogs.filter((log) => log.action === 'PASSWORD_RESET').length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-primary/20 py-8 text-center">
+                      <Shield className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
+                      <p className="text-sm text-muted-foreground">No password resets recorded</p>
+                    </div>
+                  ) : (
+                    <>
+                      {[...adminLogs, ...judgeLogs]
+                        .filter((log) => log.action === 'PASSWORD_RESET')
+                        .sort(
+                          (a, b) =>
+                            (b.timestamp?.toDate?.() || new Date()).getTime() -
+                            (a.timestamp?.toDate?.() || new Date()).getTime(),
+                        )
+                        .map((log) => (
+                          <AuditLogEntry key={log.id} log={log} />
+                        ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           {/* Admin Logs Tab */}
