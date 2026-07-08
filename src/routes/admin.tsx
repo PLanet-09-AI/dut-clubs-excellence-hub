@@ -734,57 +734,81 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
     const q = canManage
       ? query(collection(db, "nominations"), orderBy("createdAt", "desc"))
       : query(collection(db, "nominations"), where("status", "==", "shortlisted"));
-    const unsub = onSnapshot(q, (snap) => {
-      const docs = snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }) as Nomination)
-        .sort((a, b) => {
-          const aTime =
-            a.createdAt && typeof a.createdAt === "object" && a.createdAt.toDate
-              ? a.createdAt.toDate().getTime()
-              : 0;
-          const bTime =
-            b.createdAt && typeof b.createdAt === "object" && b.createdAt.toDate
-              ? b.createdAt.toDate().getTime()
-              : 0;
-          return bTime - aTime;
-        });
-      setNominations(docs);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const docs = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }) as Nomination)
+          .sort((a, b) => {
+            const aTime =
+              a.createdAt && typeof a.createdAt === "object" && a.createdAt.toDate
+                ? a.createdAt.toDate().getTime()
+                : 0;
+            const bTime =
+              b.createdAt && typeof b.createdAt === "object" && b.createdAt.toDate
+                ? b.createdAt.toDate().getTime()
+                : 0;
+            return bTime - aTime;
+          });
+        setNominations(docs);
+      },
+      (error) => {
+        console.error("[Firestore] Failed to load nominations:", error);
+      },
+    );
     return () => unsub();
   }, [canManage]);
 
   // Real-time Firestore listener — custom categories
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "admin_categories"), (snap) => {
-      setExtraCategories(
-        snap.docs.map(
-          (d) => ({ id: d.id, ...d.data() }) as { id: string; name: string; tagline: string },
-        ),
-      );
-    });
+    const unsub = onSnapshot(
+      collection(db, "admin_categories"),
+      (snap) => {
+        setExtraCategories(
+          snap.docs.map(
+            (d) => ({ id: d.id, ...d.data() }) as { id: string; name: string; tagline: string },
+          ),
+        );
+      },
+      (error) => {
+        console.error("[Firestore] Failed to load admin categories:", error);
+      },
+    );
     return () => unsub();
   }, []);
 
   // Real-time Firestore listener — all judge scores (admin supervision)
   useEffect(() => {
     const q = query(collection(db, "judge_scores"), orderBy("updatedAt", "desc"));
-    const unsub = onSnapshot(q, (snap) => {
-      setJudgeScores(
-        snap.docs.map((d) => ({ id: d.id, ...d.data() }) as (typeof judgeScores)[number]),
-      );
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setJudgeScores(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() }) as (typeof judgeScores)[number]),
+        );
+      },
+      (error) => {
+        console.error("[Firestore] Failed to load judge scores:", error);
+      },
+    );
     return () => unsub();
   }, []);
 
   // Real-time Firestore listener — admin settings (judging activation)
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "admin_settings", "judging"), (snap) => {
-      if (snap.exists()) {
-        setRealJudgingActive(snap.data()?.active ?? false);
-      } else {
-        setRealJudgingActive(false);
-      }
-    });
+    const unsub = onSnapshot(
+      doc(db, "admin_settings", "judging"),
+      (snap) => {
+        if (snap.exists()) {
+          setRealJudgingActive(snap.data()?.active ?? false);
+        } else {
+          setRealJudgingActive(false);
+        }
+      },
+      (error) => {
+        console.error("[Firestore] Failed to load admin settings:", error);
+      },
+    );
     return () => unsub();
   }, []);
 
