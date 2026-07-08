@@ -1,0 +1,66 @@
+{
+  "admins": [
+    {
+      "email": "ndumisobuthelezi028@gmail.com",
+      "displayName": "Test Admin - Ndumiso",
+      "role": "admin"
+    },
+    {
+      "email": "KeshanG@dut.ac.za",
+      "displayName": "Keshan Govender",
+      "role": "admin"
+    },
+    {
+      "email": "KholekaM@dut.ac.za",
+      "displayName": "Kholeka Sengiphiwe Mfeka",
+      "role": "admin"
+    },
+    {
+      "email": "MbaliM6@dut.ac.za",
+      "displayName": "Mbali Nontobeko Mncube",
+      "role": "admin"
+    },
+    {
+      "email": "NontuthukoG@dut.ac.za",
+      "displayName": "Nontuthuko Gwala",
+      "role": "admin"
+    }
+  ],
+  "judges": [
+    {
+      "email": "AbsolomM@dut.ac.za",
+      "displayName": "Absolom Manashe",
+      "role": "judge"
+    },
+    {
+      "email": "bonganiy@dut.ac.za",
+      "displayName": "Bongani Paul Yengwa",
+      "role": "judge"
+    },
+    {
+      "email": "masizan@dut.ac.za",
+      "displayName": "Masiza Ngculu",
+      "role": "judge"
+    },
+    {
+      "email": "ReginaldM1@dut.ac.za",
+      "displayName": "Phumlani Mnyango",
+      "role": "judge"
+    },
+    {
+      "email": "sihlem1@dut.ac.za",
+      "displayName": "Sihle Nhlanhla Mbanjwa",
+      "role": "judge"
+    },
+    {
+      "email": "SthembileM2@dut.ac.za",
+      "displayName": "S'thembile Nontobeko Mjadu",
+      "role": "judge"
+    },
+    {
+      "email": "zwakelen@dut.ac.za",
+      "displayName": "Zwakele Baldwin Ngubane",
+      "role": "judge"
+    }
+  ]
+}

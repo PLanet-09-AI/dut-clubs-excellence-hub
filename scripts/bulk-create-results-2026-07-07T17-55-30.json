@@ -1,0 +1,110 @@
+[
+  {
+    "email": "ndumisobuthelezi028@gmail.com",
+    "displayName": "Test Admin - Ndumiso",
+    "role": "admin",
+    "status": "CREATED",
+    "uid": "1QMxIoUlIkXj63bggt0tlFs7jl12",
+    "resetLink": "https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=WBMXAnlKkLcLRqEN8AAFh8Wcy7wFsbYjyB-LwcsX5awAAAGfPbgobQ&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en",
+    "error": null
+  },
+  {
+    "email": "KeshanG@dut.ac.za",
+    "displayName": "Keshan Govender",
+    "role": "admin",
+    "status": "ALREADY_EXISTS",
+    "uid": "mGprTATkoqPK6sSlHujFZH7Qbal1",
+    "resetLink": null,
+    "error": "User already exists"
+  },
+  {
+    "email": "KholekaM@dut.ac.za",
+    "displayName": "Kholeka Sengiphiwe Mfeka",
+    "role": "admin",
+    "status": "CREATED",
+    "uid": "yHqUx1fCFBYyuQEZmelvQqgnPYZ2",
+    "resetLink": "https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=DbXt5d_lMFM6EEL_X23g4jDgCTkmFeDJ-CZ65N2jl94AAAGfPbgyaQ&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en",
+    "error": null
+  },
+  {
+    "email": "MbaliM6@dut.ac.za",
+    "displayName": "Mbali Nontobeko Mncube",
+    "role": "admin",
+    "status": "CREATED",
+    "uid": "guWw3SD5uVVXcF8AIF0aBV2iMrt2",
+    "resetLink": "https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=FQABgA8ByoNSeJCE1dWTcoBJNoTjVvPzneHYjbbC4BgAAAGfPbg7ow&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en",
+    "error": null
+  },
+  {
+    "email": "NontuthukoG@dut.ac.za",
+    "displayName": "Nontuthuko Gwala",
+    "role": "admin",
+    "status": "CREATED",
+    "uid": "nGGs2J4bhJh3j2FdIHDxU1pQL043",
+    "resetLink": "https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=Ef6_YCjbSTdiTKkz1eysHJQyMoeRvqUHLLhqwMXRZpkAAAGfPbhFfw&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en",
+    "error": null
+  },
+  {
+    "email": "AbsolomM@dut.ac.za",
+    "displayName": "Absolom Manashe",
+    "role": "judge",
+    "status": "CREATED",
+    "uid": "AVFsRr5W9QcLXkgo4l5Ke6SBx1B2",
+    "resetLink": "https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=xphs5L2Rda9lbdMLb4Ag2cHql2UQV8nH283A987Fc-cAAAGfPbhOZw&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en",
+    "error": null
+  },
+  {
+    "email": "bonganiy@dut.ac.za",
+    "displayName": "Bongani Paul Yengwa",
+    "role": "judge",
+    "status": "CREATED",
+    "uid": "4Vj35ySPThTFbcGgMr7fRaGnnlu1",
+    "resetLink": "https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=l2Nqaj43WGHw9-VgxrFnPucEz210q2rzl0j3OCq1LVUAAAGfPbhXKA&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en",
+    "error": null
+  },
+  {
+    "email": "masizan@dut.ac.za",
+    "displayName": "Masiza Ngculu",
+    "role": "judge",
+    "status": "CREATED",
+    "uid": "tBoXzaPh6fcbZm9s5SqA4KLyQ0f2",
+    "resetLink": "https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=nwyLdiDvGd74Ormc5WMT1rmCOGneWqcpjlliDwX2kC0AAAGfPbhgIw&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en",
+    "error": null
+  },
+  {
+    "email": "ReginaldM1@dut.ac.za",
+    "displayName": "Phumlani Mnyango",
+    "role": "judge",
+    "status": "CREATED",
+    "uid": "3un9FPP7NMcDULj5RJxViXkP9mq1",
+    "resetLink": "https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=8mVJCwtKIJQIFciORasqlBlBWJuQAMI_YtvxHfl27ZwAAAGfPbhpAQ&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en",
+    "error": null
+  },
+  {
+    "email": "sihlem1@dut.ac.za",
+    "displayName": "Sihle Nhlanhla Mbanjwa",
+    "role": "judge",
+    "status": "CREATED",
+    "uid": "0chxtUVkX4PDqbsJoHy0OMDCn522",
+    "resetLink": "https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=avT4_Uo-nW8zdEVKnaxBLbl5vUz9k60PuxqCR20OIXgAAAGfPbhxVw&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en",
+    "error": null
+  },
+  {
+    "email": "SthembileM2@dut.ac.za",
+    "displayName": "S'thembile Nontobeko Mjadu",
+    "role": "judge",
+    "status": "CREATED",
+    "uid": "lGhSJlKrTtXKNnKqpgJ8oS0oDDS2",
+    "resetLink": "https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=79Ul_kBwzrs0EtQX9zuXYruU1Fh6n-8vCbRk74ZWAFwAAAGfPbh5wA&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en",
+    "error": null
+  },
+  {
+    "email": "zwakelen@dut.ac.za",
+    "displayName": "Zwakele Baldwin Ngubane",
+    "role": "judge",
+    "status": "CREATED",
+    "uid": "iUZqOrmrbuSWsRRKLOApjQp5utq1",
+    "resetLink": "https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=dkv8QmuTDGK6-NwGb12KrinS5hPYkUVyRErZfLH_fQkAAAGfPbiCBA&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en",
+    "error": null
+  }
+]

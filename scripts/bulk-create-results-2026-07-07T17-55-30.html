@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .header {
+      text-align: center;
+      border-bottom: 3px solid #1a1a1a;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    .header h1 {
+      margin: 0 0 5px 0;
+      color: #1a1a1a;
+    }
+    .header p {
+      margin: 5px 0;
+      color: #666;
+      font-size: 12px;
+    }
+    .section {
+      margin-bottom: 30px;
+      page-break-inside: avoid;
+    }
+    .section-title {
+      background-color: #f0f0f0;
+      padding: 10px 15px;
+      border-left: 4px solid #007bff;
+      font-weight: bold;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+    .user-card {
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 15px;
+      margin-bottom: 15px;
+      background-color: #fafafa;
+      page-break-inside: avoid;
+    }
+    .user-card.admin {
+      border-left: 4px solid #dc3545;
+    }
+    .user-card.judge {
+      border-left: 4px solid #28a745;
+    }
+    .user-card.error {
+      border-left: 4px solid #ffc107;
+      background-color: #fffbea;
+    }
+    .role-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .role-badge.admin {
+      background-color: #dc3545;
+      color: white;
+    }
+    .role-badge.judge {
+      background-color: #28a745;
+      color: white;
+    }
+    .user-name {
+      font-weight: bold;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .user-email {
+      color: #666;
+      font-size: 12px;
+      word-break: break-all;
+      margin-bottom: 10px;
+    }
+    .reset-link {
+      background-color: #f9f9f9;
+      padding: 10px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 10px;
+      word-break: break-all;
+      margin-bottom: 8px;
+      border: 1px solid #ddd;
+    }
+    .instructions {
+      font-size: 11px;
+      color: #666;
+      margin-top: 8px;
+      padding: 8px;
+      background-color: #e8f4f8;
+      border-radius: 3px;
+    }
+    .error-msg {
+      color: #dc3545;
+      font-size: 11px;
+      margin-top: 8px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+    .stat-box {
+      background-color: #f0f0f0;
+      padding: 15px;
+      border-radius: 5px;
+      text-align: center;
+    }
+    .stat-box .number {
+      font-size: 24px;
+      font-weight: bold;
+      color: #1a1a1a;
+    }
+    .stat-box .label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
+    .footer {
+      margin-top: 30px;
+      padding-top: 15px;
+      border-top: 1px solid #ddd;
+      font-size: 10px;
+      color: #999;
+      text-align: center;
+    }
+    @media print {
+      body { background-color: white; }
+      .container { box-shadow: none; }
+      .user-card { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>DUT Excellence Awards System</h1>
+      <p>User Account Setup - Password Reset Links</p>
+      <p>Generated: 2026/07/07, 19:55:30</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <div class="number">11</div>
+        <div class="label">Created</div>
+      </div>
+      <div class="stat-box">
+        <div class="number">1</div>
+        <div class="label">Already Exist</div>
+      </div>
+      <div class="stat-box">
+        <div class="number">0</div>
+        <div class="label">Errors</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">✅ Successfully Created (11)</div>
+
+      <div class="user-card admin">
+        <div class="user-name">
+          Test Admin - Ndumiso
+          <span class="role-badge admin">ADMIN</span>
+        </div>
+        <div class="user-email">ndumisobuthelezi028@gmail.com</div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">UID: 1QMxIoUlIkXj63bggt0tlFs7jl12</div>
+        <div style="font-weight: bold; font-size: 11px; margin-bottom: 5px;">Password Reset Link:</div>
+        <div class="reset-link">https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=WBMXAnlKkLcLRqEN8AAFh8Wcy7wFsbYjyB-LwcsX5awAAAGfPbgobQ&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en</div>
+        <div class="instructions">
+          <strong>Instructions:</strong><br>
+          1. Send this link to Test Admin - Ndumiso<br>
+          2. They click the link to set their password<br>
+          3. They log in with their email and new password<br>
+          4. Link expires in 1 hour
+        </div>
+      </div>
+
+      <div class="user-card admin">
+        <div class="user-name">
+          Kholeka Sengiphiwe Mfeka
+          <span class="role-badge admin">ADMIN</span>
+        </div>
+        <div class="user-email">KholekaM@dut.ac.za</div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">UID: yHqUx1fCFBYyuQEZmelvQqgnPYZ2</div>
+        <div style="font-weight: bold; font-size: 11px; margin-bottom: 5px;">Password Reset Link:</div>
+        <div class="reset-link">https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=DbXt5d_lMFM6EEL_X23g4jDgCTkmFeDJ-CZ65N2jl94AAAGfPbgyaQ&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en</div>
+        <div class="instructions">
+          <strong>Instructions:</strong><br>
+          1. Send this link to Kholeka Sengiphiwe Mfeka<br>
+          2. They click the link to set their password<br>
+          3. They log in with their email and new password<br>
+          4. Link expires in 1 hour
+        </div>
+      </div>
+
+      <div class="user-card admin">
+        <div class="user-name">
+          Mbali Nontobeko Mncube
+          <span class="role-badge admin">ADMIN</span>
+        </div>
+        <div class="user-email">MbaliM6@dut.ac.za</div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">UID: guWw3SD5uVVXcF8AIF0aBV2iMrt2</div>
+        <div style="font-weight: bold; font-size: 11px; margin-bottom: 5px;">Password Reset Link:</div>
+        <div class="reset-link">https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=FQABgA8ByoNSeJCE1dWTcoBJNoTjVvPzneHYjbbC4BgAAAGfPbg7ow&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en</div>
+        <div class="instructions">
+          <strong>Instructions:</strong><br>
+          1. Send this link to Mbali Nontobeko Mncube<br>
+          2. They click the link to set their password<br>
+          3. They log in with their email and new password<br>
+          4. Link expires in 1 hour
+        </div>
+      </div>
+
+      <div class="user-card admin">
+        <div class="user-name">
+          Nontuthuko Gwala
+          <span class="role-badge admin">ADMIN</span>
+        </div>
+        <div class="user-email">NontuthukoG@dut.ac.za</div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">UID: nGGs2J4bhJh3j2FdIHDxU1pQL043</div>
+        <div style="font-weight: bold; font-size: 11px; margin-bottom: 5px;">Password Reset Link:</div>
+        <div class="reset-link">https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=Ef6_YCjbSTdiTKkz1eysHJQyMoeRvqUHLLhqwMXRZpkAAAGfPbhFfw&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en</div>
+        <div class="instructions">
+          <strong>Instructions:</strong><br>
+          1. Send this link to Nontuthuko Gwala<br>
+          2. They click the link to set their password<br>
+          3. They log in with their email and new password<br>
+          4. Link expires in 1 hour
+        </div>
+      </div>
+
+      <div class="user-card judge">
+        <div class="user-name">
+          Absolom Manashe
+          <span class="role-badge judge">JUDGE</span>
+        </div>
+        <div class="user-email">AbsolomM@dut.ac.za</div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">UID: AVFsRr5W9QcLXkgo4l5Ke6SBx1B2</div>
+        <div style="font-weight: bold; font-size: 11px; margin-bottom: 5px;">Password Reset Link:</div>
+        <div class="reset-link">https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=xphs5L2Rda9lbdMLb4Ag2cHql2UQV8nH283A987Fc-cAAAGfPbhOZw&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en</div>
+        <div class="instructions">
+          <strong>Instructions:</strong><br>
+          1. Send this link to Absolom Manashe<br>
+          2. They click the link to set their password<br>
+          3. They log in with their email and new password<br>
+          4. Link expires in 1 hour
+        </div>
+      </div>
+
+      <div class="user-card judge">
+        <div class="user-name">
+          Bongani Paul Yengwa
+          <span class="role-badge judge">JUDGE</span>
+        </div>
+        <div class="user-email">bonganiy@dut.ac.za</div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">UID: 4Vj35ySPThTFbcGgMr7fRaGnnlu1</div>
+        <div style="font-weight: bold; font-size: 11px; margin-bottom: 5px;">Password Reset Link:</div>
+        <div class="reset-link">https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=l2Nqaj43WGHw9-VgxrFnPucEz210q2rzl0j3OCq1LVUAAAGfPbhXKA&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en</div>
+        <div class="instructions">
+          <strong>Instructions:</strong><br>
+          1. Send this link to Bongani Paul Yengwa<br>
+          2. They click the link to set their password<br>
+          3. They log in with their email and new password<br>
+          4. Link expires in 1 hour
+        </div>
+      </div>
+
+      <div class="user-card judge">
+        <div class="user-name">
+          Masiza Ngculu
+          <span class="role-badge judge">JUDGE</span>
+        </div>
+        <div class="user-email">masizan@dut.ac.za</div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">UID: tBoXzaPh6fcbZm9s5SqA4KLyQ0f2</div>
+        <div style="font-weight: bold; font-size: 11px; margin-bottom: 5px;">Password Reset Link:</div>
+        <div class="reset-link">https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=nwyLdiDvGd74Ormc5WMT1rmCOGneWqcpjlliDwX2kC0AAAGfPbhgIw&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en</div>
+        <div class="instructions">
+          <strong>Instructions:</strong><br>
+          1. Send this link to Masiza Ngculu<br>
+          2. They click the link to set their password<br>
+          3. They log in with their email and new password<br>
+          4. Link expires in 1 hour
+        </div>
+      </div>
+
+      <div class="user-card judge">
+        <div class="user-name">
+          Phumlani Mnyango
+          <span class="role-badge judge">JUDGE</span>
+        </div>
+        <div class="user-email">ReginaldM1@dut.ac.za</div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">UID: 3un9FPP7NMcDULj5RJxViXkP9mq1</div>
+        <div style="font-weight: bold; font-size: 11px; margin-bottom: 5px;">Password Reset Link:</div>
+        <div class="reset-link">https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=8mVJCwtKIJQIFciORasqlBlBWJuQAMI_YtvxHfl27ZwAAAGfPbhpAQ&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en</div>
+        <div class="instructions">
+          <strong>Instructions:</strong><br>
+          1. Send this link to Phumlani Mnyango<br>
+          2. They click the link to set their password<br>
+          3. They log in with their email and new password<br>
+          4. Link expires in 1 hour
+        </div>
+      </div>
+
+      <div class="user-card judge">
+        <div class="user-name">
+          Sihle Nhlanhla Mbanjwa
+          <span class="role-badge judge">JUDGE</span>
+        </div>
+        <div class="user-email">sihlem1@dut.ac.za</div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">UID: 0chxtUVkX4PDqbsJoHy0OMDCn522</div>
+        <div style="font-weight: bold; font-size: 11px; margin-bottom: 5px;">Password Reset Link:</div>
+        <div class="reset-link">https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=avT4_Uo-nW8zdEVKnaxBLbl5vUz9k60PuxqCR20OIXgAAAGfPbhxVw&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en</div>
+        <div class="instructions">
+          <strong>Instructions:</strong><br>
+          1. Send this link to Sihle Nhlanhla Mbanjwa<br>
+          2. They click the link to set their password<br>
+          3. They log in with their email and new password<br>
+          4. Link expires in 1 hour
+        </div>
+      </div>
+
+      <div class="user-card judge">
+        <div class="user-name">
+          S'thembile Nontobeko Mjadu
+          <span class="role-badge judge">JUDGE</span>
+        </div>
+        <div class="user-email">SthembileM2@dut.ac.za</div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">UID: lGhSJlKrTtXKNnKqpgJ8oS0oDDS2</div>
+        <div style="font-weight: bold; font-size: 11px; margin-bottom: 5px;">Password Reset Link:</div>
+        <div class="reset-link">https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=79Ul_kBwzrs0EtQX9zuXYruU1Fh6n-8vCbRk74ZWAFwAAAGfPbh5wA&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en</div>
+        <div class="instructions">
+          <strong>Instructions:</strong><br>
+          1. Send this link to S'thembile Nontobeko Mjadu<br>
+          2. They click the link to set their password<br>
+          3. They log in with their email and new password<br>
+          4. Link expires in 1 hour
+        </div>
+      </div>
+
+      <div class="user-card judge">
+        <div class="user-name">
+          Zwakele Baldwin Ngubane
+          <span class="role-badge judge">JUDGE</span>
+        </div>
+        <div class="user-email">zwakelen@dut.ac.za</div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">UID: iUZqOrmrbuSWsRRKLOApjQp5utq1</div>
+        <div style="font-weight: bold; font-size: 11px; margin-bottom: 5px;">Password Reset Link:</div>
+        <div class="reset-link">https://student-services-745d5.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=dkv8QmuTDGK6-NwGb12KrinS5hPYkUVyRErZfLH_fQkAAAGfPbiCBA&apiKey=AIzaSyDxOVoBTwnL8jGnh8fz1G7Un16g4Jgjmbk&lang=en</div>
+        <div class="instructions">
+          <strong>Instructions:</strong><br>
+          1. Send this link to Zwakele Baldwin Ngubane<br>
+          2. They click the link to set their password<br>
+          3. They log in with their email and new password<br>
+          4. Link expires in 1 hour
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">⚠️ Already Exist (1)</div>
+
+      <div class="user-card error">
+        <div class="user-name">Keshan Govender</div>
+        <div class="user-email">KeshanG@dut.ac.za</div>
+        <div class="error-msg">⚠️ Account already exists in Firebase</div>
+        <div style="font-size: 11px; color: #666; margin-top: 8px;">
+          To reset their password, use: <strong>Firebase Console → Authentication → Find user → Reset password</strong>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <p>Generated on 2026/07/07, 19:55:30</p>
+      <p>DUT Excellence Awards System - Bulk User Creation Report</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -15,7 +15,7 @@ import {
   BookOpen,
   ChevronDown,
 } from "lucide-react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, updateDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { AWARD_CATEGORIES, FACULTIES, type AwardCategory } from "@/data/awards";
 import { useDraftForm } from "@/hooks/useDraftForm";
@@ -366,12 +366,54 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
         ),
       });
 
-      const docRef = await addDoc(collection(db, "nominations"), cleanedPayload);
+      // Check for existing nomination for this nominee + category
+      const existingQuery = query(
+        collection(db, "nominations"),
+        where("nomineeEmail", "==", nominee.email.trim().toLowerCase()),
+        where("categoryId", "==", category.id)
+      );
+      
+      const existingResults = await getDocs(existingQuery);
+      let docRef;
+      let isUpdate = false;
 
-      console.log('✅ [Submit] SUCCESS! Document created:', {
-        docId: docRef.id,
-        timestamp: new Date().toISOString(),
-      });
+      if (existingResults.size > 0) {
+        // Update existing nomination (use first match)
+        const existingDoc = existingResults.docs[0];
+        docRef = existingDoc.ref;
+        
+        // Add updatedAt timestamp to track the merge
+        const updatePayload = {
+          ...cleanedPayload,
+          updatedAt: serverTimestamp(),
+          mergedAt: serverTimestamp(), // Track when nomination was merged/updated
+          previousSubmissionId: existingDoc.id, // Track the previous version
+        };
+        
+        await updateDoc(docRef, updatePayload);
+        isUpdate = true;
+        
+        console.log('🔄 [Submit] MERGED! Updated existing nomination:', {
+          docId: existingDoc.id,
+          timestamp: new Date().toISOString(),
+          action: 'update',
+          nomineeName: nominee.name.trim(),
+          nomineeEmail: nominee.email.trim(),
+          categoryId: category.id,
+        });
+      } else {
+        // Create new nomination
+        docRef = await addDoc(collection(db, "nominations"), cleanedPayload);
+        
+        console.log('✅ [Submit] SUCCESS! Document created:', {
+          docId: docRef.id,
+          timestamp: new Date().toISOString(),
+          action: 'create',
+          nomineeName: nominee.name.trim(),
+          nomineeEmail: nominee.email.trim(),
+          categoryId: category.id,
+        });
+      }
 
       clearDraft(); // wipe the saved draft on success
       setSubmitted(true);

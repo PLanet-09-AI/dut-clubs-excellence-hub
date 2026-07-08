@@ -1,0 +1,98 @@
+[
+  {
+    "email": "ndumisobuthelezi028@gmail.com",
+    "displayName": "Test Admin - Ndumiso",
+    "role": "admin",
+    "uid": "BXeGik3OrOYjHCWzetYU5zurLQk1",
+    "tempPassword": "TempPassword@2026",
+    "status": "success"
+  },
+  {
+    "email": "KeshanG@dut.ac.za",
+    "displayName": "Keshan Govender",
+    "role": "admin",
+    "uid": "xPE0cuwo2kXW0sILIRBafOVRn1g1",
+    "tempPassword": "TempPassword@2026",
+    "status": "success"
+  },
+  {
+    "email": "KholekaM@dut.ac.za",
+    "displayName": "Kholeka Sengiphiwe Mfeka",
+    "role": "admin",
+    "uid": "vNUuzdNNUmRWEFoKhy4Tnfrd0NX2",
+    "tempPassword": "TempPassword@2026",
+    "status": "success"
+  },
+  {
+    "email": "MbaliM6@dut.ac.za",
+    "displayName": "Mbali Nontobeko Mncube",
+    "role": "admin",
+    "uid": "3Oe1KSaxe8guy3yntGf4lKA69Wz2",
+    "tempPassword": "TempPassword@2026",
+    "status": "success"
+  },
+  {
+    "email": "NontuthukoG@dut.ac.za",
+    "displayName": "Nontuthuko Gwala",
+    "role": "admin",
+    "uid": "YO5wTpL2eYWLfYNAy7Dk6NRm1ox1",
+    "tempPassword": "TempPassword@2026",
+    "status": "success"
+  },
+  {
+    "email": "AbsolomM@dut.ac.za",
+    "displayName": "Absolom Manashe",
+    "role": "judge",
+    "uid": "EfX6zybD0dUYXuKYQqU0Au3QpOz1",
+    "tempPassword": "TempPassword@2026",
+    "status": "success"
+  },
+  {
+    "email": "bonganiy@dut.ac.za",
+    "displayName": "Bongani Paul Yengwa",
+    "role": "judge",
+    "uid": "I7otw8snuIZGzq0mBLh5DhA0bfh2",
+    "tempPassword": "TempPassword@2026",
+    "status": "success"
+  },
+  {
+    "email": "masizan@dut.ac.za",
+    "displayName": "Masiza Ngculu",
+    "role": "judge",
+    "uid": "rNMmhmaXVaRzFGeZci0TSoZ6dbt1",
+    "tempPassword": "TempPassword@2026",
+    "status": "success"
+  },
+  {
+    "email": "ReginaldM1@dut.ac.za",
+    "displayName": "Phumlani Mnyango",
+    "role": "judge",
+    "uid": "wuHb0WsWcwTPWBxq3wHcRVYxZ843",
+    "tempPassword": "TempPassword@2026",
+    "status": "success"
+  },
+  {
+    "email": "sihlem1@dut.ac.za",
+    "displayName": "Sihle Nhlanhla Mbanjwa",
+    "role": "judge",
+    "uid": "UzBI9cvbK1PvS3cNdVc0fTI7KMh1",
+    "tempPassword": "TempPassword@2026",
+    "status": "success"
+  },
+  {
+    "email": "SthembileM2@dut.ac.za",
+    "displayName": "S'thembile Nontobeko Mjadu",
+    "role": "judge",
+    "uid": "spLliPvUVaOO3UVIPrDbeYHAEmD2",
+    "tempPassword": "TempPassword@2026",
+    "status": "success"
+  },
+  {
+    "email": "zwakelen@dut.ac.za",
+    "displayName": "Zwakele Baldwin Ngubane",
+    "role": "judge",
+    "uid": "rs5hEp5x2fRQGtlhgycTcogMwOh1",
+    "tempPassword": "TempPassword@2026",
+    "status": "success"
+  }
+]

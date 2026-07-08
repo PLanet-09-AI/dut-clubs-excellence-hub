@@ -39,6 +39,8 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { signIn, signOut as firebaseSignOut, subscribeToAuthState } from "@/lib/auth-firebase";
+import { ForcePasswordChangeModal } from "@/components/ForcePasswordChangeModal";
+import { User } from "firebase/auth";
 import {
   AWARD_THEME,
   AWARD_CATEGORIES,
@@ -215,6 +217,9 @@ export const Route = createFileRoute("/judge")({
 
 function JudgePage() {
   const [authed, setAuthed] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [usedTempPassword, setUsedTempPassword] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState(false);
   const [checking, setChecking] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -225,20 +230,48 @@ function JudgePage() {
   useEffect(() => {
     const unsub = subscribeToAuthState(async (user) => {
       if (user) {
-        const snap = await getDoc(doc(db, "users", user.uid));
-        const data = snap.data();
-        if (data?.role === "judge") {
-          setAuthed(true);
-        } else if (data?.role === "admin") {
-          navigate({ to: "/admin" });
-          return;
-        } else {
-          await firebaseSignOut();
-          setErr("Your account does not have judge access.");
-          setAuthed(false);
+        setCurrentUser(user);
+        try {
+          // Check custom claims from Firebase Auth
+          const idTokenResult = await user.getIdTokenResult();
+          const role = idTokenResult.claims?.role as "admin" | "judge" | undefined;
+          
+          if (role === "judge") {
+            setAuthed(true);
+            setChecking(false);
+            return;
+          } else if (role === "admin") {
+            navigate({ to: "/admin" });
+            setChecking(false);
+            return;
+          }
+        } catch (err) {
+          console.error("Error getting token result:", err);
         }
+        
+        // Fallback: check Firestore users collection
+        try {
+          const snap = await getDoc(doc(db, "users", user.uid));
+          const data = snap.data();
+          if (data?.role === "judge") {
+            setAuthed(true);
+            setChecking(false);
+            return;
+          } else if (data?.role === "admin") {
+            navigate({ to: "/admin" });
+            setChecking(false);
+            return;
+          }
+        } catch (err) {
+          console.error("Error checking Firestore:", err);
+        }
+        
+        await firebaseSignOut();
+        setErr("Your account does not have judge access.");
+        setAuthed(false);
       } else {
         setAuthed(false);
+        setCurrentUser(null);
       }
       setChecking(false);
     });
@@ -250,6 +283,10 @@ function JudgePage() {
     setErr("");
     setLoading(true);
     try {
+      // Track if they're using the temporary password
+      if (password === "TempPassword@2026") {
+        setUsedTempPassword(true);
+      }
       await signIn(email, password);
     } catch (ex: unknown) {
       const code = (ex as { code?: string }).code ?? "";
@@ -280,9 +317,20 @@ function JudgePage() {
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-hero">
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,oklch(0.90_0.04_260)_0%,transparent_60%)]" />
+      {/* Force Password Change Modal */}
+      {usedTempPassword && !passwordChanged && currentUser && (
+        <ForcePasswordChangeModal
+          user={currentUser}
+          usedTempPassword={true}
+          onPasswordChanged={() => {
+            setPasswordChanged(true);
+            setUsedTempPassword(false);
+          }}
+        />
+      )}
       <SiteNav />
       <main className="relative z-10 mx-auto max-w-7xl px-6 pb-16 pt-28">
-        {!authed ? (
+        {!authed || (usedTempPassword && !passwordChanged) ? (
           <div className="mx-auto mt-20 max-w-md rounded-3xl border border-primary/30 bg-card/60 p-10 backdrop-blur">
             <div className="mx-auto mb-6 grid h-14 w-14 place-items-center rounded-full bg-gold shadow-gold">
               <Star className="h-6 w-6 text-primary-foreground" />

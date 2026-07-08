@@ -14,7 +14,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "create:users": "node scripts/bulk-create-users.mjs",
+    "create:users:local": "node scripts/bulk-create-users-local.mjs",
+    "send:invitations": "node scripts/send-user-invitations.mjs",
+    "send:notifications": "node scripts/send-notification-emails.mjs",
+    "cleanup:corrupted": "node -e \"fetch('/.netlify/functions/cleanup-corrupted-nominations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'list', dryRun: true }) }).then(r => r.json()).then(d => console.log(JSON.stringify(d, null, 2)))\"",
+    "cleanup:corrupted:dryrun": "node -e \"console.log('Running DRY RUN cleanup...')\"",
+    "cleanup:corrupted:delete": "node -e \"console.log('🗑️ PERMANENT: Deleting corrupted nominations. See CLEANUP_CORRUPTED_NOMINATIONS.md for safe usage.')\""
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
@@ -65,6 +72,7 @@
     "framer-motion": "^12.38.0",
     "input-otp": "^1.4.2",
     "jspdf": "^4.2.1",
+    "jspdf-autotable": "^3.8.4",
     "jszip": "^3.10.1",
     "lucide-react": "^0.575.0",
     "mammoth": "^1.12.0",

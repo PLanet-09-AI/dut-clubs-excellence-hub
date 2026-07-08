@@ -1,0 +1,65 @@
+DUT EXCELLENCE AWARDS - USER CREDENTIALS
+========================================
+
+Generated: 2026/07/07, 20:22:53
+Site: https://salea2026.netlify.app
+
+TEMPORARY PASSWORD FOR ALL USERS:
+TempPassword@2026
+
+---
+ADMINISTRATORS
+---
+
+Test Admin - Ndumiso
+Email: ndumisobuthelezi028@gmail.com
+Temp Password: TempPassword@2026
+
+Keshan Govender
+Email: KeshanG@dut.ac.za
+Temp Password: TempPassword@2026
+
+Kholeka Sengiphiwe Mfeka
+Email: KholekaM@dut.ac.za
+Temp Password: TempPassword@2026
+
+Mbali Nontobeko Mncube
+Email: MbaliM6@dut.ac.za
+Temp Password: TempPassword@2026
+
+Nontuthuko Gwala
+Email: NontuthukoG@dut.ac.za
+Temp Password: TempPassword@2026
+
+---
+JUDGES
+---
+
+Absolom Manashe
+Email: AbsolomM@dut.ac.za
+Temp Password: TempPassword@2026
+
+Bongani Paul Yengwa
+Email: bonganiy@dut.ac.za
+Temp Password: TempPassword@2026
+
+Masiza Ngculu
+Email: masizan@dut.ac.za
+Temp Password: TempPassword@2026
+
+Phumlani Mnyango
+Email: ReginaldM1@dut.ac.za
+Temp Password: TempPassword@2026
+
+Sihle Nhlanhla Mbanjwa
+Email: sihlem1@dut.ac.za
+Temp Password: TempPassword@2026
+
+S'thembile Nontobeko Mjadu
+Email: SthembileM2@dut.ac.za
+Temp Password: TempPassword@2026
+
+Zwakele Baldwin Ngubane
+Email: zwakelen@dut.ac.za
+Temp Password: TempPassword@2026
+

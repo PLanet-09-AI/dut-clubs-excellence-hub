@@ -87,6 +87,9 @@ import {
   registerUser,
 } from "@/lib/auth-firebase";
 import SiteNav from "@/components/SiteNav";
+import { AdminSettings } from "@/components/AdminSettings";
+import { ForcePasswordChangeModal } from "@/components/ForcePasswordChangeModal";
+import { User } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -332,6 +335,9 @@ function AdminQuickGuide({ canManage }: { canManage: boolean }) {
 
 function AdminPage() {
   const [authed, setAuthed] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [usedTempPassword, setUsedTempPassword] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState(false);
   const [userRole, setUserRole] = useState<"admin" | "judge" | null>(null);
   const [mode, setMode] = useState<"signin" | "register">("signin");
   const [email, setEmail] = useState("");
@@ -348,18 +354,40 @@ function AdminPage() {
   useEffect(() => {
     const unsub = subscribeToAuthState(async (user) => {
       if (user) {
-        const snap = await getDoc(doc(db, "users", user.uid));
-        const data = snap.data();
-        if (data?.role === "admin" || data?.role === "judge") {
-          setUserRole(data.role);
-          setAuthed(true);
-          return;
+        setCurrentUser(user);
+        try {
+          // Check custom claims from Firebase Auth
+          const idTokenResult = await user.getIdTokenResult();
+          const role = idTokenResult.claims?.role as "admin" | "judge" | undefined;
+          
+          if (role === "admin" || role === "judge") {
+            setUserRole(role);
+            setAuthed(true);
+            return;
+          }
+        } catch (err) {
+          console.error("Error getting token result:", err);
         }
+        
+        // Fallback: check Firestore users collection
+        try {
+          const snap = await getDoc(doc(db, "users", user.uid));
+          const data = snap.data();
+          if (data?.role === "admin" || data?.role === "judge") {
+            setUserRole(data.role);
+            setAuthed(true);
+            return;
+          }
+        } catch (err) {
+          console.error("Error checking Firestore:", err);
+        }
+        
         await firebaseSignOut();
         setErr("Your account does not have admin panel access.");
       }
       setUserRole(null);
       setAuthed(!!user);
+      setCurrentUser(null);
     });
     return unsub;
   }, [navigate]);
@@ -389,6 +417,10 @@ function AdminPage() {
     setLoading(true);
     try {
       if (mode === "signin") {
+        // Track if they're using the temporary password
+        if (password === "TempPassword@2026") {
+          setUsedTempPassword(true);
+        }
         await signIn(email, password);
       } else {
         const cred = await registerUser(email, password);
@@ -440,14 +472,27 @@ function AdminPage() {
 
   async function logout() {
     await firebaseSignOut();
+    setUsedTempPassword(false);
+    setPasswordChanged(false);
   }
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-hero">
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,oklch(0.90_0.04_260)_0%,transparent_60%)]" />
+      {/* Force Password Change Modal */}
+      {usedTempPassword && !passwordChanged && currentUser && (
+        <ForcePasswordChangeModal
+          user={currentUser}
+          usedTempPassword={true}
+          onPasswordChanged={() => {
+            setPasswordChanged(true);
+            setUsedTempPassword(false);
+          }}
+        />
+      )}
       <SiteNav />
       <main className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 pt-24 pb-16">
-        {!authed ? (
+        {!authed || (usedTempPassword && !passwordChanged) ? (
           <div className="mx-auto mt-20 max-w-md rounded-3xl border border-primary/30 bg-card/60 p-10 backdrop-blur">
             <div className="mx-auto mb-6 grid h-14 w-14 place-items-center rounded-full bg-gold shadow-gold">
               <Lock className="h-6 w-6 text-primary-foreground" />
@@ -623,7 +668,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
     { id: string; name: string; tagline: string }[]
   >([]);
   const [newCat, setNewCat] = useState({ name: "", tagline: "" });
-  const [activeSection, setActiveSection] = useState<"nominations" | "categories" | "winners" | "judges" | "leaderboard" | "accounts" | "audit-logs">("nominations");
+  const [activeSection, setActiveSection] = useState<"nominations" | "categories" | "winners" | "judges" | "leaderboard" | "accounts" | "audit-logs" | "settings">("nominations");
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [judgeScores, setJudgeScores] = useState<
     Array<{
@@ -1618,6 +1663,7 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
               { key: "leaderboard" as const, label: "Leaderboard", icon: <Trophy className="h-4 w-4" /> },
               { key: "accounts" as const, label: "Create Account", icon: <Users2 className="h-4 w-4" /> },
               { key: "audit-logs" as const, label: "Audit Logs", icon: <Shield className="h-4 w-4" />, badge: auditLogs.length > 0 ? auditLogs.length : undefined },
+              { key: "settings" as const, label: "Settings", icon: <Shield className="h-4 w-4" /> },
             ] : [])
           ]).map((item) => (
             <button
@@ -2189,6 +2235,11 @@ function Dashboard({ onLogout, role }: { onLogout: () => void; role: "admin" | "
               </div>
             )}
           </div>
+        )}
+
+        {/* ── Settings section ─── */}
+        {canManage && activeSection === "settings" && (
+          <AdminSettings />
         )}
 
         </div>{/* end content area */}
