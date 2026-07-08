@@ -3258,7 +3258,16 @@ function NominationDetail({
   }, [activePreview, activePreviewMeta?.kind, runtimePreviewPdfUrls]);
 
   function openPreview(path: string) {
-    setPreviewLoading(true);
+    const targetFile = previewableFiles.find(f => f.file.path === path);
+    const kind = targetFile?.kind;
+    
+    // Don't show loading spinner for images — they load immediately
+    if (kind !== 'image') {
+      setPreviewLoading(true);
+    } else {
+      setPreviewLoading(false);
+    }
+    
     setPreviewPath(path);
     setPreviewPage(1);
     setPreviewZoom(110);
