@@ -50,6 +50,7 @@ import {
   orderBy,
   where,
   getDocs,
+  limit,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -779,7 +780,11 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
 
   // Real-time Firestore listener — all judge scores (admin supervision)
   useEffect(() => {
-    const q = query(collection(db, "judge_scores"), orderBy("updatedAt", "desc"));
+    const q = query(
+      collection(db, "judge_scores"),
+      orderBy("updatedAt", "desc"),
+      limit(500), // Limit to 500 most recent scores for performance
+    );
     const unsub = onSnapshot(
       q,
       (snap) => {
