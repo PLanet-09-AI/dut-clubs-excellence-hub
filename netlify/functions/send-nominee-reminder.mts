@@ -22,11 +22,28 @@ interface NomineeReminderRequest {
   incompleteItems: string[];
 }
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Content-Type': 'application/json',
+};
+
 export const handler: Handler = async (event: HandlerEvent) => {
+  // Handle OPTIONS for CORS
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: '',
+    };
+  }
+
   // Only allow POST
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
+      headers: corsHeaders,
       body: JSON.stringify({ error: 'Method not allowed' }),
     };
   }
@@ -34,9 +51,15 @@ export const handler: Handler = async (event: HandlerEvent) => {
   try {
     // Check for required environment variables
     if (!EMAILJS_PUBLIC_KEY || !EMAILJS_PRIVATE_KEY || !EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID) {
-      console.error('Missing EmailJS configuration');
+      console.error('Missing EmailJS configuration', {
+        hasPublicKey: !!EMAILJS_PUBLIC_KEY,
+        hasPrivateKey: !!EMAILJS_PRIVATE_KEY,
+        hasServiceId: !!EMAILJS_SERVICE_ID,
+        hasTemplateId: !!EMAILJS_TEMPLATE_ID,
+      });
       return {
         statusCode: 500,
+        headers: corsHeaders,
         body: JSON.stringify({
           error: 'EmailJS not configured. Set VITE_EMAILJS_PUBLIC_KEY, EMAILJS_PRIVATE_KEY, VITE_EMAILJS_SERVICE_ID, and VITE_EMAILJS_TEMPLATE_ID',
         }),
