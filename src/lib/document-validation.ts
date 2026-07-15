@@ -62,10 +62,10 @@ export function getDocumentRequirements(categoryId: string): DocumentRequirement
  * Handles both flat uploads (from form) and nested uploads (from Firestore)
  * 
  * VALIDATION STRATEGY:
- * - For each question with evidence requirements, check if AT LEAST ONE document is provided
+ * - For each question with evidence requirements, check if ALL evidence slots are filled
+ * - Each evidence label (e0, e1, e2...) is a separate requirement
  * - Both file uploads and SharePoint/OneDrive links count as valid evidence
- * - This allows flexibility: users can upload PDFs, links, or any combination
- * - Missing: if a question has no documents of any kind
+ * - Missing: if ANY evidence slot for a question is empty
  * 
  * When called from nomination form: uploads is Record<questionId, Record<slotKey, UploadedFile[]>>
  * When called from admin: uploads is nested Record<questionId, Record<slotKey, UploadedFile[]>>
@@ -143,23 +143,27 @@ export function validateDocumentsForCategory(
       }
     }
 
-    // Check if ANY evidence has been uploaded for this question
-    // This counts both PDFs/files AND SharePoint/OneDrive links
-    let hasAnyEvidence = false;
+    // Check if ALL evidence slots are filled (not just ANY)
+    // Each evidence label must have at least one document
+    let allSlotsHaveEvidence = true;
+    const missingSlots: string[] = [];
     
-    if (flatUploadsBySlot && Object.keys(flatUploadsBySlot).length > 0) {
-      // Check if any slot has files (regardless of type: file or sharepoint)
-      for (const slotFiles of Object.values(flatUploadsBySlot)) {
-        if (Array.isArray(slotFiles) && slotFiles.length > 0) {
-          hasAnyEvidence = true;
-          break;
-        }
+    for (let i = 0; i < req.evidenceLabels.length; i++) {
+      const slotKey = `e${i}`;
+      const slotFiles = flatUploadsBySlot[slotKey];
+      
+      // Check if this slot has at least one file
+      if (!Array.isArray(slotFiles) || slotFiles.length === 0) {
+        allSlotsHaveEvidence = false;
+        missingSlots.push(`"${req.evidenceLabels[i]}"`);
       }
     }
 
     if (typeof window !== 'undefined') {
       console.log(`  📄 Question "${req.questionId}" evidence check:`, {
-        hasAnyEvidence,
+        allSlotsHaveEvidence,
+        requiredSlots: req.evidenceLabels.length,
+        missingSlots,
         slotsWithFiles: Object.entries(flatUploadsBySlot || {}).map(([slot, files]) => ({
           slot,
           count: Array.isArray(files) ? files.length : 0,
@@ -168,13 +172,17 @@ export function validateDocumentsForCategory(
       });
     }
 
-    // For this question, we need at least ONE evidence slot to have documents
-    // Users can upload PDFs, links, or any combination
-    if (hasAnyEvidence) {
+    // For this question, ALL evidence slots must have at least one document
+    if (allSlotsHaveEvidence) {
       uploadedCount++;
     } else {
-      // Mark entire question as missing
-      missingDocuments.push(`${req.questionPrompt.substring(0, 50)}...`);
+      // Mark specific missing slots
+      const questionLabel = req.questionPrompt.substring(0, 50);
+      if (missingSlots.length > 0) {
+        missingDocuments.push(`${questionLabel}... (missing: ${missingSlots.join(", ")})`);
+      } else {
+        missingDocuments.push(`${questionLabel}...`);
+      }
     }
   }
 
