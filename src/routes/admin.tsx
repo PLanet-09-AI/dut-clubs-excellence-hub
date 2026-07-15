@@ -1420,12 +1420,71 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   }
 
   function formatDate(ts: Nomination["createdAt"]) {
-    if (!ts) return "—";
-    if (typeof ts === "object" && ts.toDate)
-      return ts
-        .toDate()
-        .toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" });
-    return String(ts);
+    if (!ts) {
+      // Fallback to today's date if createdAt is missing
+      return new Date().toLocaleDateString("en-ZA", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    }
+
+    let date: Date | null = null;
+
+    // Handle Firebase Timestamp with toDate() method
+    if (typeof ts === "object" && ts && "toDate" in ts && typeof ts.toDate === "function") {
+      try {
+        date = (ts as any).toDate();
+      } catch (e) {
+        console.error("Failed to call toDate():", e, ts);
+      }
+    }
+    // Handle plain object with _seconds property (serialized Timestamp)
+    else if (typeof ts === "object" && ts && "_seconds" in ts) {
+      try {
+        const timestamp = ts as { _seconds: number; _nanoseconds?: number };
+        date = new Date(timestamp._seconds * 1000);
+      } catch (e) {
+        console.error("Failed to parse _seconds:", e, ts);
+      }
+    }
+    // Handle Date object
+    else if (ts instanceof Date) {
+      date = ts;
+    }
+    // Handle ISO string
+    else if (typeof ts === "string") {
+      date = new Date(ts);
+    }
+    // Handle timestamp number
+    else if (typeof ts === "number") {
+      // Could be milliseconds or seconds
+      date = new Date(ts > 9999999999 ? ts : ts * 1000);
+    }
+
+    // Fallback: try to convert to string and then to date
+    if (!date && typeof ts === "object") {
+      try {
+        date = new Date(String(ts));
+      } catch (e) {
+        console.error("Failed all date parsing methods:", ts);
+      }
+    }
+
+    if (date && !isNaN(date.getTime())) {
+      return date.toLocaleDateString("en-ZA", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    }
+
+    // Ultimate fallback - return today's date
+    return new Date().toLocaleDateString("en-ZA", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
   }
 
   const STATUS_FILTERS: { label: string; value: "all" | NominationStatus }[] = [
