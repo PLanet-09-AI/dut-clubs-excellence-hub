@@ -99,6 +99,69 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * Detect document link type (Google Docs, Microsoft, SharePoint, etc.)
+ */
+function detectLinkType(url: string): "google-docs" | "microsoft" | "sharepoint" | "onedrive" | "teams" | "other" {
+  const hostname = new URL(url).hostname.toLowerCase();
+  
+  if (hostname.includes("docs.google.com")) return "google-docs";
+  if (hostname.includes("sharepoint.com")) return "sharepoint";
+  if (hostname.includes("onedrive.live.com") || hostname.includes("1drv.ms")) return "onedrive";
+  if (hostname.includes("teams.microsoft.com")) return "teams";
+  if (hostname.includes("microsoft.com") || hostname.includes("office.com")) return "microsoft";
+  
+  return "other";
+}
+
+/**
+ * Convert various document links to embeddable preview URLs
+ */
+function convertToEmbeddableUrl(url: string): string {
+  const type = detectLinkType(url);
+  let finalUrl = url;
+  
+  switch (type) {
+    case "google-docs":
+      // Convert /edit?usp=sharing to /preview for embeddable format
+      finalUrl = url
+        .replace(/\/edit.*$/, "/preview")
+        .replace(/\/view.*$/, "/preview");
+      break;
+      
+    case "onedrive":
+      // OneDrive: append ?web=1 for web preview
+      if (!finalUrl.includes("?")) {
+        finalUrl = `${finalUrl}?web=1`;
+      } else if (!finalUrl.includes("web=1")) {
+        finalUrl = `${finalUrl}&web=1`;
+      }
+      break;
+      
+    case "sharepoint":
+      // SharePoint: append ?web=1 for web preview
+      if (!finalUrl.includes("?")) {
+        finalUrl = `${finalUrl}?web=1`;
+      } else if (!finalUrl.includes("web=1")) {
+        finalUrl = finalUrl.replace(/(\?|$)/, "?web=1&");
+      }
+      break;
+      
+    case "microsoft":
+      // Microsoft Office online - use as-is or with ?web=1
+      if (!finalUrl.includes("?")) {
+        finalUrl = `${finalUrl}?web=1`;
+      }
+      break;
+      
+    case "teams":
+      // Teams documents - use as-is
+      break;
+  }
+  
+  return finalUrl;
+}
+
 export function isVideoFile(fileName: string): boolean {
   return fileName.toLowerCase().endsWith(".mp4") || fileName.toLowerCase().endsWith(".webm") || fileName.toLowerCase().endsWith(".mov");
 }
@@ -134,15 +197,39 @@ function PdfPreview({ url, name, onClose }: { url: string; name: string; onClose
   );
 }
 
-// ─── SharePoint link preview modal ───────────────────────────────────────────
+// ─── Document link preview modal (Google Docs, Microsoft, SharePoint, OneDrive, Teams) ───
 
 function SharePointPreview({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
-  // Attempt iframe embed: append ?web=1 for SharePoint, leave others as-is
-  const embedUrl = url.includes("sharepoint.com") && !url.includes("?")
-    ? `${url}?web=1`
-    : url.includes("sharepoint.com")
-    ? url.replace(/(\?|$)/, "?web=1&")
-    : url;
+  const type = detectLinkType(url);
+  
+  // Display appropriate label and help text based on document type
+  const getTypeLabel = () => {
+    switch (type) {
+      case "google-docs": return "Google Docs";
+      case "onedrive": return "OneDrive";
+      case "sharepoint": return "SharePoint";
+      case "teams": return "Microsoft Teams";
+      case "microsoft": return "Microsoft Office";
+      default: return "Document";
+    }
+  };
+  
+  const getHelpText = () => {
+    switch (type) {
+      case "google-docs":
+        return "Google Docs preview · Share the document with 'Anyone with the link' for access.";
+      case "onedrive":
+        return "OneDrive preview · Ensure the file is shared with 'Anyone with the link' (edit or view access).";
+      case "sharepoint":
+        return "SharePoint preview · If blank, the link may require DUT login or 'Anyone with the link' sharing.";
+      case "teams":
+        return "Microsoft Teams document preview · Ensure proper sharing permissions are set.";
+      case "microsoft":
+        return "Microsoft Office document preview · Ensure proper sharing permissions are set.";
+      default:
+        return "Document preview · Ensure proper sharing permissions are set.";
+    }
+  };
 
   return (
     <div
@@ -157,20 +244,20 @@ function SharePointPreview({ url, name, onClose }: { url: string; name: string; 
           <Link2 className="h-4 w-4 text-primary" />
           <span className="flex-1 min-w-0 truncate text-sm font-medium">{name}</span>
           <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0">
-            <ExternalLink className="h-3.5 w-3.5" /> Open in SharePoint
+            <ExternalLink className="h-3.5 w-3.5" /> Open in {getTypeLabel()}
           </a>
           <button type="button" onClick={onClose} className="ml-2 rounded p-1 hover:bg-primary/10 text-muted-foreground hover:text-foreground transition">
             <X className="h-4 w-4" />
           </button>
         </div>
         <iframe
-          src={embedUrl}
-          title={name || "SharePoint Document Preview"}
+          src={url}
+          title={name || `${getTypeLabel()} Document Preview`}
           className="flex-1 w-full border-0"
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
         />
         <p className="px-4 py-2 text-[10px] text-muted-foreground text-center shrink-0">
-          Preview powered by SharePoint's built-in viewer · If blank, the link may require DUT login or "Anyone with the link" sharing.
+          {getHelpText()}
         </p>
       </div>
     </div>
@@ -303,7 +390,11 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
     let parsed: URL;
     try { parsed = new URL(trimmed); } catch { setLinkError("Not a valid URL."); return; }
     if (parsed.protocol !== "https:") { setLinkError("Only HTTPS links are accepted."); return; }
-    if (files.some((f) => f.type === "sharepoint" && f.url === trimmed)) {
+    
+    // Convert to embeddable format based on link type
+    const finalUrl = convertToEmbeddableUrl(trimmed);
+    
+    if (files.some((f) => f.type === "sharepoint" && f.url === finalUrl)) {
       setLinkError("This link is already added."); return;
     }
     // Derive a readable name from the URL
@@ -312,7 +403,7 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
     const name = rawName.length > 60 ? rawName.slice(0, 57) + "…" : rawName;
     onFilesChange([
       ...files,
-      { name, url: trimmed, size: 0, path: "", type: "sharepoint" },
+      { name, url: finalUrl, size: 0, path: "", type: "sharepoint" },
     ]);
     setLinkInput("");
     setShowLinkInput(false);
@@ -536,7 +627,7 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
         />
       </div>
 
-      {/* SharePoint / link alternative */}
+      {/* Microsoft / Google Docs / OneDrive / SharePoint / Teams link alternative */}
       <div className="mx-3 mb-2.5">
         <button
           type="button"
@@ -544,7 +635,7 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
           className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition"
         >
           <Link2 className="h-3 w-3" />
-          {showLinkInput ? "Cancel link" : "Add SharePoint / OneDrive link instead"}
+          {showLinkInput ? "Cancel link" : "Add online document link (Google Docs, OneDrive, SharePoint, Teams)"}
         </button>
         <AnimatePresence>
           {showLinkInput && (
