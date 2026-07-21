@@ -1421,12 +1421,8 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
 
   function formatDate(ts: Nomination["createdAt"]) {
     if (!ts) {
-      // Fallback to today's date if createdAt is missing
-      return new Date().toLocaleDateString("en-ZA", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
+      // No submission date available - return placeholder
+      return "—";
     }
 
     let date: Date | null = null;
@@ -1479,12 +1475,8 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
       });
     }
 
-    // Ultimate fallback - return today's date
-    return new Date().toLocaleDateString("en-ZA", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+    // No valid date found - return placeholder instead of today's date
+    return "—";
   }
 
   const STATUS_FILTERS: { label: string; value: "all" | NominationStatus }[] = [
