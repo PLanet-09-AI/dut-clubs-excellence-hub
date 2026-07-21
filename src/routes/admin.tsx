@@ -3345,6 +3345,18 @@ function NominationDetail({
     }
   }, [activePreviewMeta?.kind, activePreview?.path]);
 
+  // Fallback: clear loading state after timeout if iframe onLoad doesn't fire
+  // (Google Docs viewer doesn't reliably fire onLoad in cross-origin scenarios)
+  useEffect(() => {
+    if (!previewLoading || !activePreview) return;
+
+    const timeoutId = setTimeout(() => {
+      setPreviewLoading(false);
+    }, 8000); // 8 second timeout
+
+    return () => clearTimeout(timeoutId);
+  }, [previewLoading, activePreview]);
+
   function openPreview(path: string) {
     setPreviewLoading(true);
     setPreviewPath(path);
