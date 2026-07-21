@@ -40,16 +40,29 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import type { Handler } from '@netlify/functions';
 
-// Initialize Firebase Admin
-const serviceAccount = JSON.parse(
-  Buffer.from(process.env.FIREBASE_ADMIN_SDK_B64 || '', 'base64').toString()
-);
+// Firebase Admin will be initialized in the handler (defer to avoid crash if env var missing)
+let db: any = null;
 
-initializeApp({
-  credential: cert(serviceAccount),
-});
+function initializeFirebase() {
+  if (db) return; // Already initialized
+  
+  const credB64 = process.env.FIREBASE_ADMIN_SDK_B64 || '';
+  if (!credB64) {
+    throw new Error('FIREBASE_ADMIN_SDK_B64 environment variable is not set');
+  }
 
-const db = getFirestore();
+  try {
+    const serviceAccount = JSON.parse(
+      Buffer.from(credB64, 'base64').toString()
+    );
+    initializeApp({
+      credential: cert(serviceAccount),
+    });
+    db = getFirestore();
+  } catch (error) {
+    throw new Error(`Failed to initialize Firebase: ${error}`);
+  }
+}
 
 interface NominationData {
   nomineeName?: any;
@@ -172,6 +185,9 @@ const handler: Handler = async (event) => {
         body: JSON.stringify({ error: 'Method not allowed' })
       };
     }
+
+    // Initialize Firebase on first request
+    initializeFirebase();
 
     const body = JSON.parse(event.body || '{}');
     const { action = 'report', dryRun = true } = body;
