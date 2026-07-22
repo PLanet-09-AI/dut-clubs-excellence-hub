@@ -26,16 +26,29 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import type { Handler } from '@netlify/functions';
 
-// Initialize Firebase Admin
-const serviceAccount = JSON.parse(
-  Buffer.from(process.env.FIREBASE_ADMIN_SDK_B64 || '', 'base64').toString()
-);
+// Firebase Admin will be initialized in the handler (defer to avoid crash if env var missing)
+let db: any = null;
 
-initializeApp({
-  credential: cert(serviceAccount),
-});
+function initializeFirebase() {
+  if (db) return; // Already initialized
+  
+  const credB64 = process.env.FIREBASE_ADMIN_SDK_B64 || '';
+  if (!credB64) {
+    throw new Error('FIREBASE_ADMIN_SDK_B64 environment variable is not set');
+  }
 
-const db = getFirestore();
+  try {
+    const serviceAccount = JSON.parse(
+      Buffer.from(credB64, 'base64').toString()
+    );
+    initializeApp({
+      credential: cert(serviceAccount),
+    });
+    db = getFirestore();
+  } catch (error) {
+    throw new Error(`Failed to initialize Firebase: ${error}`);
+  }
+}
 
 interface CorruptedNomination {
   id: string;
@@ -109,6 +122,9 @@ function isCorrupted(docId: string, data: Record<string, any>): { corrupted: boo
 
 const handler: Handler = async (event) => {
   try {
+    // Initialize Firebase on first request
+    initializeFirebase();
+
     // Only allow POST requests
     if (event.httpMethod !== 'POST') {
       return {

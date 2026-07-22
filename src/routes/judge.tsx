@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
+import { initializeClarityUser, clearClarityUser } from "@/lib/clarity-integration";
 import {
   Lock,
   LogOut,
@@ -241,6 +242,8 @@ function JudgePage() {
           if (role === "judge") {
             setAuthed(true);
             setChecking(false);
+            // Link session to Clarity for user identification and session recording
+            initializeClarityUser(user.uid, user.email || 'unknown', 'judge');
             return;
           } else if (role === "admin") {
             navigate({ to: "/admin" });
@@ -386,6 +389,8 @@ function JudgePage() {
             onLogout={async () => {
               setLoggingOut(true);
               try {
+                // Clear Clarity user context before signing out
+                clearClarityUser();
                 await firebaseSignOut();
                 await new Promise((resolve) => setTimeout(resolve, 500));
               } finally {

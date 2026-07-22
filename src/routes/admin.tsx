@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { initializeClarityUser, clearClarityUser } from "@/lib/clarity-integration";
 import {
   Lock,
   LogOut,
@@ -365,6 +366,8 @@ function AdminPage() {
           if (role === "admin" || role === "judge") {
             setUserRole(role);
             setAuthed(true);
+            // Link session to Clarity for user identification and session recording
+            initializeClarityUser(user.uid, user.email || 'unknown', role);
             return;
           }
         } catch (err) {
@@ -378,6 +381,8 @@ function AdminPage() {
           if (data?.role === "admin" || data?.role === "judge") {
             setUserRole(data.role);
             setAuthed(true);
+            // Link session to Clarity for user identification and session recording
+            initializeClarityUser(user.uid, user.email || 'unknown', data.role);
             return;
           }
         } catch (err) {
@@ -475,6 +480,8 @@ function AdminPage() {
   async function logout() {
     setLoggingOut(true);
     try {
+      // Clear Clarity user context before signing out
+      clearClarityUser();
       await firebaseSignOut();
       // Add brief delay for animation effect
       await new Promise((resolve) => setTimeout(resolve, 500));

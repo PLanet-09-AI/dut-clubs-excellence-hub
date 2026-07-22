@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
+import { initializeClarityUser, clearClarityUser } from "@/lib/clarity-integration";
 import { motion } from "framer-motion";
 import {
   Trophy,
@@ -323,6 +324,8 @@ function LeaderboardPage() {
         if (data?.role === "judge" || data?.role === "admin") {
           setRole(data.role as string);
           setAuthed(true);
+          // Link session to Clarity for user identification and session recording
+          initializeClarityUser(user.uid, user.email || 'unknown', data.role as 'admin' | 'judge');
         } else {
           await firebaseSignOut();
           setAuthed(false);
