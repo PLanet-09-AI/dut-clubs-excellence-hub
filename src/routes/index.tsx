@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { lazy, Suspense, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Award, Sparkles, Calendar, MapPin, Users, Trophy, Heart, Briefcase, Home, Globe, GraduationCap, ChevronDown, ChevronRight, ShieldCheck, Star, FileText, Loader } from "lucide-react";
+import { Award, Sparkles, Calendar, MapPin, Users, Trophy, Heart, Briefcase, Home, Globe, GraduationCap, ChevronDown, ChevronRight, ShieldCheck, Star, FileText, Loader, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SiteNav from "@/components/SiteNav";
 import EventProgram from "@/components/EventProgram";
@@ -48,6 +48,15 @@ const stats = [
   { num: "8", label: "Award Categories" },
   { num: "2026", label: "Year of Excellence" },
 ];
+
+// Nomination period deadline: August 2, 2026 at midnight (00:00:00)
+const NOMINATION_DEADLINE = new Date("2026-08-02T00:00:00").getTime();
+
+// Check if nomination period is closed
+function isNominationPeriodClosed(): boolean {
+  const now = new Date().getTime();
+  return now > NOMINATION_DEADLINE;
+}
 
 function Index() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -318,6 +327,30 @@ function Index() {
         </div>
       </section>
 
+      {/* Nomination Period Closed Banner */}
+      {isNominationPeriodClosed() && (
+        <section className="relative z-10 mx-auto max-w-7xl px-6 py-6">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl border-2 border-red-300 bg-red-50 px-6 py-5 shadow-sm"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-200">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-red-900">Nomination Period Has Closed</h3>
+                <p className="text-sm text-red-800 mt-1">
+                  Thank you for your interest in SALEA 2026! The nomination period ended on August 2, 2026 at midnight. 
+                  No new nominations are being accepted. Thank you to everyone who participated!
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </section>
+      )}
+
       {/* Categories */}
       <section id="categories" className="relative z-10 mx-auto max-w-7xl px-6 py-20">
         <div className="mb-14 text-center">
@@ -407,12 +440,15 @@ function Index() {
                         <motion.button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleNominate(c.id);
+                            if (!isNominationPeriodClosed()) {
+                              handleNominate(c.id);
+                            }
                           }}
-                          disabled={nominatingId === c.id}
-                          whileHover={nominatingId !== c.id ? { scale: 1.05 } : {}}
-                          whileTap={nominatingId !== c.id ? { scale: 0.95 } : {}}
+                          disabled={nominatingId === c.id || isNominationPeriodClosed()}
+                          whileHover={nominatingId !== c.id && !isNominationPeriodClosed() ? { scale: 1.05 } : {}}
+                          whileTap={nominatingId !== c.id && !isNominationPeriodClosed() ? { scale: 0.95 } : {}}
                           className="mt-4 w-full rounded-xl bg-gold px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-gold transition hover:opacity-90 disabled:opacity-70"
+                          title={isNominationPeriodClosed() ? "Nomination period has closed" : ""}
                         >
                           <div className="flex items-center justify-center gap-2">
                             {nominatingId === c.id ? (
@@ -425,6 +461,8 @@ function Index() {
                                 </motion.div>
                                 <span>Processing...</span>
                               </>
+                            ) : isNominationPeriodClosed() ? (
+                              <span>Nominations Closed</span>
                             ) : (
                               <span>Nominate for this Award</span>
                             )}

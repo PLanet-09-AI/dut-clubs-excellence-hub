@@ -1,9 +1,9 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, Browser } from '@playwright/test';
 
 test.describe('Nomination Submission with Google Docs Link', () => {
   let page: Page;
 
-  test.beforeEach(async ({ browser }) => {
+  test.beforeEach(async ({ browser }: { browser: Browser }) => {
     page = await browser.newPage();
     // Navigate to the nomination form
     await page.goto('http://localhost:8081');
@@ -39,19 +39,19 @@ test.describe('Nomination Submission with Google Docs Link', () => {
 
     // Fill in nomination form fields
     const nomineeNameInput = page.locator('input[placeholder*="name" i], input[name*="name" i]').first();
-    if (nomineeNameInput.isVisible()) {
+    if (await nomineeNameInput.isVisible()) {
       await nomineeNameInput.fill('Test Nominee Google Docs');
       console.log('✅ Entered nominee name');
     }
 
     const nomineeEmailInput = page.locator('input[type="email"], input[placeholder*="email" i]').first();
-    if (nomineeEmailInput.isVisible()) {
+    if (await nomineeEmailInput.isVisible()) {
       await nomineeEmailInput.fill(`test-${Date.now()}@example.com`);
       console.log('✅ Entered nominee email');
     }
 
     const studentNumberInput = page.locator('input[placeholder*="student" i], input[placeholder*="number" i]').first();
-    if (studentNumberInput.isVisible()) {
+    if (await studentNumberInput.isVisible()) {
       await studentNumberInput.fill('S12345678');
       console.log('✅ Entered student number');
     }

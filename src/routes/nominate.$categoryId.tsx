@@ -72,6 +72,27 @@ const RELATIONSHIP_OPTIONS = [
 
 const STEP_LABELS = ["Nominee Details", "Your Details", "Nomination Questions"];
 
+// Nomination period deadline: August 2, 2026 at midnight (00:00:00)
+const NOMINATION_DEADLINE = new Date("2026-08-02T00:00:00").getTime();
+
+// Check if nomination period is closed
+function isNominationPeriodClosed(): boolean {
+  const now = new Date().getTime();
+  return now > NOMINATION_DEADLINE;
+}
+
+// Format the deadline for display
+function formatDeadline(): string {
+  const deadline = new Date(NOMINATION_DEADLINE);
+  return deadline.toLocaleDateString("en-ZA", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 type Step = 1 | 2 | 3;
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -287,6 +308,14 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
 
   async function submit() {
     setError("");
+    
+    // Check if nomination period is closed
+    if (isNominationPeriodClosed()) {
+      setError("The nomination period has closed and no new nominations are being accepted. The deadline was August 2, 2026 at midnight.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    
     if (!validateStep3()) {
       setError("Please answer all questions before submitting.");
       return;
@@ -448,6 +477,55 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
 
   if (submitted) {
     return <SuccessScreen categoryName={category.name} onBack={onBack} />;
+  }
+
+  // Check if nomination period is closed
+  const periodClosed = isNominationPeriodClosed();
+
+  if (periodClosed) {
+    return (
+      <div>
+        {/* Breadcrumb */}
+        <button
+          onClick={onBack}
+          className="mb-6 flex items-center gap-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to Award Categories
+        </button>
+
+        {/* Nomination period closed message */}
+        <div className="rounded-2xl border-2 border-red-300 bg-red-50 px-8 py-12 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-200">
+              <AlertCircle className="h-6 w-6 text-red-600" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold text-red-900 mb-2">
+                Nomination Period Has Closed
+              </h2>
+              <p className="text-red-800 mb-4">
+                Thank you for your interest! Unfortunately, the nomination period for SALEA 2026 has officially ended. 
+                No new nominations are being accepted at this time.
+              </p>
+              <div className="rounded-lg bg-red-100 px-4 py-3 border border-red-200">
+                <p className="text-sm text-red-700">
+                  <span className="font-semibold">Deadline was:</span> August 2, 2026 at midnight
+                </p>
+              </div>
+              <p className="text-red-700 text-sm mt-4">
+                If you believe this is an error or have questions, please contact the awards team.
+              </p>
+              <Button
+                onClick={onBack}
+                className="mt-6 bg-red-600 hover:bg-red-700 text-white"
+              >
+                Return to Awards
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

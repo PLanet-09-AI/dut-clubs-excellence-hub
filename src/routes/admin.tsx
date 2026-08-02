@@ -232,6 +232,15 @@ export const Route = createFileRoute("/admin")({
   }),
 });
 
+// ─── Nomination period deadline ────────────────────────────────────────────────
+
+const NOMINATION_DEADLINE = new Date("2026-08-02T00:00:00").getTime();
+
+function isNominationPeriodClosed(): boolean {
+  const now = new Date().getTime();
+  return now > NOMINATION_DEADLINE;
+}
+
 // ─── Admin quick-start guide ──────────────────────────────────────────────────
 
 const ADMIN_STEPS = [
@@ -1428,8 +1437,8 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
 
   function formatDate(ts: Nomination["createdAt"]) {
     if (!ts) {
-      // No submission date available - return placeholder
-      return "—";
+      // No submission date available
+      return "Date unavailable";
     }
 
     let date: Date | null = null;
@@ -1482,8 +1491,12 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
       });
     }
 
-    // No valid date found - return placeholder instead of today's date
-    return "—";
+    // No valid date found
+    return "Date unavailable";
+  }
+
+  function isDateMissing(ts: Nomination["createdAt"]): boolean {
+    return !ts;
   }
 
   const STATUS_FILTERS: { label: string; value: "all" | NominationStatus }[] = [
@@ -1524,6 +1537,23 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
             )}
           </Button>
         </div>
+
+        {/* Nomination Period Closed Banner */}
+        {isNominationPeriodClosed() && (
+          <div className="rounded-2xl border-2 border-blue-300 bg-blue-50 px-6 py-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-200">
+                <Info className="h-5 w-5 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-blue-900">Nomination Period Closed</p>
+                <p className="text-sm text-blue-800">
+                  The nomination period ended on August 2, 2026 at midnight. No new nominations are being accepted.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Admin Actions Grid - Organized by category */}
         {canManage && (
@@ -1891,11 +1921,26 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
                   <button
                     key={n.id}
                     onClick={() => setDetailNom(n)}
-                    className="group text-left rounded-2xl border border-primary/20 bg-white p-5 shadow-sm transition hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                    className={`group text-left rounded-2xl border bg-white p-5 shadow-sm transition hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
+                      isDateMissing(n.createdAt)
+                        ? "border-amber-200 hover:border-amber-400"
+                        : "border-primary/20 hover:border-primary/50"
+                    }`}
                   >
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <StatusBadge status={n.status} />
-                      <span className="text-[11px] text-muted-foreground">
+                      <span
+                        className={`text-[11px] ${
+                          isDateMissing(n.createdAt)
+                            ? "text-amber-700 font-medium"
+                            : "text-muted-foreground"
+                        }`}
+                        title={
+                          isDateMissing(n.createdAt)
+                            ? "Submission date not recorded. This nomination may have been imported or created before date tracking was enabled."
+                            : undefined
+                        }
+                      >
                         {formatDate(n.createdAt)}
                       </span>
                     </div>
@@ -2515,6 +2560,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
               onUpdate={update}
               onDelete={remove}
               formatDate={formatDate}
+              isDateMissing={isDateMissing}
               canManage={canManage}
               setShowVideoPreview={setShowVideoPreview}
             />
@@ -3136,6 +3182,7 @@ function NominationDetail({
   onUpdate,
   onDelete,
   formatDate,
+  isDateMissing,
   canManage,
   setShowVideoPreview,
 }: {
@@ -3143,6 +3190,7 @@ function NominationDetail({
   onUpdate: (id: string, s: NominationStatus) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   formatDate: (ts: Nomination["createdAt"]) => string;
+  isDateMissing: (ts: Nomination["createdAt"]) => boolean;
   canManage: boolean;
   setShowVideoPreview: (state: { url: string; name: string } | null) => void;
 }) {
@@ -3738,9 +3786,25 @@ function NominationDetail({
               ["Student #", nom.studentNumber],
               ["Submitted", formatDate(nom.createdAt)],
             ].map(([k, v]) => (
-              <div key={k} className="rounded-xl border border-primary/15 bg-gray-50 p-3">
+              <div
+                key={k}
+                className={`rounded-xl border p-3 ${
+                  k === "Submitted" && isDateMissing(nom.createdAt)
+                    ? "border-amber-200 bg-amber-50"
+                    : "border-primary/15 bg-gray-50"
+                }`}
+              >
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{k}</p>
-                <p className="mt-0.5 font-semibold text-foreground">{v ?? "—"}</p>
+                <div className="mt-0.5 flex items-center gap-1">
+                  <p className={`font-semibold ${
+                    k === "Submitted" && isDateMissing(nom.createdAt) ? "text-amber-900" : "text-foreground"
+                  }`}>
+                    {v ?? "—"}
+                  </p>
+                  {k === "Submitted" && isDateMissing(nom.createdAt) && (
+                    <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+                  )}
+                </div>
               </div>
             ))}
           </div>
