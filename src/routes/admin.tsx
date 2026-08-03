@@ -3355,16 +3355,41 @@ function NominationDetail({
     : "";
 
   /**
-   * Returns a PWA-safe viewer URL for PDFs.
-   * - Blob URLs (runtime-converted): returned as-is; caller should use <object>.
-   * - Remote URLs: wrapped in Google Docs viewer so iOS PWA can render them.
+   * Returns true only when running as an installed/standalone PWA (iOS "Add to
+   * Home Screen" or Android/desktop installed app) — regular browser tabs
+   * render PDFs natively and don't need any special handling.
    */
-  function getPwaViewerUrl(rawPdfUrl: string): { kind: "blob" | "gdocs"; src: string } {
+  function isStandalonePwa(): boolean {
+    if (typeof window === "undefined") return false;
+    const nav = window.navigator as Navigator & { standalone?: boolean };
+    return (
+      window.matchMedia?.("(display-mode: standalone)").matches ||
+      window.matchMedia?.("(display-mode: fullscreen)").matches ||
+      window.matchMedia?.("(display-mode: minimal-ui)").matches ||
+      nav.standalone === true
+    );
+  }
+
+  /**
+   * Returns a viewer URL/strategy for PDFs.
+   * - Blob URLs (runtime-converted): returned as-is; caller should use <object>.
+   * - Remote URLs in a normal browser tab: rendered directly — browsers embed
+   *   PDFs natively with no file-size ceiling, unlike Google Docs Viewer
+   *   (which fails with "This file is too large to preview" on big PDFs and
+   *   pulls in Google's own CSP-violating telemetry).
+   * - Remote URLs in standalone PWA mode: iOS/Android PWA webviews often
+   *   don't render remote PDF iframes, so Google Docs Viewer is used there
+   *   as a fallback despite its size limits.
+   */
+  function getPwaViewerUrl(rawPdfUrl: string): { kind: "blob" | "gdocs" | "direct"; src: string } {
     if (rawPdfUrl.startsWith("blob:")) return { kind: "blob", src: rawPdfUrl };
-    return {
-      kind: "gdocs",
-      src: `https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`,
-    };
+    if (isStandalonePwa()) {
+      return {
+        kind: "gdocs",
+        src: `https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`,
+      };
+    }
+    return { kind: "direct", src: rawPdfUrl };
   }
 
   const resolvedPdfSrc = resolvedKind === "pdf" && activePreview
@@ -3755,8 +3780,29 @@ function NominationDetail({
                   </div>
                 </div>
               </object>
+            ) : resolvedKind === "pdf" && pwaViewer?.kind === "direct" ? (
+              /* Remote PDF, regular browser tab — native PDF rendering, no size limit */
+              <object
+                key={activePreview.path}
+                data={pwaViewer.src}
+                type="application/pdf"
+                className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                onLoad={() => setPreviewLoading(false)}
+              >
+                <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold">PDF ready</p>
+                    <p className="text-xs text-muted-foreground">Your browser cannot embed this PDF inline.</p>
+                    <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
+                      <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                        <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open PDF
+                      </Button>
+                    </a>
+                  </div>
+                </div>
+              </object>
             ) : resolvedKind === "pdf" && pwaViewer?.kind === "gdocs" ? (
-              /* Remote PDF — Google Docs viewer works in iOS PWA, Android PWA, and all browsers */
+              /* Remote PDF in standalone PWA — Google Docs viewer, may fail on very large files */
               <iframe
                 key={activePreview.path}
                 src={pwaViewer.src}
@@ -4277,8 +4323,28 @@ function NominationDetail({
                     </div>
                   </div>
                 </object>
+              ) : resolvedKind === "pdf" && pwaViewer?.kind === "direct" ? (
+                /* Remote PDF, regular browser tab — native PDF rendering, no size limit */
+                <object
+                  key={`mobile-direct-${activePreview.path}`}
+                  data={pwaViewer.src}
+                  type="application/pdf"
+                  className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                >
+                  <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold">PDF ready</p>
+                      <p className="text-xs text-muted-foreground">Your browser cannot embed this PDF inline.</p>
+                      <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                          <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open PDF
+                        </Button>
+                      </a>
+                    </div>
+                  </div>
+                </object>
               ) : resolvedKind === "pdf" && pwaViewer?.kind === "gdocs" ? (
-                /* Remote PDF — Google Docs viewer works in iOS PWA + Android PWA */
+                /* Remote PDF in standalone PWA — Google Docs viewer, may fail on very large files */
                 <iframe
                   key={`mobile-gdocs-${activePreview.path}`}
                   src={pwaViewer.src}
