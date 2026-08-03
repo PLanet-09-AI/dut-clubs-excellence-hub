@@ -17,6 +17,46 @@ import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
+import { createHash } from "node:crypto";
+import { initializeApp, cert, getApps } from "firebase-admin/app";
+import { getStorage } from "firebase-admin/storage";
+
+// ─── Firebase Admin (lazy init) — used to cache converted PDFs in Storage ───
+// Returning the rendered PDF inline (base64 in the Lambda response body) hits
+// Netlify/AWS Lambda's ~6 MB response size limit for anything but the smallest
+// documents (error: Function.ResponseSizeTooLarge). Instead we upload the PDF
+// to Firebase Storage and return a small JSON payload with a signed URL. This
+// also lets us cache conversions by source-file hash, so repeated previews of
+// the same document skip the (slow, memory-heavy) Chromium render entirely.
+const STORAGE_BUCKET =
+  process.env.FIREBASE_STORAGE_BUCKET || "student-services-745d5.appspot.com";
+const CACHE_PREFIX = "office-preview-cache/";
+const SIGNED_URL_TTL_MS = 6 * 24 * 60 * 60 * 1000; // 6 days (GCS signed URL max is 7 days)
+
+function getBucket() {
+  if (getApps().length === 0) {
+    const credB64 = process.env.FIREBASE_ADMIN_SDK_B64 || "";
+    if (!credB64) {
+      throw new Error("FIREBASE_ADMIN_SDK_B64 environment variable is not set");
+    }
+    const serviceAccount = JSON.parse(Buffer.from(credB64, "base64").toString());
+    initializeApp({ credential: cert(serviceAccount), storageBucket: STORAGE_BUCKET });
+  }
+  return getStorage().bucket(STORAGE_BUCKET);
+}
+
+function cacheKeyFor(sourceUrl: string): string {
+  return `${CACHE_PREFIX}${createHash("sha256").update(sourceUrl).digest("hex")}.pdf`;
+}
+
+async function signedUrlFor(objectPath: string): Promise<string> {
+  const bucket = getBucket();
+  const [url] = await bucket.file(objectPath).getSignedUrl({
+    action: "read",
+    expires: Date.now() + SIGNED_URL_TTL_MS,
+  });
+  return url;
+}
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -382,6 +422,24 @@ export const handler: Handler = async (event: HandlerEvent) => {
     return jsonError("Invalid fileName.", 400);
   }
 
+  // ── Cache check: reuse a previously-converted PDF when available ─────────
+  const cacheKey = cacheKeyFor(sourceUrl);
+  try {
+    const [cachedExists] = await getBucket().file(cacheKey).exists();
+    if (cachedExists) {
+      console.log(`[office-to-pdf] Cache hit for ${fileName} (${cacheKey})`);
+      const pdfUrl = await signedUrlFor(cacheKey);
+      return {
+        statusCode: 200,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ pdfUrl, cached: true }),
+      };
+    }
+  } catch (err) {
+    // Cache lookup failures should not block conversion — fall through and render.
+    console.warn(`[office-to-pdf] Cache lookup failed, proceeding with conversion:`, err);
+  }
+
   // Download source file from Firebase Storage
   let fileBuffer: Buffer;
   try {
@@ -453,16 +511,27 @@ export const handler: Handler = async (event: HandlerEvent) => {
     return jsonError(`Failed to render PDF: ${msg}`, 500);
   }
 
-  const baseName = fileName.replace(/\.[^.]+$/, "");
-  console.log(`[office-to-pdf] Success: returning ${pdfBuffer.length} bytes as PDF`);
-  return {
-    statusCode: 200,
-    headers: {
-      "content-type": "application/pdf",
-      "cache-control": "no-store",
-      "content-disposition": `inline; filename="${baseName}.pdf"`,
-    },
-    body: pdfBuffer.toString("base64"),
-    isBase64Encoded: true,
-  };
+  // Upload the rendered PDF to Storage (cached by source-file hash) and return
+  // a signed URL instead of embedding the bytes in the function response —
+  // avoids the Lambda response size limit and lets the browser fetch/cache
+  // the PDF directly from Storage/CDN on subsequent opens.
+  console.log(`[office-to-pdf] Success: uploading ${pdfBuffer.length} bytes to Storage cache`);
+  try {
+    await getBucket().file(cacheKey).save(pdfBuffer, {
+      contentType: "application/pdf",
+      metadata: {
+        cacheControl: "public, max-age=31536000, immutable",
+      },
+    });
+    const pdfUrl = await signedUrlFor(cacheKey);
+    return {
+      statusCode: 200,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+      body: JSON.stringify({ pdfUrl, cached: false }),
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[office-to-pdf] Storage upload error: ${msg}`);
+    return jsonError(`Failed to store converted PDF: ${msg}`, 500);
+  }
 };

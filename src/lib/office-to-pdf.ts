@@ -7,9 +7,12 @@
  *   2. The client POSTs `{ sourceUrl, fileName }` to `/api/office-to-pdf`.
  *   3. The Netlify function (netlify/functions/office-to-pdf.mts) downloads the
  *      file, parses it to HTML (mammoth / xlsx / jszip), renders the HTML to PDF
- *      with headless Chromium, and returns `application/pdf`.
- *   4. The client receives a PDF Blob it can preview in an <iframe>, turn into an
- *      object URL, or re-upload as a cached preview.
+ *      with headless Chromium, uploads the PDF to Firebase Storage (cached by a
+ *      hash of the source URL), and returns a small JSON payload with a signed
+ *      Storage URL — never the PDF bytes, since embedding those in the Lambda
+ *      response can exceed its ~6 MB size limit (Function.ResponseSizeTooLarge).
+ *   4. The client uses that URL directly (e.g. as an <iframe src>) or fetches it
+ *      into a Blob when an object URL is needed.
  *
  * Import these helpers anywhere you need Office → PDF behaviour instead of
  * re-implementing the fetch / regex in each component.
@@ -36,13 +39,16 @@ export function stripExtension(name: string): string {
 }
 
 /**
- * Calls the office-to-pdf function and returns the rendered PDF as a Blob.
- * Throws an Error (with the server message when available) on failure.
+ * Calls the office-to-pdf function, which converts (or reuses a cached
+ * conversion of) the source file and returns a signed Storage URL for the
+ * rendered PDF — never the PDF bytes themselves, since embedding those in the
+ * function response can exceed the Lambda response size limit
+ * (Function.ResponseSizeTooLarge) for larger documents.
  */
-export async function convertOfficeToPdfBlob(
+export async function convertOfficeToPdfUrl(
   sourceUrl: string,
   fileName: string,
-): Promise<Blob> {
+): Promise<string> {
   const response = await fetch(OFFICE_TO_PDF_ENDPOINT, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -54,7 +60,30 @@ export async function convertOfficeToPdfBlob(
     throw new Error(message || "Office-to-PDF conversion failed.");
   }
 
-  return await response.blob();
+  const { pdfUrl } = (await response.json()) as { pdfUrl?: string };
+  if (!pdfUrl) {
+    throw new Error("Office-to-PDF conversion did not return a PDF URL.");
+  }
+  return pdfUrl;
+}
+
+/**
+ * Calls the office-to-pdf function and returns the rendered PDF as a Blob by
+ * fetching the signed Storage URL it returns. Prefer `convertOfficeToPdfUrl`
+ * directly when you just need a URL (e.g. for an <iframe src>) — it avoids
+ * this extra download and lets the browser cache the PDF via Storage/CDN.
+ * Throws an Error (with the server message when available) on failure.
+ */
+export async function convertOfficeToPdfBlob(
+  sourceUrl: string,
+  fileName: string,
+): Promise<Blob> {
+  const pdfUrl = await convertOfficeToPdfUrl(sourceUrl, fileName);
+  const pdfResponse = await fetch(pdfUrl);
+  if (!pdfResponse.ok) {
+    throw new Error("Failed to download the converted PDF.");
+  }
+  return await pdfResponse.blob();
 }
 
 /**

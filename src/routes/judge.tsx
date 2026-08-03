@@ -37,6 +37,7 @@ import {
   query,
   orderBy,
   where,
+  limit,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { signIn, signOut as firebaseSignOut, subscribeToAuthState } from "@/lib/auth-firebase";
@@ -49,7 +50,8 @@ import {
   getCriteriaForCategory,
   computeWeightedAverage,
 } from "@/data/awards";
-import { convertOfficeToPdfBlob } from "@/lib/office-to-pdf";
+import { convertOfficeToPdfUrl } from "@/lib/office-to-pdf";
+import { convertOfficeToHtml, isClientConvertible, withZoom } from "@/lib/office-to-html-client";
 import SiteNav from "@/components/SiteNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -570,8 +572,13 @@ function JudgeDashboard({ onLogout, loggingOut }: { onLogout: () => void; loggin
   const scoringOpen = realJudgingActive;
 
   // Only shortlisted nominations
+  // NOTE: Limit to 100 to prevent exceeding Firebase's 6MB response size limit
   useEffect(() => {
-    const q = query(collection(db, "nominations"), where("status", "==", "shortlisted"));
+    const q = query(
+      collection(db, "nominations"),
+      where("status", "==", "shortlisted"),
+      limit(100),
+    );
     const unsub = onSnapshot(q, (snap) => {
       setNominations(
         snap.docs
@@ -929,8 +936,8 @@ function JudgeNominationDetail({
     type EvidenceFile = {
       questionId: string;
       evidenceLabel: string;
-      file: { name: string; url: string; size: number; path: string };
-      kind: "pdf" | "office";
+      file: { name: string; url: string; size: number; path: string; previewPdfUrl?: string };
+      kind: "pdf" | "office" | "image";
     };
     const files: EvidenceFile[] = [];
     if (!catData?.questions) return files;
@@ -958,6 +965,7 @@ function JudgeNominationDetail({
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
   const [officePreviewError, setOfficePreviewError] = useState(false);
   const [runtimePreviewPdfUrls, setRuntimePreviewPdfUrls] = useState<Record<string, string>>({});
+  const [runtimePreviewHtml, setRuntimePreviewHtml] = useState<Record<string, string>>({});
   const [runtimeConvertingPath, setRuntimeConvertingPath] = useState<string | null>(null);
   const [runtimeConversionError, setRuntimeConversionError] = useState<string | null>(null);
 
@@ -983,13 +991,8 @@ function JudgeNominationDetail({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      Object.values(runtimePreviewPdfUrls).forEach((blobUrl) => {
-        URL.revokeObjectURL(blobUrl);
-      });
-    };
-  }, [runtimePreviewPdfUrls]);
+  // runtimePreviewPdfUrls now holds signed Storage URLs (not blob: object URLs),
+  // so there is nothing to revoke — the browser handles caching/eviction itself.
 
   const activePreview = useMemo(
     () => evidenceFiles.find(({ file }) => file.path === previewPath) ?? null,
@@ -1010,10 +1013,18 @@ function JudgeNominationDetail({
 
   const activePdfUrl = activePreview?.file.previewPdfUrl ?? activeRuntimePdfUrl;
 
-  const resolvedKind: "pdf" | "office" | "image" | null =
-    activePreview && activePreview.kind === "office" && activePdfUrl
-      ? "pdf"
-      : activePreview?.kind ?? null;
+  const activeHtml =
+    activePreview && activePreview.file.path
+      ? runtimePreviewHtml[activePreview.file.path]
+      : undefined;
+  const activeHtmlZoomed = activeHtml ? withZoom(activeHtml, previewZoom) : undefined;
+
+  const resolvedKind: "pdf" | "office" | "image" | "html" | null =
+    activePreview && activePreview.kind === "office" && activeHtml
+      ? "html"
+      : activePreview && activePreview.kind === "office" && activePdfUrl
+        ? "pdf"
+        : activePreview?.kind ?? null;
 
   const activePreviewUrl = activePreview
     ? resolvedKind === "pdf"
@@ -1037,7 +1048,7 @@ function JudgeNominationDetail({
       return;
     }
 
-    if (target.previewPdfUrl || runtimePreviewPdfUrls[target.path]) {
+    if (target.previewPdfUrl || runtimePreviewPdfUrls[target.path] || runtimePreviewHtml[target.path]) {
       setRuntimeConvertingPath(null);
       setRuntimeConversionError(null);
       return;
@@ -1050,15 +1061,26 @@ function JudgeNominationDetail({
         setRuntimeConvertingPath(target.path);
         setRuntimeConversionError(null);
 
-        const pdfBlob = await convertOfficeToPdfBlob(target.url, target.name);
+        // Prefer converting entirely in-browser — it has no file-size/timeout
+        // ceiling (unlike the server pipeline's Chromium render), so large
+        // documents preview fine. Only fall back to the server-rendered PDF
+        // pipeline when the client can't handle the format (e.g. legacy .doc)
+        // or parsing fails (corrupt/password-protected file).
+        if (isClientConvertible(target.name)) {
+          try {
+            const html = await convertOfficeToHtml(target.url, target.name);
+            if (cancelled) return;
+            setRuntimePreviewHtml((prev) => ({ ...prev, [target.path]: html }));
+            return;
+          } catch (clientErr) {
+            console.warn("[judge] Client-side Office conversion failed, falling back to server:", clientErr);
+          }
+        }
+
+        const pdfUrl = await convertOfficeToPdfUrl(target.url, target.name);
         if (cancelled) return;
 
-        const objectUrl = URL.createObjectURL(pdfBlob);
-        setRuntimePreviewPdfUrls((prev) => {
-          const existing = prev[target.path];
-          if (existing) URL.revokeObjectURL(existing);
-          return { ...prev, [target.path]: objectUrl };
-        });
+        setRuntimePreviewPdfUrls((prev) => ({ ...prev, [target.path]: pdfUrl }));
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : "Failed to convert Office file";
@@ -1076,7 +1098,7 @@ function JudgeNominationDetail({
     return () => {
       cancelled = true;
     };
-  }, [activePreview?.file, activePreview?.kind, runtimePreviewPdfUrls]);
+  }, [activePreview?.file, activePreview?.kind, runtimePreviewPdfUrls, runtimePreviewHtml]);
 
   function openPreview(path: string) {
     setPreviewPath(path);
@@ -1252,7 +1274,7 @@ function JudgeNominationDetail({
                 <div className="max-w-sm space-y-2">
                   <p className="text-sm font-semibold text-foreground">Converting document…</p>
                   <p className="text-xs text-muted-foreground">
-                    Preparing a PDF preview for this Office file. This can take a few seconds.
+                    Preparing a preview for this Office file. This can take a few seconds.
                   </p>
                 </div>
               </div>
@@ -1289,12 +1311,22 @@ function JudgeNominationDetail({
                   </div>
                 </div>
               </div>
+            ) : resolvedKind === "html" && activeHtmlZoomed ? (
+              <iframe
+                key={activePreview.file.path}
+                srcDoc={activeHtmlZoomed}
+                title={`Document preview for ${activePreview.file.name}`}
+                sandbox=""
+                className="h-full w-full rounded-lg border border-primary/20 bg-white"
+              />
             ) : activePreview.kind === "image" ? (
               <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
                 <img
                   key={activePreview.file.path}
                   src={activePreview.file.url}
                   alt={activePreview.file.name}
+                  loading="lazy"
+                  decoding="async"
                   className="max-h-full max-w-full rounded object-contain"
                 />
               </div>
@@ -1741,16 +1773,26 @@ function JudgeNominationDetail({
                     <div className="max-w-sm space-y-2">
                       <p className="text-sm font-semibold text-foreground">Converting document…</p>
                       <p className="text-xs text-muted-foreground">
-                        Preparing a PDF preview for this Office file. This can take a few seconds.
+                        Preparing a preview for this Office file. This can take a few seconds.
                       </p>
                     </div>
                   </div>
+                ) : resolvedKind === "html" && activeHtmlZoomed ? (
+                  <iframe
+                    key={activePreview.file.path}
+                    srcDoc={activeHtmlZoomed}
+                    title={`Preview: ${activePreview.file.name}`}
+                    sandbox=""
+                    className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                  />
                 ) : resolvedKind === "image" ? (
                   <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
                     <img
                       key={activePreview.file.path}
                       src={activePreview.file.url}
                       alt={activePreview.file.name}
+                      loading="lazy"
+                      decoding="async"
                       className="max-h-full max-w-full rounded object-contain"
                     />
                   </div>

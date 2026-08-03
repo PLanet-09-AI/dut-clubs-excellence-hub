@@ -59,6 +59,11 @@ import {
   OFFICE_FILE_PATTERN,
   IMAGE_FILE_PATTERN,
 } from "@/lib/office-to-pdf";
+import {
+  convertOfficeToHtml,
+  isClientConvertible,
+  withZoom,
+} from "@/lib/office-to-html-client";
 import { validateDocumentsForCategory, getIncompleteItemsList } from "@/lib/document-validation";
 import {
   logCreateAccount,
@@ -153,7 +158,7 @@ type Nomination = {
   status: NominationStatus;
 };
 
-type PreviewKind = "pdf" | "office" | "image" | "video";
+type PreviewKind = "pdf" | "office" | "image" | "video" | "html";
 
 function hasFileExtension(value: string, extensionPattern: RegExp): boolean {
   if (!value) return false;
@@ -731,6 +736,10 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   const [sendingShortlistEmails, setSendingShortlistEmails] = useState(false);
   const [shortlistEmailResults, setShortlistEmailResults] = useState<{ email: string; success: boolean; error?: string }[]>([]);
   const [showVideoPreview, setShowVideoPreview] = useState<{ url: string; name: string } | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12; // 3 columns × 4 rows on desktop
 
   // All categories = static + admin-added (from Firestore)
   const allCategories = useMemo(
@@ -747,10 +756,20 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   );
 
   // Real-time Firestore listener — nominations
+  // NOTE: We limit to 100 results to prevent exceeding Firebase's 6MB response size limit
+  // with large document uploads. Frontend can implement pagination if needed.
   useEffect(() => {
     const q = canManage
-      ? query(collection(db, "nominations"), orderBy("createdAt", "desc"))
-      : query(collection(db, "nominations"), where("status", "==", "shortlisted"));
+      ? query(
+          collection(db, "nominations"),
+          orderBy("createdAt", "desc"),
+          limit(100), // Prevent 6MB response size limit exceeded error
+        )
+      : query(
+          collection(db, "nominations"),
+          where("status", "==", "shortlisted"),
+          limit(100),
+        );
     const unsub = onSnapshot(
       q,
       (snap) => {
@@ -861,6 +880,11 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
     };
     logJudgeView();
   }, [activeSection, canManage, judgeScores.length]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, statusFilter, selfNomFilter, search]);
 
   async function handleCreateAccount(e: React.FormEvent) {
     e.preventDefault();
@@ -1132,6 +1156,8 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
       return true;
     });
   }, [nominations, selectedCategory, statusFilter, selfNomFilter, search]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
 
   async function update(id: string, status: NominationStatus) {
     if (!canManage) return;
@@ -3253,6 +3279,7 @@ function NominationDetail({
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
   const [officePreviewError, setOfficePreviewError] = useState(false);
   const [runtimePreviewPdfUrls, setRuntimePreviewPdfUrls] = useState<Record<string, string>>({});
+  const [runtimePreviewHtml, setRuntimePreviewHtml] = useState<Record<string, string>>({});
   const [runtimeConvertingPath, setRuntimeConvertingPath] = useState<string | null>(null);
   const [runtimeConversionError, setRuntimeConversionError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -3310,8 +3337,16 @@ function NominationDetail({
 
   const activePdfUrl = activePreview?.previewPdfUrl ?? activeRuntimePdfUrl;
 
+  const activeHtml =
+    activePreview && activePreview.path ? runtimePreviewHtml[activePreview.path] : undefined;
+  const activeHtmlZoomed = activeHtml ? withZoom(activeHtml, previewZoom) : undefined;
+
   const resolvedKind: PreviewKind | null =
-    activePreviewMeta?.kind === "office" && activePdfUrl ? "pdf" : activePreviewMeta?.kind ?? null;
+    activePreviewMeta?.kind === "office" && activeHtml
+      ? "html"
+      : activePreviewMeta?.kind === "office" && activePdfUrl
+        ? "pdf"
+        : activePreviewMeta?.kind ?? null;
 
   const activePreviewUrl = activePreview
     ? resolvedKind === "pdf"
@@ -3353,7 +3388,7 @@ function NominationDetail({
       return;
     }
 
-    if (target.previewPdfUrl || runtimePreviewPdfUrls[target.path]) {
+    if (target.previewPdfUrl || runtimePreviewPdfUrls[target.path] || runtimePreviewHtml[target.path]) {
       setRuntimeConvertingPath(null);
       setRuntimeConversionError(null);
       return;
@@ -3365,6 +3400,23 @@ function NominationDetail({
       try {
         setRuntimeConvertingPath(target.path);
         setRuntimeConversionError(null);
+
+        // Prefer converting entirely in-browser — no file-size/timeout ceiling
+        // (unlike the server's Chromium render), so large documents preview
+        // fine even on slow connections since there's only one download, no
+        // round trip to a function that could itself time out. Only fall back
+        // to the server-rendered PDF pipeline when the client can't handle the
+        // format (e.g. legacy .doc) or parsing fails.
+        if (isClientConvertible(target.name)) {
+          try {
+            const html = await convertOfficeToHtml(target.url, target.name);
+            if (cancelled) return;
+            setRuntimePreviewHtml((prev) => ({ ...prev, [target.path]: html }));
+            return;
+          } catch (clientErr) {
+            console.warn("[admin] Client-side Office conversion failed, falling back to server:", clientErr);
+          }
+        }
 
         const pdfBlob = await convertOfficeToPdfBlob(target.url, target.name);
         if (cancelled) return;
@@ -3390,7 +3442,7 @@ function NominationDetail({
     return () => {
       cancelled = true;
     };
-  }, [activePreview, activePreviewMeta?.kind, runtimePreviewPdfUrls]);
+  }, [activePreview, activePreviewMeta?.kind, runtimePreviewPdfUrls, runtimePreviewHtml]);
 
   // Clear loading spinner for images and videos immediately (no conversion needed)
   useEffect(() => {
@@ -3441,10 +3493,15 @@ function NominationDetail({
   function retryConversion() {
     if (!activePreview) return;
     setRuntimeConversionError(null);
-    // Remove any stale cached blob so the effect re-runs
+    // Remove any stale cached blob/html so the effect re-runs
     setRuntimePreviewPdfUrls((prev) => {
       const existing = prev[activePreview.path];
       if (existing) URL.revokeObjectURL(existing);
+      const next = { ...prev };
+      delete next[activePreview.path];
+      return next;
+    });
+    setRuntimePreviewHtml((prev) => {
       const next = { ...prev };
       delete next[activePreview.path];
       return next;
@@ -3601,7 +3658,7 @@ function NominationDetail({
                 <div className="max-w-sm space-y-2">
                   <p className="text-sm font-semibold text-foreground">Converting document…</p>
                   <p className="text-xs text-muted-foreground">
-                    Preparing a PDF preview for this Office file. This can take a few seconds.
+                    Preparing a preview for this Office file. This can take a few seconds.
                   </p>
                 </div>
               </div>
@@ -3614,7 +3671,7 @@ function NominationDetail({
                   <p className="text-sm font-semibold text-foreground">Loading document…</p>
                 </div>
               </div>
-            ) : activePreviewMeta?.kind === "office" && !activePdfUrl ? (
+            ) : activePreviewMeta?.kind === "office" && !activePdfUrl && !activeHtml ? (
               <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
                 <div className="max-w-sm space-y-3">
                   <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
@@ -3657,6 +3714,15 @@ function NominationDetail({
                   </div>
                 </div>
               </div>
+            ) : resolvedKind === "html" && activeHtmlZoomed ? (
+              <iframe
+                key={activePreview.path}
+                srcDoc={activeHtmlZoomed}
+                title={`Document preview for ${activePreview.name}`}
+                sandbox=""
+                className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                onLoad={() => setPreviewLoading(false)}
+              />
             ) : resolvedKind === "image" ? (
               <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
                 <img
@@ -4126,11 +4192,11 @@ function NominationDetail({
                   <div className="max-w-sm space-y-2">
                     <p className="text-sm font-semibold text-foreground">Converting document…</p>
                     <p className="text-xs text-muted-foreground">
-                      Preparing a PDF preview for this Office file. This can take a few seconds.
+                      Preparing a preview for this Office file. This can take a few seconds.
                     </p>
                   </div>
                 </div>
-              ) : activePreviewMeta?.kind === "office" && !activePdfUrl ? (
+              ) : activePreviewMeta?.kind === "office" && !activePdfUrl && !activeHtml ? (
                 <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
                   <div className="max-w-sm space-y-3">
                     <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
@@ -4173,6 +4239,14 @@ function NominationDetail({
                     </div>
                   </div>
                 </div>
+              ) : resolvedKind === "html" && activeHtmlZoomed ? (
+                <iframe
+                  key={`mobile-html-${activePreview.path}`}
+                  srcDoc={activeHtmlZoomed}
+                  title={`Document preview for ${activePreview.name}`}
+                  sandbox=""
+                  className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                />
               ) : resolvedKind === "image" ? (
                 /* Images — direct render, works in all PWA environments */
                 <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
