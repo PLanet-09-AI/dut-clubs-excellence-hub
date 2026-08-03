@@ -3760,47 +3760,25 @@ function NominationDetail({
                 />
               </div>
             ) : resolvedKind === "pdf" && pwaViewer?.kind === "blob" ? (
-              /* Runtime-converted blob PDF — use <object> which works across all PWA environments */
-              <object
+              /* Runtime-converted blob PDF — <iframe> (our CSP has no object-src,
+                 which defaults to default-src 'self' and silently blocks <object>) */
+              <iframe
                 key={activePreview.path}
-                data={pwaViewer.src}
-                type="application/pdf"
+                src={pwaViewer.src}
+                title={`Document preview for ${activePreview.name}`}
                 className="h-full w-full rounded-lg border border-primary/20 bg-white"
                 onLoad={() => setPreviewLoading(false)}
-              >
-                <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
-                  <div className="space-y-3">
-                    <p className="text-sm font-semibold">PDF ready</p>
-                    <p className="text-xs text-muted-foreground">Your browser cannot embed this PDF inline.</p>
-                    <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
-                        <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open PDF
-                      </Button>
-                    </a>
-                  </div>
-                </div>
-              </object>
+              />
             ) : resolvedKind === "pdf" && pwaViewer?.kind === "direct" ? (
-              /* Remote PDF, regular browser tab — native PDF rendering, no size limit */
-              <object
+              /* Remote PDF, regular browser tab — native PDF rendering via <iframe>,
+                 no size limit. (frame-src explicitly allows the Storage domains.) */
+              <iframe
                 key={activePreview.path}
-                data={pwaViewer.src}
-                type="application/pdf"
+                src={pwaViewer.src}
+                title={`Document preview for ${activePreview.name}`}
                 className="h-full w-full rounded-lg border border-primary/20 bg-white"
                 onLoad={() => setPreviewLoading(false)}
-              >
-                <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
-                  <div className="space-y-3">
-                    <p className="text-sm font-semibold">PDF ready</p>
-                    <p className="text-xs text-muted-foreground">Your browser cannot embed this PDF inline.</p>
-                    <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
-                        <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open PDF
-                      </Button>
-                    </a>
-                  </div>
-                </div>
-              </object>
+              />
             ) : resolvedKind === "pdf" && pwaViewer?.kind === "gdocs" ? (
               /* Remote PDF in standalone PWA — Google Docs viewer, may fail on very large files */
               <iframe
@@ -4304,45 +4282,23 @@ function NominationDetail({
                   />
                 </div>
               ) : resolvedKind === "pdf" && pwaViewer?.kind === "blob" ? (
-                /* Runtime-converted blob PDF — <object> works reliably in PWA */
-                <object
+                /* Runtime-converted blob PDF — <iframe> (our CSP has no object-src,
+                   which defaults to default-src 'self' and silently blocks <object>) */
+                <iframe
                   key={`mobile-blob-${activePreview.path}`}
-                  data={pwaViewer.src}
-                  type="application/pdf"
+                  src={pwaViewer.src}
+                  title={`Document preview for ${activePreview.name}`}
                   className="h-full w-full rounded-lg border border-primary/20 bg-white"
-                >
-                  <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
-                    <div className="space-y-3">
-                      <p className="text-sm font-semibold">PDF ready</p>
-                      <p className="text-xs text-muted-foreground">Your browser cannot embed this PDF inline.</p>
-                      <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
-                          <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open PDF
-                        </Button>
-                      </a>
-                    </div>
-                  </div>
-                </object>
+                />
               ) : resolvedKind === "pdf" && pwaViewer?.kind === "direct" ? (
-                /* Remote PDF, regular browser tab — native PDF rendering, no size limit */
-                <object
+                /* Remote PDF, regular browser tab — native PDF rendering via <iframe>,
+                   no size limit. (frame-src explicitly allows the Storage domains.) */
+                <iframe
                   key={`mobile-direct-${activePreview.path}`}
-                  data={pwaViewer.src}
-                  type="application/pdf"
+                  src={pwaViewer.src}
+                  title={`Document preview for ${activePreview.name}`}
                   className="h-full w-full rounded-lg border border-primary/20 bg-white"
-                >
-                  <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
-                    <div className="space-y-3">
-                      <p className="text-sm font-semibold">PDF ready</p>
-                      <p className="text-xs text-muted-foreground">Your browser cannot embed this PDF inline.</p>
-                      <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
-                          <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open PDF
-                        </Button>
-                      </a>
-                    </div>
-                  </div>
-                </object>
+                />
               ) : resolvedKind === "pdf" && pwaViewer?.kind === "gdocs" ? (
                 /* Remote PDF in standalone PWA — Google Docs viewer, may fail on very large files */
                 <iframe

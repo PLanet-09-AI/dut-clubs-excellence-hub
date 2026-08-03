@@ -186,10 +186,10 @@ function PdfPreview({ url, name, onClose }: { url: string; name: string; onClose
           </button>
         </div>
         <div className="flex-1 w-full overflow-hidden bg-gray-50 dark:bg-gray-900">
-          <embed
+          <iframe
             src={`${url}#toolbar=1&navpanes=0&scrollbar=1`}
-            type="application/pdf"
-            className="w-full h-full"
+            title={name}
+            className="w-full h-full border-0"
           />
         </div>
       </div>
