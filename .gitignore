@@ -43,3 +43,6 @@ dist-ssr
 # Test scripts with hardcoded credentials
 scripts/test-*.mjs
 scripts/verify-*.mjs
+
+# Local Netlify folder
+.netlify
