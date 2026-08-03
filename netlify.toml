@@ -4,6 +4,9 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # SSR build (mammoth/xlsx/jszip + three.js chunks) exceeds the default ~2GB
+  # V8 heap, causing "JavaScript heap out of memory" during `vite build`.
+  NODE_OPTIONS = "--max-old-space-size=4096"
 
 [functions]
   directory = "netlify/functions"
