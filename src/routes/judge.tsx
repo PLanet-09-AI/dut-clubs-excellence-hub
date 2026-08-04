@@ -52,6 +52,7 @@ import {
 } from "@/data/awards";
 import { convertOfficeToPdfUrl } from "@/lib/office-to-pdf";
 import { convertOfficeToHtml, isClientConvertible, withZoom } from "@/lib/office-to-html-client";
+import { PdfCanvasViewer } from "@/components/PdfCanvasViewer";
 import SiteNav from "@/components/SiteNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1032,6 +1033,35 @@ function JudgeNominationDetail({
       : activePreview.file.url
     : "";
 
+  /**
+   * Returns true for mobile browsers (iOS/Android) and any installed PWA.
+   * Most of these environments have no built-in inline PDF renderer for
+   * <iframe src=pdfUrl> (Safari/WKWebView-based PWAs in particular never do),
+   * unlike desktop browsers which all ship one.
+   */
+  function isMobileOrStandalone(): boolean {
+    if (typeof window === "undefined") return false;
+    const nav = window.navigator as Navigator & { standalone?: boolean };
+    const standalone =
+      window.matchMedia?.("(display-mode: standalone)").matches ||
+      window.matchMedia?.("(display-mode: fullscreen)").matches ||
+      window.matchMedia?.("(display-mode: minimal-ui)").matches ||
+      nav.standalone === true;
+    return standalone || /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator.userAgent || "");
+  }
+
+  const resolvedPdfSrc = resolvedKind === "pdf" && activePreview
+    ? (activePdfUrl ?? activePreview.file.url)
+    : null;
+  const useCanvasPdfViewer = resolvedPdfSrc ? isMobileOrStandalone() : false;
+  const [pdfCanvasError, setPdfCanvasError] = useState<string | null>(null);
+  const [pdfPageCount, setPdfPageCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    setPdfCanvasError(null);
+    setPdfPageCount(null);
+  }, [previewPath]);
+
   useEffect(() => {
     setOfficePreviewError(false);
   }, [previewPath]);
@@ -1319,6 +1349,42 @@ function JudgeNominationDetail({
                 sandbox=""
                 className="h-full w-full rounded-lg border border-primary/20 bg-white"
               />
+            ) : resolvedKind === "pdf" && useCanvasPdfViewer && resolvedPdfSrc ? (
+              /* Mobile browsers + installed PWAs — render via pdf.js onto a
+                 <canvas>. Works identically everywhere (no reliance on a
+                 built-in browser PDF plugin, which most mobile browsers/PWAs
+                 lack) and has no file-size ceiling. */
+              pdfCanvasError ? (
+                <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
+                  <div className="max-w-sm space-y-3">
+                    <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
+                    <p className="text-xs text-amber-800">{pdfCanvasError}</p>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <a href={resolvedPdfSrc} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                          <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
+                        </Button>
+                      </a>
+                      <a href={resolvedPdfSrc} download>
+                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                          <Download className="mr-1 h-3.5 w-3.5" /> Download
+                        </Button>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full w-full overflow-auto rounded-lg border border-primary/20 bg-white p-3">
+                  <PdfCanvasViewer
+                    key={activePreview.file.path}
+                    url={resolvedPdfSrc}
+                    page={previewPage}
+                    zoomPercent={previewZoom}
+                    onDocumentLoad={(count) => setPdfPageCount(count)}
+                    onError={(msg) => setPdfCanvasError(msg)}
+                  />
+                </div>
+              )
             ) : activePreview.kind === "image" ? (
               <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
                 <img
@@ -1785,6 +1851,41 @@ function JudgeNominationDetail({
                     sandbox=""
                     className="h-full w-full rounded-lg border border-primary/20 bg-white"
                   />
+                ) : resolvedKind === "pdf" && useCanvasPdfViewer && resolvedPdfSrc ? (
+                  /* Mobile browsers + installed PWAs — render via pdf.js onto a
+                     <canvas>. Works identically everywhere and has no
+                     file-size ceiling. */
+                  pdfCanvasError ? (
+                    <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
+                      <div className="max-w-sm space-y-3">
+                        <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
+                        <p className="text-xs text-amber-800">{pdfCanvasError}</p>
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          <a href={resolvedPdfSrc} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                              <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
+                            </Button>
+                          </a>
+                          <a href={resolvedPdfSrc} download>
+                            <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                              <Download className="mr-1 h-3.5 w-3.5" /> Download
+                            </Button>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-full w-full overflow-auto rounded-lg border border-primary/20 bg-white p-3">
+                      <PdfCanvasViewer
+                        key={`mobile-canvas-${activePreview.file.path}`}
+                        url={resolvedPdfSrc}
+                        page={previewPage}
+                        zoomPercent={previewZoom}
+                        onDocumentLoad={(count) => setPdfPageCount(count)}
+                        onError={(msg) => setPdfCanvasError(msg)}
+                      />
+                    </div>
+                  )
                 ) : resolvedKind === "image" ? (
                   <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
                     <img

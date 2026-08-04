@@ -64,6 +64,7 @@ import {
   isClientConvertible,
   withZoom,
 } from "@/lib/office-to-html-client";
+import { PdfCanvasViewer } from "@/components/PdfCanvasViewer";
 import { validateDocumentsForCategory, getIncompleteItemsList } from "@/lib/document-validation";
 import {
   logCreateAccount,
@@ -3371,24 +3372,30 @@ function NominationDetail({
   }
 
   /**
-   * Returns a viewer URL/strategy for PDFs.
-   * - Blob URLs (runtime-converted): returned as-is; caller should use <object>.
-   * - Remote URLs in a normal browser tab: rendered directly — browsers embed
-   *   PDFs natively with no file-size ceiling, unlike Google Docs Viewer
-   *   (which fails with "This file is too large to preview" on big PDFs and
-   *   pulls in Google's own CSP-violating telemetry).
-   * - Remote URLs in standalone PWA mode: iOS/Android PWA webviews often
-   *   don't render remote PDF iframes, so Google Docs Viewer is used there
-   *   as a fallback despite its size limits.
+   * Returns true for mobile browsers (iOS/Android) and any installed PWA.
+   * Most of these environments have no built-in inline PDF renderer for
+   * <iframe src=pdfUrl> (Safari/WKWebView-based PWAs in particular never do),
+   * unlike desktop browsers which all ship one.
    */
-  function getPwaViewerUrl(rawPdfUrl: string): { kind: "blob" | "gdocs" | "direct"; src: string } {
+  function isMobileOrStandalone(): boolean {
+    if (typeof window === "undefined") return false;
+    if (isStandalonePwa()) return true;
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator.userAgent || "");
+  }
+
+  /**
+   * Returns a viewer strategy for PDFs.
+   * - Mobile browsers + installed PWAs: rendered via pdf.js onto a <canvas>
+   *   (PdfCanvasViewer). This works identically everywhere (no reliance on a
+   *   browser's built-in PDF plugin, which most mobile browsers/PWAs lack),
+   *   has no file-size ceiling (pages are streamed/rendered on demand), and
+   *   stays fully in-app.
+   * - Desktop browsers: rendered directly via <iframe src=pdfUrl>, which all
+   *   desktop browsers handle natively with their own built-in PDF viewer.
+   */
+  function getPwaViewerUrl(rawPdfUrl: string): { kind: "canvas" | "blob" | "direct"; src: string } {
+    if (isMobileOrStandalone()) return { kind: "canvas", src: rawPdfUrl };
     if (rawPdfUrl.startsWith("blob:")) return { kind: "blob", src: rawPdfUrl };
-    if (isStandalonePwa()) {
-      return {
-        kind: "gdocs",
-        src: `https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`,
-      };
-    }
     return { kind: "direct", src: rawPdfUrl };
   }
 
@@ -3396,6 +3403,14 @@ function NominationDetail({
     ? (activePdfUrl ?? activePreview.url)
     : null;
   const pwaViewer = resolvedPdfSrc ? getPwaViewerUrl(resolvedPdfSrc) : null;
+  const [pdfCanvasError, setPdfCanvasError] = useState<string | null>(null);
+  const [pdfPageCount, setPdfPageCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    setPdfCanvasError(null);
+    setPdfPageCount(null);
+  }, [previewPath]);
+
 
   useEffect(() => {
     setOfficePreviewError(false);
@@ -3613,8 +3628,8 @@ function NominationDetail({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setPreviewPage((p) => p + 1)}
-              disabled={!activePreview || activePreviewMeta?.kind !== "pdf"}
+              onClick={() => setPreviewPage((p) => (pdfPageCount ? Math.min(pdfPageCount, p + 1) : p + 1))}
+              disabled={!activePreview || activePreviewMeta?.kind !== "pdf" || (pdfPageCount != null && previewPage >= pdfPageCount)}
               aria-label="Next PDF page"
             >
               Page +
@@ -3759,6 +3774,46 @@ function NominationDetail({
                   onError={() => setPreviewLoading(false)}
                 />
               </div>
+            ) : resolvedKind === "pdf" && pwaViewer?.kind === "canvas" ? (
+              /* Mobile browsers + installed PWAs — render via pdf.js onto a
+                 <canvas>. Works identically everywhere (no reliance on a
+                 built-in browser PDF plugin, which most mobile browsers/PWAs
+                 lack) and has no file-size ceiling. */
+              pdfCanvasError ? (
+                <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
+                  <div className="max-w-sm space-y-3">
+                    <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
+                    <p className="text-xs text-amber-800">{pdfCanvasError}</p>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                          <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
+                        </Button>
+                      </a>
+                      <a href={pwaViewer.src} download>
+                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                          <Download className="mr-1 h-3.5 w-3.5" /> Download
+                        </Button>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full w-full overflow-auto rounded-lg border border-primary/20 bg-white p-3">
+                  <PdfCanvasViewer
+                    key={activePreview.path}
+                    url={pwaViewer.src}
+                    page={previewPage}
+                    zoomPercent={previewZoom}
+                    onDocumentLoad={(count) => setPdfPageCount(count)}
+                    onError={(msg) => {
+                      setPdfCanvasError(msg);
+                      setPreviewLoading(false);
+                    }}
+                    onLoadingChange={setPreviewLoading}
+                  />
+                </div>
+              )
             ) : resolvedKind === "pdf" && pwaViewer?.kind === "blob" ? (
               /* Runtime-converted blob PDF — <iframe> (our CSP has no object-src,
                  which defaults to default-src 'self' and silently blocks <object>) */
@@ -3772,15 +3827,6 @@ function NominationDetail({
             ) : resolvedKind === "pdf" && pwaViewer?.kind === "direct" ? (
               /* Remote PDF, regular browser tab — native PDF rendering via <iframe>,
                  no size limit. (frame-src explicitly allows the Storage domains.) */
-              <iframe
-                key={activePreview.path}
-                src={pwaViewer.src}
-                title={`Document preview for ${activePreview.name}`}
-                className="h-full w-full rounded-lg border border-primary/20 bg-white"
-                onLoad={() => setPreviewLoading(false)}
-              />
-            ) : resolvedKind === "pdf" && pwaViewer?.kind === "gdocs" ? (
-              /* Remote PDF in standalone PWA — Google Docs viewer, may fail on very large files */
               <iframe
                 key={activePreview.path}
                 src={pwaViewer.src}
@@ -4281,6 +4327,42 @@ function NominationDetail({
                     className="max-h-full max-w-full rounded object-contain"
                   />
                 </div>
+              ) : resolvedKind === "pdf" && pwaViewer?.kind === "canvas" ? (
+                /* Mobile browsers + installed PWAs — render via pdf.js onto a
+                   <canvas>. Works identically everywhere and has no file-size
+                   ceiling, unlike the built-in browser PDF plugin (which most
+                   mobile browsers/PWAs lack) or Google Docs Viewer. */
+                pdfCanvasError ? (
+                  <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
+                    <div className="max-w-sm space-y-3">
+                      <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
+                      <p className="text-xs text-amber-800">{pdfCanvasError}</p>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
+                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                            <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
+                          </Button>
+                        </a>
+                        <a href={pwaViewer.src} download>
+                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                            <Download className="mr-1 h-3.5 w-3.5" /> Download
+                          </Button>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full w-full overflow-auto rounded-lg border border-primary/20 bg-white p-3">
+                    <PdfCanvasViewer
+                      key={`mobile-canvas-${activePreview.path}`}
+                      url={pwaViewer.src}
+                      page={previewPage}
+                      zoomPercent={previewZoom}
+                      onDocumentLoad={(count) => setPdfPageCount(count)}
+                      onError={(msg) => setPdfCanvasError(msg)}
+                    />
+                  </div>
+                )
               ) : resolvedKind === "pdf" && pwaViewer?.kind === "blob" ? (
                 /* Runtime-converted blob PDF — <iframe> (our CSP has no object-src,
                    which defaults to default-src 'self' and silently blocks <object>) */
@@ -4295,14 +4377,6 @@ function NominationDetail({
                    no size limit. (frame-src explicitly allows the Storage domains.) */
                 <iframe
                   key={`mobile-direct-${activePreview.path}`}
-                  src={pwaViewer.src}
-                  title={`Document preview for ${activePreview.name}`}
-                  className="h-full w-full rounded-lg border border-primary/20 bg-white"
-                />
-              ) : resolvedKind === "pdf" && pwaViewer?.kind === "gdocs" ? (
-                /* Remote PDF in standalone PWA — Google Docs viewer, may fail on very large files */
-                <iframe
-                  key={`mobile-gdocs-${activePreview.path}`}
                   src={pwaViewer.src}
                   title={`Document preview for ${activePreview.name}`}
                   className="h-full w-full rounded-lg border border-primary/20 bg-white"
