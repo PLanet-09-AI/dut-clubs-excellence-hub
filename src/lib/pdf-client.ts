@@ -3,27 +3,46 @@
  *
  * Why this exists: neither <object>/<embed>/<iframe src=pdfUrl> nor Google
  * Docs Viewer render reliably everywhere:
- *   - <iframe src=pdfUrl> relies on the browser's *built-in* PDF viewer, which
- *     desktop Chrome/Edge/Firefox/Safari all have, but most mobile browsers
- *     (Chrome/Safari on iOS/Android) and installed PWAs do NOT — they just
- *     show a blank frame or try to download the file instead of previewing it.
- *   - Google Docs Viewer works around that, but has its own file-size ceiling
- *     ("This file is too large to preview") and pulls in Google's CSP-
- *     violating telemetry.
+ *   - <iframe src=pdfUrl> relies on the browser's *built-in* PDF viewer.
+ *     Desktop Chrome/Edge/Firefox/Safari all have one, but most mobile
+ *     browsers (iOS/Android) and installed PWAs do NOT, and neither do some
+ *     desktop Chromium embedders (Electron apps, webviews) — they just show
+ *     a blank frame or silently trigger a file download instead of
+ *     previewing it.
+ *   - Google Docs Viewer works around that, but has its own file-size
+ *     ceiling ("This file is too large to preview") and pulls in Google's
+ *     CSP-violating telemetry.
  *
  * pdf.js renders pages onto <canvas> entirely client-side and works
- * identically across desktop browsers, mobile browsers, and installed PWAs.
- * It streams pages on demand instead of loading the whole document into the
- * DOM, so there's no artificial size ceiling — only the device's own
- * RAM/CPU limits apply (same as any other PDF viewer).
+ * identically everywhere. It streams pages on demand instead of loading the
+ * whole document into the DOM, so there's no artificial size ceiling — only
+ * the device's own RAM/CPU limits apply (same as any other PDF viewer).
+ *
+ * IMPORTANT: pdfjs-dist references browser-only globals (DOMMatrix, etc.) at
+ * module-evaluation time, which crashes SSR (Node has no DOMMatrix). All
+ * imports here are therefore fully dynamic (`import()`), so the library is
+ * only ever loaded in the browser, never during server rendering.
  */
-import * as pdfjsLib from "pdfjs-dist";
-// eslint-disable-next-line import/no-unresolved
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import type * as PdfJsLib from "pdfjs-dist";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+export type PdfDocumentHandle = PdfJsLib.PDFDocumentProxy;
 
-export type PdfDocumentHandle = pdfjsLib.PDFDocumentProxy;
+let pdfjsLibPromise: Promise<typeof PdfJsLib> | null = null;
+
+function loadPdfjsLib(): Promise<typeof PdfJsLib> {
+  if (!pdfjsLibPromise) {
+    pdfjsLibPromise = (async () => {
+      const [lib, workerModule] = await Promise.all([
+        import("pdfjs-dist"),
+        // eslint-disable-next-line import/no-unresolved
+        import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
+      ]);
+      lib.GlobalWorkerOptions.workerSrc = workerModule.default;
+      return lib;
+    })();
+  }
+  return pdfjsLibPromise;
+}
 
 /** Aborts the PDF fetch if it stalls, so a slow connection fails fast instead
  * of hanging indefinitely. */
@@ -32,6 +51,7 @@ const LOAD_TIMEOUT_MS = 45_000;
 /** Loads a PDF document from a URL. Caller is responsible for calling
  * `.destroy()` on the returned handle when done to free memory. */
 export async function loadPdfDocument(url: string): Promise<PdfDocumentHandle> {
+  const pdfjsLib = await loadPdfjsLib();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS);
   try {
@@ -53,7 +73,7 @@ export async function loadPdfDocument(url: string): Promise<PdfDocumentHandle> {
  * the given zoom (1 = 100%). Cancels any in-flight render on the canvas
  * before starting a new one to avoid pdf.js's "already rendering" error when
  * the user flips pages or zooms quickly. */
-const renderTasks = new WeakMap<HTMLCanvasElement, ReturnType<pdfjsLib.PDFPageProxy["render"]>>();
+const renderTasks = new WeakMap<HTMLCanvasElement, ReturnType<PdfJsLib.PDFPageProxy["render"]>>();
 
 export async function renderPdfPageToCanvas(
   doc: PdfDocumentHandle,
@@ -80,6 +100,7 @@ export async function renderPdfPageToCanvas(
   canvas.style.height = `${viewport.height}px`;
 
   const renderTask = page.render({
+    canvas,
     canvasContext: context,
     viewport,
     transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
@@ -98,3 +119,4 @@ export async function renderPdfPageToCanvas(
     page.cleanup();
   }
 }
+
