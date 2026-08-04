@@ -33,6 +33,24 @@ import { createHash } from "node:crypto";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { PDFDocument as PdfLibDocument } from "pdf-lib";
+import { createCanvas, DOMMatrix, Path2D } from "@napi-rs/canvas";
+
+// pdfjs-dist's legacy Node build normally polyfills `DOMMatrix`/`Path2D`
+// (and finds a canvas implementation) itself via a dynamic
+// `require("@napi-rs/canvas")` built from `import.meta.url`. That breaks
+// once this function is bundled by Netlify's esbuild step — `import.meta.url`
+// comes back `undefined` in the bundled output, so the internal require
+// throws and the polyfills never get applied, crashing with
+// "DOMMatrix is not defined" the moment pdf.mjs's module body runs (some of
+// its top-level code constructs a `DOMMatrix` immediately on load). Doing
+// the polyfilling ourselves via a static import (which bundles fine) avoids
+// relying on that fragile dynamic require entirely.
+if (!(globalThis as Record<string, unknown>).DOMMatrix) {
+  (globalThis as Record<string, unknown>).DOMMatrix = DOMMatrix;
+}
+if (!(globalThis as Record<string, unknown>).Path2D) {
+  (globalThis as Record<string, unknown>).Path2D = Path2D;
+}
 
 const STORAGE_BUCKET =
   process.env.FIREBASE_STORAGE_BUCKET || "student-services-745d5.appspot.com";
@@ -81,28 +99,49 @@ const MAX_SOURCE_BYTES = 150 * 1024 * 1024; // 150 MB
 const MAX_PAGE_PIXELS = 1600;
 const JPEG_QUALITY = 0.55;
 
-/** Minimal shape of pdfjs-dist's internal NodeCanvasFactory (typed as `Object`
- * in pdfjs-dist's own generated .d.ts, so we declare the bits we use here). */
-interface PdfCanvasFactory {
-  create(width: number, height: number): { canvas: unknown; context: CanvasRenderingContext2D };
-  destroy(canvasAndContext: { canvas: unknown; context: CanvasRenderingContext2D }): void;
+/** Minimal canvas-and-context pair pdf.js needs for rendering — both the main
+ * page canvas and any internal temporary canvases (soft masks/patterns). */
+type CanvasAndContext = { canvas: unknown; context: CanvasRenderingContext2D };
+
+/** Canvas factory class backed directly by our statically-imported
+ * @napi-rs/canvas — avoids depending on pdfjs-dist's own internal
+ * NodeCanvasFactory, which needs a dynamic `require("@napi-rs/canvas")`
+ * built from `import.meta.url` to even exist. pdf.js instantiates whatever
+ * class is passed as `CanvasFactory` itself (`new CanvasFactory({...})`),
+ * so this must be a class, not a plain object. */
+class StaticCanvasFactory {
+  create(width: number, height: number): CanvasAndContext {
+    const canvas = createCanvas(width, height);
+    return { canvas, context: canvas.getContext("2d") as unknown as CanvasRenderingContext2D };
+  }
+  reset(canvasAndContext: CanvasAndContext, width: number, height: number): void {
+    const canvas = canvasAndContext.canvas as { width: number; height: number };
+    canvas.width = width;
+    canvas.height = height;
+  }
+  destroy(canvasAndContext: CanvasAndContext): void {
+    const canvas = canvasAndContext.canvas as { width: number; height: number } | null;
+    if (canvas) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+    canvasAndContext.canvas = null;
+    canvasAndContext.context = null as unknown as CanvasRenderingContext2D;
+  }
 }
 
 /** Rasterizes every page of `sourcePdf` to a JPEG and reassembles them into a
  * new, much smaller PDF (one full-page image per page). */
 async function compressPdf(sourcePdf: Buffer): Promise<Buffer> {
-  // Legacy Node build — automatically uses its built-in NodeCanvasFactory
-  // (backed by @napi-rs/canvas) for all rendering when running under Node,
-  // including for internal temporary canvases (soft masks/patterns/groups),
-  // so we don't need to supply our own canvas factory.
   const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(sourcePdf),
     useSystemFonts: true,
+    CanvasFactory: StaticCanvasFactory as unknown as Object,
   });
   const pdfDocument = await loadingTask.promise;
-  const canvasFactory = pdfDocument.canvasFactory as unknown as PdfCanvasFactory;
+  const canvasFactory = new StaticCanvasFactory();
 
   const outDoc = await PdfLibDocument.create();
 
