@@ -3356,47 +3356,19 @@ function NominationDetail({
     : "";
 
   /**
-   * Returns true only when running as an installed/standalone PWA (iOS "Add to
-   * Home Screen" or Android/desktop installed app) — regular browser tabs
-   * render PDFs natively and don't need any special handling.
+   * All PDFs are rendered via pdf.js onto a <canvas> (PdfCanvasViewer),
+   * regardless of device/browser. Relying on a browser's *built-in* PDF
+   * viewer for <iframe src=pdfUrl> is unreliable in practice — most mobile
+   * browsers and installed PWAs (especially iOS WKWebView-based ones) lack
+   * one entirely, and even some desktop Chromium embedders (Electron apps,
+   * webviews, etc.) don't ship the PDF viewer component either, silently
+   * falling back to a file download instead of an inline preview. Canvas
+   * rendering works identically everywhere and has no file-size ceiling —
+   * pages are streamed/rendered on demand instead of loading the whole
+   * document into the DOM.
    */
-  function isStandalonePwa(): boolean {
-    if (typeof window === "undefined") return false;
-    const nav = window.navigator as Navigator & { standalone?: boolean };
-    return (
-      window.matchMedia?.("(display-mode: standalone)").matches ||
-      window.matchMedia?.("(display-mode: fullscreen)").matches ||
-      window.matchMedia?.("(display-mode: minimal-ui)").matches ||
-      nav.standalone === true
-    );
-  }
-
-  /**
-   * Returns true for mobile browsers (iOS/Android) and any installed PWA.
-   * Most of these environments have no built-in inline PDF renderer for
-   * <iframe src=pdfUrl> (Safari/WKWebView-based PWAs in particular never do),
-   * unlike desktop browsers which all ship one.
-   */
-  function isMobileOrStandalone(): boolean {
-    if (typeof window === "undefined") return false;
-    if (isStandalonePwa()) return true;
-    return /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator.userAgent || "");
-  }
-
-  /**
-   * Returns a viewer strategy for PDFs.
-   * - Mobile browsers + installed PWAs: rendered via pdf.js onto a <canvas>
-   *   (PdfCanvasViewer). This works identically everywhere (no reliance on a
-   *   browser's built-in PDF plugin, which most mobile browsers/PWAs lack),
-   *   has no file-size ceiling (pages are streamed/rendered on demand), and
-   *   stays fully in-app.
-   * - Desktop browsers: rendered directly via <iframe src=pdfUrl>, which all
-   *   desktop browsers handle natively with their own built-in PDF viewer.
-   */
-  function getPwaViewerUrl(rawPdfUrl: string): { kind: "canvas" | "blob" | "direct"; src: string } {
-    if (isMobileOrStandalone()) return { kind: "canvas", src: rawPdfUrl };
-    if (rawPdfUrl.startsWith("blob:")) return { kind: "blob", src: rawPdfUrl };
-    return { kind: "direct", src: rawPdfUrl };
+  function getPwaViewerUrl(rawPdfUrl: string): { kind: "canvas"; src: string } {
+    return { kind: "canvas", src: rawPdfUrl };
   }
 
   const resolvedPdfSrc = resolvedKind === "pdf" && activePreview
@@ -3814,26 +3786,6 @@ function NominationDetail({
                   />
                 </div>
               )
-            ) : resolvedKind === "pdf" && pwaViewer?.kind === "blob" ? (
-              /* Runtime-converted blob PDF — <iframe> (our CSP has no object-src,
-                 which defaults to default-src 'self' and silently blocks <object>) */
-              <iframe
-                key={activePreview.path}
-                src={pwaViewer.src}
-                title={`Document preview for ${activePreview.name}`}
-                className="h-full w-full rounded-lg border border-primary/20 bg-white"
-                onLoad={() => setPreviewLoading(false)}
-              />
-            ) : resolvedKind === "pdf" && pwaViewer?.kind === "direct" ? (
-              /* Remote PDF, regular browser tab — native PDF rendering via <iframe>,
-                 no size limit. (frame-src explicitly allows the Storage domains.) */
-              <iframe
-                key={activePreview.path}
-                src={pwaViewer.src}
-                title={`Document preview for ${activePreview.name}`}
-                className="h-full w-full rounded-lg border border-primary/20 bg-white"
-                onLoad={() => setPreviewLoading(false)}
-              />
             ) : resolvedKind === "video" ? (
               /* HTML5 video player */
               <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-black">
@@ -4363,24 +4315,6 @@ function NominationDetail({
                     />
                   </div>
                 )
-              ) : resolvedKind === "pdf" && pwaViewer?.kind === "blob" ? (
-                /* Runtime-converted blob PDF — <iframe> (our CSP has no object-src,
-                   which defaults to default-src 'self' and silently blocks <object>) */
-                <iframe
-                  key={`mobile-blob-${activePreview.path}`}
-                  src={pwaViewer.src}
-                  title={`Document preview for ${activePreview.name}`}
-                  className="h-full w-full rounded-lg border border-primary/20 bg-white"
-                />
-              ) : resolvedKind === "pdf" && pwaViewer?.kind === "direct" ? (
-                /* Remote PDF, regular browser tab — native PDF rendering via <iframe>,
-                   no size limit. (frame-src explicitly allows the Storage domains.) */
-                <iframe
-                  key={`mobile-direct-${activePreview.path}`}
-                  src={pwaViewer.src}
-                  title={`Document preview for ${activePreview.name}`}
-                  className="h-full w-full rounded-lg border border-primary/20 bg-white"
-                />
               ) : (
                 /* Office Online or other embeddable content */
                 <iframe

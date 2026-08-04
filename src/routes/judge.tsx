@@ -1034,26 +1034,18 @@ function JudgeNominationDetail({
     : "";
 
   /**
-   * Returns true for mobile browsers (iOS/Android) and any installed PWA.
-   * Most of these environments have no built-in inline PDF renderer for
-   * <iframe src=pdfUrl> (Safari/WKWebView-based PWAs in particular never do),
-   * unlike desktop browsers which all ship one.
+   * All PDFs are rendered via pdf.js onto a <canvas> (PdfCanvasViewer),
+   * regardless of device/browser. Relying on a browser's *built-in* PDF
+   * viewer for <iframe src=pdfUrl> is unreliable in practice — most mobile
+   * browsers and installed PWAs (especially iOS WKWebView-based ones) lack
+   * one entirely, and even some desktop Chromium embedders (Electron apps,
+   * webviews, etc.) don't ship the PDF viewer component either, silently
+   * falling back to a file download instead of an inline preview.
    */
-  function isMobileOrStandalone(): boolean {
-    if (typeof window === "undefined") return false;
-    const nav = window.navigator as Navigator & { standalone?: boolean };
-    const standalone =
-      window.matchMedia?.("(display-mode: standalone)").matches ||
-      window.matchMedia?.("(display-mode: fullscreen)").matches ||
-      window.matchMedia?.("(display-mode: minimal-ui)").matches ||
-      nav.standalone === true;
-    return standalone || /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator.userAgent || "");
-  }
-
   const resolvedPdfSrc = resolvedKind === "pdf" && activePreview
     ? (activePdfUrl ?? activePreview.file.url)
     : null;
-  const useCanvasPdfViewer = resolvedPdfSrc ? isMobileOrStandalone() : false;
+  const useCanvasPdfViewer = resolvedPdfSrc != null;
   const [pdfCanvasError, setPdfCanvasError] = useState<string | null>(null);
   const [pdfPageCount, setPdfPageCount] = useState<number | null>(null);
 
