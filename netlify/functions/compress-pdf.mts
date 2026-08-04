@@ -2,16 +2,27 @@
  * Netlify Function: compress-pdf
  *
  * Produces a smaller, lower-quality "preview" copy of a large PDF so it opens
- * reliably even on slow connections/devices, trading some visual fidelity for
- * a much smaller download. The ORIGINAL file is never touched — it stays in
+ * reliably even on slow connections/devices, trading visual fidelity for a
+ * much smaller download. The ORIGINAL file is never touched — it stays in
  * Storage untouched for full-quality Open/Download.
  *
- * How it works: headless Chromium (already used by office-to-pdf.mts) opens
- * the source PDF directly in its built-in PDF viewer, then "prints" it back
- * to PDF via `page.pdf()`. Chromium's print pipeline re-rasterizes/recompresses
- * embedded images, which is where the size reduction comes from — this is the
- * same technique as using a desktop browser's "Print → Save as PDF" on an
- * open PDF to shrink it. No paid API, no extra native dependencies.
+ * How it works: pdfjs-dist (legacy Node build, already a dependency) renders
+ * every page to a raster bitmap via @napi-rs/canvas (a Skia-backed canvas
+ * with prebuilt native binaries for Linux x64 — unlike the `canvas` package
+ * it needs no Cairo/Pango system libraries, so it works in a Lambda sandbox),
+ * encodes each page as a JPEG at a reduced resolution/quality, then
+ * reassembles those JPEGs into a brand-new PDF (one full-page image per
+ * page) via pdf-lib. This is the classic "rasterize to shrink" technique —
+ * it trades the original's vector precision/text layer for a much smaller
+ * file, which is the right trade for image-heavy documents (scanned
+ * registers, photographed certificates, etc.) that make up most large PDFs.
+ *
+ * NOTE: an earlier version of this function tried to open the PDF in
+ * @sparticuz/chromium's headless Chromium (via puppeteer) and "print" it
+ * back to PDF. That doesn't work — @sparticuz/chromium's minimal Lambda
+ * build has no PDF viewer plugin, so navigating to a PDF URL just triggers
+ * a download and aborts the navigation (net::ERR_ABORTED). Rasterizing with
+ * pdfjs-dist directly avoids Chromium entirely for this function.
  *
  * Called by the client at POST /api/compress-pdf
  * (redirected to /.netlify/functions/compress-pdf via netlify.toml)
@@ -21,6 +32,7 @@ import type { Handler, HandlerEvent } from "@netlify/functions";
 import { createHash } from "node:crypto";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
+import { PDFDocument as PdfLibDocument } from "pdf-lib";
 
 const STORAGE_BUCKET =
   process.env.FIREBASE_STORAGE_BUCKET || "student-services-745d5.appspot.com";
@@ -60,72 +72,85 @@ function jsonError(message: string, status: number) {
   };
 }
 
-// Same extra flags office-to-pdf.mts uses to keep Chromium lean in a Lambda sandbox.
-const EXTRA_CHROMIUM_ARGS = [
-  "--no-sandbox",
-  "--no-zygote",
-  "--single-process",
-  "--disable-extensions",
-  "--disable-background-networking",
-  "--disable-default-apps",
-  "--disable-sync",
-  "--disable-translate",
-  "--hide-scrollbars",
-  "--metrics-recording-only",
-  "--mute-audio",
-  "--safebrowsing-disable-auto-update",
-];
+// Source PDFs larger than this are rejected — rasterizing every page of an
+// enormous document would blow past the Lambda's time/memory budget.
+const MAX_SOURCE_BYTES = 150 * 1024 * 1024; // 150 MB
 
-async function compressPdf(sourceUrl: string): Promise<Buffer> {
-  const [chromiumModule, puppeteerModule] = await Promise.all([
-    import("@sparticuz/chromium"),
-    import("puppeteer-core"),
-  ]);
-  const chromium = chromiumModule.default;
-  const puppeteer = puppeteerModule.default;
+// Cap the longest side of each rendered page to this many pixels — enough to
+// stay legible on screen while keeping per-page JPEGs small.
+const MAX_PAGE_PIXELS = 1600;
+const JPEG_QUALITY = 0.55;
 
-  let executablePath: string | undefined;
-  try {
-    const pathPromise = chromium.executablePath();
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("executablePath() timed out after 20 s")), 20_000),
-    );
-    executablePath = await Promise.race([pathPromise, timeoutPromise]);
-  } catch (err) {
-    console.warn("[compress-pdf] executablePath() failed — will attempt without explicit path:", err);
-  }
+/** Minimal shape of pdfjs-dist's internal NodeCanvasFactory (typed as `Object`
+ * in pdfjs-dist's own generated .d.ts, so we declare the bits we use here). */
+interface PdfCanvasFactory {
+  create(width: number, height: number): { canvas: unknown; context: CanvasRenderingContext2D };
+  destroy(canvasAndContext: { canvas: unknown; context: CanvasRenderingContext2D }): void;
+}
 
-  const baseArgs: string[] = Array.isArray(chromium.args) ? chromium.args : [];
-  const mergedArgs = Array.from(new Set([...baseArgs, ...EXTRA_CHROMIUM_ARGS]));
+/** Rasterizes every page of `sourcePdf` to a JPEG and reassembles them into a
+ * new, much smaller PDF (one full-page image per page). */
+async function compressPdf(sourcePdf: Buffer): Promise<Buffer> {
+  // Legacy Node build — automatically uses its built-in NodeCanvasFactory
+  // (backed by @napi-rs/canvas) for all rendering when running under Node,
+  // including for internal temporary canvases (soft masks/patterns/groups),
+  // so we don't need to supply our own canvas factory.
+  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
-  const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
-    args: mergedArgs,
-    defaultViewport: { width: 1000, height: 1400 },
-    headless: true,
-    protocolTimeout: 50_000,
-  };
-  if (executablePath) launchOptions.executablePath = executablePath;
+  const loadingTask = pdfjsLib.getDocument({
+    data: new Uint8Array(sourcePdf),
+    useSystemFonts: true,
+  });
+  const pdfDocument = await loadingTask.promise;
+  const canvasFactory = pdfDocument.canvasFactory as unknown as PdfCanvasFactory;
 
-  console.log("[compress-pdf] Launching browser...");
-  const browser = await puppeteer.launch(launchOptions);
+  const outDoc = await PdfLibDocument.create();
 
   try {
-    const page = await browser.newPage();
+    for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber++) {
+      const page = await pdfDocument.getPage(pageNumber);
+      const baseViewport = page.getViewport({ scale: 1 });
 
-    console.log("[compress-pdf] Opening source PDF in Chromium's built-in viewer...");
-    await page.goto(sourceUrl, { waitUntil: "networkidle0", timeout: 45_000 });
+      // Scale down so the longest side is at most MAX_PAGE_PIXELS.
+      const longestSide = Math.max(baseViewport.width, baseViewport.height);
+      const scale = Math.min(1, MAX_PAGE_PIXELS / longestSide);
+      const viewport = page.getViewport({ scale });
 
-    console.log("[compress-pdf] Printing to PDF (this re-rasterizes/recompresses embedded images)...");
-    const pdfBytes = await page.pdf({
-      printBackground: true,
-      timeout: 45_000,
-    });
+      const canvasAndContext = canvasFactory.create(
+        Math.ceil(viewport.width),
+        Math.ceil(viewport.height),
+      );
 
-    console.log(`[compress-pdf] Compressed PDF rendered: ${pdfBytes.length} bytes`);
-    return Buffer.from(pdfBytes);
+      await page.render({
+        canvas: null,
+        canvasContext: canvasAndContext.context,
+        viewport,
+      }).promise;
+
+      const jpegBytes: Buffer = (
+        canvasAndContext.canvas as unknown as { toBuffer(mime: "image/jpeg", quality?: number): Buffer }
+      ).toBuffer("image/jpeg", JPEG_QUALITY);
+      const jpegImage = await outDoc.embedJpg(jpegBytes);
+
+      // Keep the output page the same physical size (in PDF points) as the
+      // source page — only the embedded bitmap's resolution is reduced.
+      const outPage = outDoc.addPage([baseViewport.width, baseViewport.height]);
+      outPage.drawImage(jpegImage, {
+        x: 0,
+        y: 0,
+        width: baseViewport.width,
+        height: baseViewport.height,
+      });
+
+      canvasFactory.destroy(canvasAndContext);
+      page.cleanup();
+    }
   } finally {
-    await browser.close();
+    await loadingTask.destroy();
   }
+
+  const outBytes = await outDoc.save();
+  return Buffer.from(outBytes);
 }
 
 export const handler: Handler = async (event: HandlerEvent) => {
@@ -198,12 +223,43 @@ export const handler: Handler = async (event: HandlerEvent) => {
     console.warn("[compress-pdf] Cache lookup failed, proceeding with compression:", err);
   }
 
-  let pdfBuffer: Buffer;
+  // ── Download source PDF ───────────────────────────────────────────────────
+  let sourceBuffer: Buffer;
   try {
-    pdfBuffer = await compressPdf(sourceUrl);
+    console.log("[compress-pdf] Downloading source PDF...");
+    const response = await fetch(sourceUrl);
+    if (!response.ok) {
+      return jsonError(`Failed to download source file (HTTP ${response.status}).`, 502);
+    }
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+    if (contentLength > MAX_SOURCE_BYTES) {
+      return jsonError("Source file exceeds the 150 MB size limit.", 413);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > MAX_SOURCE_BYTES) {
+      return jsonError("Source file exceeds the 150 MB size limit.", 413);
+    }
+    sourceBuffer = Buffer.from(arrayBuffer);
+    console.log(`[compress-pdf] Downloaded ${sourceBuffer.length} bytes`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    return jsonError(`Failed to download source file: ${msg}`, 502);
+  }
+
+  // ── Compress ──────────────────────────────────────────────────────────────
+  let pdfBuffer: Buffer;
+  try {
+    console.log("[compress-pdf] Rasterizing pages...");
+    pdfBuffer = await compressPdf(sourceBuffer);
+    console.log(
+      `[compress-pdf] Compressed: ${sourceBuffer.length} -> ${pdfBuffer.length} bytes ` +
+        `(${Math.round((1 - pdfBuffer.length / sourceBuffer.length) * 100)}% smaller)`,
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : "";
     console.error(`[compress-pdf] Compression error: ${msg}`);
+    console.error(`[compress-pdf] Stack: ${stack}`);
     return jsonError(`Failed to compress PDF: ${msg}`, 500);
   }
 

@@ -19,11 +19,12 @@
   # Load these large modules from node_modules at runtime instead of bundling
   external_node_modules = ["@sparticuz/chromium", "puppeteer-core"]
 
-# Per-function configuration for compress-pdf (same Chromium requirements as office-to-pdf)
+# Per-function configuration for compress-pdf (pdfjs-dist rasterization —
+# @napi-rs/canvas ships a prebuilt native binary that esbuild can't bundle)
 [functions."compress-pdf"]
   timeout = 60
-  memory = 3008
-  external_node_modules = ["@sparticuz/chromium", "puppeteer-core"]
+  memory = 2048
+  external_node_modules = ["@napi-rs/canvas"]
 
 # Route /api/office-to-pdf → Netlify function (must come before the catch-all)
 [[redirects]]
