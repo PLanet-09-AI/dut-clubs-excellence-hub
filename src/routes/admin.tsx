@@ -59,6 +59,7 @@ import {
   OFFICE_FILE_PATTERN,
   IMAGE_FILE_PATTERN,
 } from "@/lib/office-to-pdf";
+import { compressPdfUrl, COMPRESS_THRESHOLD_BYTES } from "@/lib/compress-pdf";
 import {
   convertOfficeToHtml,
   isClientConvertible,
@@ -3284,6 +3285,10 @@ function NominationDetail({
   const [runtimeConvertingPath, setRuntimeConvertingPath] = useState<string | null>(null);
   const [runtimeConversionError, setRuntimeConversionError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  // Large PDFs (>= COMPRESS_THRESHOLD_BYTES) get an on-demand compressed
+  // preview copy instead of streaming the original — see src/lib/compress-pdf.ts.
+  const [compressedPdfUrls, setCompressedPdfUrls] = useState<Record<string, string>>({});
+  const [compressingPath, setCompressingPath] = useState<string | null>(null);
 
   useEffect(() => {
     if (previewableFiles.length === 0) {
@@ -3371,8 +3376,41 @@ function NominationDetail({
     return { kind: "canvas", src: rawPdfUrl };
   }
 
+  const nativePdfPath =
+    activePreviewMeta?.kind === "pdf" && activePreview ? activePreview.path : null;
+  const needsCompression =
+    nativePdfPath != null && (activePreview?.size ?? 0) >= COMPRESS_THRESHOLD_BYTES;
+  const compressedPdfUrl = nativePdfPath ? compressedPdfUrls[nativePdfPath] : undefined;
+
+  // Large native PDFs get a compressed preview copy once it's ready; until
+  // then (or if compression fails) fall back to the original so the user
+  // isn't blocked from previewing.
+  useEffect(() => {
+    if (!nativePdfPath || !needsCompression || !activePreview) return;
+    if (compressedPdfUrls[nativePdfPath]) return;
+    if (compressingPath === nativePdfPath) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setCompressingPath(nativePdfPath);
+        const url = await compressPdfUrl(activePreview.url);
+        if (cancelled) return;
+        setCompressedPdfUrls((prev) => ({ ...prev, [nativePdfPath]: url }));
+      } catch (err) {
+        console.warn("[admin] PDF compression failed, using original:", err);
+      } finally {
+        if (!cancelled) setCompressingPath((current) => (current === nativePdfPath ? null : current));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [nativePdfPath, needsCompression, compressedPdfUrls, compressingPath, activePreview]);
+
   const resolvedPdfSrc = resolvedKind === "pdf" && activePreview
-    ? (activePdfUrl ?? activePreview.url)
+    ? needsCompression
+      ? (compressedPdfUrl ?? activePdfUrl ?? activePreview.url)
+      : (activePdfUrl ?? activePreview.url)
     : null;
   const pwaViewer = resolvedPdfSrc ? getPwaViewerUrl(resolvedPdfSrc) : null;
   const [pdfCanvasError, setPdfCanvasError] = useState<string | null>(null);
@@ -3787,19 +3825,28 @@ function NominationDetail({
                   </div>
                 </div>
               ) : (
-                <PdfCanvasViewer
-                  key={`${activePreview.path}-${pdfRetryToken}`}
-                  url={pwaViewer.src}
-                  scrollToPage={previewPage}
-                  zoomPercent={previewZoom}
-                  onDocumentLoad={(count) => setPdfPageCount(count)}
-                  onError={(msg) => {
-                    setPdfCanvasError(msg);
-                    setPreviewLoading(false);
-                  }}
-                  onLoadingChange={setPreviewLoading}
-                  className="h-full w-full rounded-lg border border-primary/20 bg-white"
-                />
+                <div className="flex h-full flex-col gap-2">
+                  {needsCompression && (
+                    <p className="shrink-0 rounded-md bg-primary/5 px-2 py-1 text-[10px] text-muted-foreground">
+                      {compressedPdfUrl
+                        ? "Showing a compressed preview of this large file for faster loading — download for full quality."
+                        : "Large file — preparing a compressed preview for faster loading…"}
+                    </p>
+                  )}
+                  <PdfCanvasViewer
+                    key={`${activePreview.path}-${pdfRetryToken}-${compressedPdfUrl ? "c" : "o"}`}
+                    url={pwaViewer.src}
+                    scrollToPage={previewPage}
+                    zoomPercent={previewZoom}
+                    onDocumentLoad={(count) => setPdfPageCount(count)}
+                    onError={(msg) => {
+                      setPdfCanvasError(msg);
+                      setPreviewLoading(false);
+                    }}
+                    onLoadingChange={setPreviewLoading}
+                    className="h-full w-full flex-1 rounded-lg border border-primary/20 bg-white"
+                  />
+                </div>
               )
             ) : resolvedKind === "video" ? (
               /* HTML5 video player */
@@ -4327,15 +4374,24 @@ function NominationDetail({
                     </div>
                   </div>
                 ) : (
-                  <PdfCanvasViewer
-                    key={`mobile-canvas-${activePreview.path}-${pdfRetryToken}`}
-                    url={pwaViewer.src}
-                    scrollToPage={previewPage}
-                    zoomPercent={previewZoom}
-                    onDocumentLoad={(count) => setPdfPageCount(count)}
-                    onError={(msg) => setPdfCanvasError(msg)}
-                    className="h-full w-full rounded-lg border border-primary/20 bg-white"
-                  />
+                  <div className="flex h-full flex-col gap-2">
+                    {needsCompression && (
+                      <p className="shrink-0 rounded-md bg-primary/5 px-2 py-1 text-[10px] text-muted-foreground">
+                        {compressedPdfUrl
+                          ? "Compressed preview shown for faster loading — download for full quality."
+                          : "Large file — preparing a compressed preview…"}
+                      </p>
+                    )}
+                    <PdfCanvasViewer
+                      key={`mobile-canvas-${activePreview.path}-${pdfRetryToken}-${compressedPdfUrl ? "c" : "o"}`}
+                      url={pwaViewer.src}
+                      scrollToPage={previewPage}
+                      zoomPercent={previewZoom}
+                      onDocumentLoad={(count) => setPdfPageCount(count)}
+                      onError={(msg) => setPdfCanvasError(msg)}
+                      className="h-full w-full flex-1 rounded-lg border border-primary/20 bg-white"
+                    />
+                  </div>
                 )
               ) : (
                 /* Office Online or other embeddable content */

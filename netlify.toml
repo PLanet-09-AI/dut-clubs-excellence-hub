@@ -19,10 +19,22 @@
   # Load these large modules from node_modules at runtime instead of bundling
   external_node_modules = ["@sparticuz/chromium", "puppeteer-core"]
 
+# Per-function configuration for compress-pdf (same Chromium requirements as office-to-pdf)
+[functions."compress-pdf"]
+  timeout = 60
+  memory = 3008
+  external_node_modules = ["@sparticuz/chromium", "puppeteer-core"]
+
 # Route /api/office-to-pdf → Netlify function (must come before the catch-all)
 [[redirects]]
   from = "/api/office-to-pdf"
   to = "/.netlify/functions/office-to-pdf"
+  status = 200
+
+# Route /api/compress-pdf → Netlify function (must come before the catch-all)
+[[redirects]]
+  from = "/api/compress-pdf"
+  to = "/.netlify/functions/compress-pdf"
   status = 200
 
 [[redirects]]

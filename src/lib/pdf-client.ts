@@ -62,29 +62,62 @@ export async function destroyPdfDocument(doc: PdfDocumentHandle): Promise<void> 
   await doc.loadingTask.destroy();
 }
 
-/** Aborts the PDF fetch if it stalls, so a slow connection fails fast instead
- * of hanging indefinitely. */
-const LOAD_TIMEOUT_MS = 45_000;
+/** Aborts the PDF load if no data has arrived for this long, so a stalled
+ * connection fails fast (and surfaces a retryable error) instead of hanging
+ * indefinitely. Reset on every progress tick (see below) rather than being a
+ * single fixed deadline for the whole download, so large files on slow-but-
+ * working connections aren't killed just for taking a while — only a true
+ * stall triggers it. */
+const STALL_TIMEOUT_MS = 45_000;
 
 /** Loads a PDF document from a URL. Caller is responsible for calling
  * `.destroy()` on the returned handle when done to free memory. */
-export async function loadPdfDocument(url: string): Promise<PdfDocumentHandle> {
-  const pdfjsLib = await loadPdfjsLib();
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS);
-  try {
-    const loadingTask = pdfjsLib.getDocument({
-      url,
-      // Renders large PDFs progressively instead of waiting for the full
-      // download, and avoids buffering the whole file in memory up front.
-      disableAutoFetch: false,
-      disableStream: false,
-    });
-    const doc = await loadingTask.promise;
-    return doc;
-  } finally {
-    clearTimeout(timeoutId);
-  }
+export function loadPdfDocument(url: string): Promise<PdfDocumentHandle> {
+  return loadPdfjsLib().then(
+    (pdfjsLib) =>
+      new Promise<PdfDocumentHandle>((resolve, reject) => {
+        const loadingTask = pdfjsLib.getDocument({
+          url,
+          // Renders large PDFs progressively instead of waiting for the full
+          // download, and avoids buffering the whole file in memory up front.
+          disableAutoFetch: false,
+          disableStream: false,
+        });
+
+        let settled = false;
+        let timeoutId: ReturnType<typeof setTimeout>;
+        const resetStallTimer = () => {
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            void loadingTask.destroy();
+            reject(
+              new Error(
+                `PDF load stalled: no data received for ${STALL_TIMEOUT_MS / 1000}s.`,
+              ),
+            );
+          }, STALL_TIMEOUT_MS);
+        };
+        loadingTask.onProgress = () => resetStallTimer();
+        resetStallTimer();
+
+        loadingTask.promise.then(
+          (doc) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeoutId);
+            resolve(doc);
+          },
+          (err) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeoutId);
+            reject(err);
+          },
+        );
+      }),
+  );
 }
 
 /** Renders a single page of a loaded PDF document onto the given canvas at

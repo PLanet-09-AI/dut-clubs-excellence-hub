@@ -315,7 +315,7 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
   const [linkInput, setLinkInput] = useState("");
   const [linkError, setLinkError] = useState("");
   const [showLinkInput, setShowLinkInput] = useState(false);
-  const [preview, setPreview] = useState<{ url: string; name: string; type: "sharepoint" | "video" } | null>(null);
+  const [preview, setPreview] = useState<{ url: string; name: string; type: "pdf" | "sharepoint" | "video" } | null>(null);
 
   const handleFiles = useCallback(
     (fileList: File[]) => {
@@ -334,7 +334,14 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
 
         const path = `${basePath}/${file.name}`;
         const sRef = storageRef(storage, path);
-        const task = uploadBytesResumable(sRef, file);
+        // Files are never overwritten in place (same-name re-uploads are
+        // deduped above), so content at a given path is effectively
+        // immutable — cache it long-term instead of Storage's default
+        // `private, max-age=0`, which forces a revalidation round-trip on
+        // every single preview/download.
+        const task = uploadBytesResumable(sRef, file, {
+          cacheControl: "public, max-age=31536000, immutable",
+        });
 
         setTasks((prev) => [...prev, { id, name: file.name, progress: 0 }]);
 
@@ -357,7 +364,10 @@ function LabelUploader({ label, basePath, files, onFilesChange }: LabelUploaderP
                 const convertedPdfBlob = await convertOfficeToPdfBlob(url, file.name);
                 previewPdfPath = `${basePath}/__preview__/${stripExtension(file.name)}.pdf`;
                 const previewRef = storageRef(storage, previewPdfPath);
-                await uploadBytes(previewRef, convertedPdfBlob, { contentType: "application/pdf" });
+                await uploadBytes(previewRef, convertedPdfBlob, {
+                  contentType: "application/pdf",
+                  cacheControl: "public, max-age=31536000, immutable",
+                });
                 previewPdfUrl = await getDownloadURL(previewRef);
               } catch {
                 // Keep original upload when conversion fails; preview can still open/download externally.

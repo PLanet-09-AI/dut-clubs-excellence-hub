@@ -51,6 +51,7 @@ import {
   computeWeightedAverage,
 } from "@/data/awards";
 import { convertOfficeToPdfUrl } from "@/lib/office-to-pdf";
+import { compressPdfUrl, COMPRESS_THRESHOLD_BYTES } from "@/lib/compress-pdf";
 import { convertOfficeToHtml, isClientConvertible, withZoom } from "@/lib/office-to-html-client";
 import { PdfCanvasViewer } from "@/components/PdfCanvasViewer";
 import SiteNav from "@/components/SiteNav";
@@ -969,6 +970,10 @@ function JudgeNominationDetail({
   const [runtimePreviewHtml, setRuntimePreviewHtml] = useState<Record<string, string>>({});
   const [runtimeConvertingPath, setRuntimeConvertingPath] = useState<string | null>(null);
   const [runtimeConversionError, setRuntimeConversionError] = useState<string | null>(null);
+  // Large PDFs (>= COMPRESS_THRESHOLD_BYTES) get an on-demand compressed
+  // preview copy instead of streaming the original — see src/lib/compress-pdf.ts.
+  const [compressedPdfUrls, setCompressedPdfUrls] = useState<Record<string, string>>({});
+  const [compressingPath, setCompressingPath] = useState<string | null>(null);
 
   useEffect(() => {
     if (evidenceFiles.length === 0) {
@@ -1042,8 +1047,41 @@ function JudgeNominationDetail({
    * webviews, etc.) don't ship the PDF viewer component either, silently
    * falling back to a file download instead of an inline preview.
    */
+  const nativePdfPath =
+    activePreview && activePreview.kind === "pdf" ? activePreview.file.path : null;
+  const needsCompression =
+    nativePdfPath != null && (activePreview?.file.size ?? 0) >= COMPRESS_THRESHOLD_BYTES;
+  const compressedPdfUrl = nativePdfPath ? compressedPdfUrls[nativePdfPath] : undefined;
+
+  // Large native PDFs get a compressed preview copy once it's ready; until
+  // then (or if compression fails) fall back to the original so the user
+  // isn't blocked from previewing.
+  useEffect(() => {
+    if (!nativePdfPath || !needsCompression) return;
+    if (compressedPdfUrls[nativePdfPath]) return;
+    if (compressingPath === nativePdfPath) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setCompressingPath(nativePdfPath);
+        const url = await compressPdfUrl(activePreview!.file.url);
+        if (cancelled) return;
+        setCompressedPdfUrls((prev) => ({ ...prev, [nativePdfPath]: url }));
+      } catch (err) {
+        console.warn("[judge] PDF compression failed, using original:", err);
+      } finally {
+        if (!cancelled) setCompressingPath((current) => (current === nativePdfPath ? null : current));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [nativePdfPath, needsCompression, compressedPdfUrls, compressingPath, activePreview]);
+
   const resolvedPdfSrc = resolvedKind === "pdf" && activePreview
-    ? (activePdfUrl ?? activePreview.file.url)
+    ? needsCompression
+      ? (compressedPdfUrl ?? activePdfUrl ?? activePreview.file.url)
+      : (activePdfUrl ?? activePreview.file.url)
     : null;
   const useCanvasPdfViewer = resolvedPdfSrc != null;
   const [pdfCanvasError, setPdfCanvasError] = useState<string | null>(null);
@@ -1382,15 +1420,24 @@ function JudgeNominationDetail({
                   </div>
                 </div>
               ) : (
-                <PdfCanvasViewer
-                  key={`${activePreview.file.path}-${pdfRetryToken}`}
-                  url={resolvedPdfSrc}
-                  scrollToPage={previewPage}
-                  zoomPercent={previewZoom}
-                  onDocumentLoad={(count) => setPdfPageCount(count)}
-                  onError={(msg) => setPdfCanvasError(msg)}
-                  className="h-full w-full rounded-lg border border-primary/20 bg-white"
-                />
+                <div className="flex h-full flex-col gap-2">
+                  {needsCompression && (
+                    <p className="shrink-0 rounded-md bg-primary/5 px-2 py-1 text-[10px] text-muted-foreground">
+                      {compressedPdfUrl
+                        ? "Showing a compressed preview of this large file for faster loading — download for full quality."
+                        : "Large file — preparing a compressed preview for faster loading…"}
+                    </p>
+                  )}
+                  <PdfCanvasViewer
+                    key={`${activePreview.file.path}-${pdfRetryToken}-${compressedPdfUrl ? "c" : "o"}`}
+                    url={resolvedPdfSrc}
+                    scrollToPage={previewPage}
+                    zoomPercent={previewZoom}
+                    onDocumentLoad={(count) => setPdfPageCount(count)}
+                    onError={(msg) => setPdfCanvasError(msg)}
+                    className="h-full w-full flex-1 rounded-lg border border-primary/20 bg-white"
+                  />
+                </div>
               )
             ) : activePreview.kind === "image" ? (
               <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
@@ -1890,15 +1937,24 @@ function JudgeNominationDetail({
                       </div>
                     </div>
                   ) : (
-                    <PdfCanvasViewer
-                      key={`mobile-canvas-${activePreview.file.path}-${pdfRetryToken}`}
-                      url={resolvedPdfSrc}
-                      scrollToPage={previewPage}
-                      zoomPercent={previewZoom}
-                      onDocumentLoad={(count) => setPdfPageCount(count)}
-                      onError={(msg) => setPdfCanvasError(msg)}
-                      className="h-full w-full rounded-lg border border-primary/20 bg-white"
-                    />
+                    <div className="flex h-full flex-col gap-2">
+                      {needsCompression && (
+                        <p className="shrink-0 rounded-md bg-primary/5 px-2 py-1 text-[10px] text-muted-foreground">
+                          {compressedPdfUrl
+                            ? "Compressed preview shown for faster loading — download for full quality."
+                            : "Large file — preparing a compressed preview…"}
+                        </p>
+                      )}
+                      <PdfCanvasViewer
+                        key={`mobile-canvas-${activePreview.file.path}-${pdfRetryToken}-${compressedPdfUrl ? "c" : "o"}`}
+                        url={resolvedPdfSrc}
+                        scrollToPage={previewPage}
+                        zoomPercent={previewZoom}
+                        onDocumentLoad={(count) => setPdfPageCount(count)}
+                        onError={(msg) => setPdfCanvasError(msg)}
+                        className="h-full w-full flex-1 rounded-lg border border-primary/20 bg-white"
+                      />
+                    </div>
                   )
                 ) : resolvedKind === "image" ? (
                   <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
