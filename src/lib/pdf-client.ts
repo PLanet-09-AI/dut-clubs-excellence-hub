@@ -44,6 +44,24 @@ function loadPdfjsLib(): Promise<typeof PdfJsLib> {
   return pdfjsLibPromise;
 }
 
+/** Returns a page's unscaled (100%) width/height in points, without
+ * rendering it — used to size placeholder page slots in a scrollable
+ * multi-page viewer before the page itself has been rendered. */
+export async function getPageBaseSize(
+  doc: PdfDocumentHandle,
+  pageNumber: number,
+): Promise<{ width: number; height: number }> {
+  const page = await doc.getPage(pageNumber);
+  const viewport = page.getViewport({ scale: 1 });
+  return { width: viewport.width, height: viewport.height };
+}
+
+/** Frees a loaded PDF document's resources. `PDFDocumentProxy` itself has no
+ * `destroy()` method — it's exposed on the `loadingTask` that produced it. */
+export async function destroyPdfDocument(doc: PdfDocumentHandle): Promise<void> {
+  await doc.loadingTask.destroy();
+}
+
 /** Aborts the PDF fetch if it stalls, so a slow connection fails fast instead
  * of hanging indefinitely. */
 const LOAD_TIMEOUT_MS = 45_000;

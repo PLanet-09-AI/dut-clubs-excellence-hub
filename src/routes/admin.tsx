@@ -3377,10 +3377,18 @@ function NominationDetail({
   const pwaViewer = resolvedPdfSrc ? getPwaViewerUrl(resolvedPdfSrc) : null;
   const [pdfCanvasError, setPdfCanvasError] = useState<string | null>(null);
   const [pdfPageCount, setPdfPageCount] = useState<number | null>(null);
+  // Bumped on "Retry" to force PdfCanvasViewer to remount and re-fetch the
+  // PDF (clearing pdfCanvasError alone doesn't retrigger its internal load).
+  const [pdfRetryToken, setPdfRetryToken] = useState(0);
+  const retryPdfCanvas = () => {
+    setPdfCanvasError(null);
+    setPdfRetryToken((t) => t + 1);
+  };
 
   useEffect(() => {
     setPdfCanvasError(null);
     setPdfPageCount(null);
+    setPdfRetryToken(0);
   }, [previewPath]);
 
 
@@ -3757,6 +3765,14 @@ function NominationDetail({
                     <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
                     <p className="text-xs text-amber-800">{pdfCanvasError}</p>
                     <div className="flex flex-wrap items-center justify-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 px-3 text-xs bg-primary text-primary-foreground"
+                        onClick={retryPdfCanvas}
+                      >
+                        <RotateCcw className="mr-1 h-3.5 w-3.5" /> Retry
+                      </Button>
                       <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
                         <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
                           <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
@@ -3771,20 +3787,19 @@ function NominationDetail({
                   </div>
                 </div>
               ) : (
-                <div className="h-full w-full overflow-auto rounded-lg border border-primary/20 bg-white p-3">
-                  <PdfCanvasViewer
-                    key={activePreview.path}
-                    url={pwaViewer.src}
-                    page={previewPage}
-                    zoomPercent={previewZoom}
-                    onDocumentLoad={(count) => setPdfPageCount(count)}
-                    onError={(msg) => {
-                      setPdfCanvasError(msg);
-                      setPreviewLoading(false);
-                    }}
-                    onLoadingChange={setPreviewLoading}
-                  />
-                </div>
+                <PdfCanvasViewer
+                  key={`${activePreview.path}-${pdfRetryToken}`}
+                  url={pwaViewer.src}
+                  scrollToPage={previewPage}
+                  zoomPercent={previewZoom}
+                  onDocumentLoad={(count) => setPdfPageCount(count)}
+                  onError={(msg) => {
+                    setPdfCanvasError(msg);
+                    setPreviewLoading(false);
+                  }}
+                  onLoadingChange={setPreviewLoading}
+                  className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                />
               )
             ) : resolvedKind === "video" ? (
               /* HTML5 video player */
@@ -4290,6 +4305,14 @@ function NominationDetail({
                       <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
                       <p className="text-xs text-amber-800">{pdfCanvasError}</p>
                       <div className="flex flex-wrap items-center justify-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-8 px-3 text-xs bg-primary text-primary-foreground"
+                          onClick={retryPdfCanvas}
+                        >
+                          <RotateCcw className="mr-1 h-3.5 w-3.5" /> Retry
+                        </Button>
                         <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
                           <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
                             <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
@@ -4304,16 +4327,15 @@ function NominationDetail({
                     </div>
                   </div>
                 ) : (
-                  <div className="h-full w-full overflow-auto rounded-lg border border-primary/20 bg-white p-3">
-                    <PdfCanvasViewer
-                      key={`mobile-canvas-${activePreview.path}`}
-                      url={pwaViewer.src}
-                      page={previewPage}
-                      zoomPercent={previewZoom}
-                      onDocumentLoad={(count) => setPdfPageCount(count)}
-                      onError={(msg) => setPdfCanvasError(msg)}
-                    />
-                  </div>
+                  <PdfCanvasViewer
+                    key={`mobile-canvas-${activePreview.path}-${pdfRetryToken}`}
+                    url={pwaViewer.src}
+                    scrollToPage={previewPage}
+                    zoomPercent={previewZoom}
+                    onDocumentLoad={(count) => setPdfPageCount(count)}
+                    onError={(msg) => setPdfCanvasError(msg)}
+                    className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                  />
                 )
               ) : (
                 /* Office Online or other embeddable content */
