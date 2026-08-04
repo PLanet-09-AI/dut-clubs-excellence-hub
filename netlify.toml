@@ -30,6 +30,15 @@
   to = "/index.html"
   status = 200
 
+# Hashed build assets (JS/CSS/workers emitted by Vite into /assets with a
+# content hash in the filename, e.g. pdf.worker.min-CHFwMXne.mjs) never
+# change contents under the same filename, so they can be cached by the
+# browser indefinitely instead of being revalidated (304) on every load.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
 # Security Headers
 [[headers]]
   for = "/*"
