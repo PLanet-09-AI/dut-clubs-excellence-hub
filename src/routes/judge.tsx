@@ -1186,7 +1186,7 @@ function JudgeNominationDetail({
               <option value="">No previewable files available</option>
             ) : (
               evidenceFiles.map(({ file, evidenceLabel, kind }, index) => (
-                <option key={file.path} value={file.path}>
+                <option key={`${file.path || file.url}-${index}`} value={file.path}>
                   {index + 1}. {evidenceLabel} - {file.name} ({kind.toUpperCase()})
                 </option>
               ))
@@ -1516,7 +1516,7 @@ function JudgeNominationDetail({
                                 <p className="mb-1 text-[10px] font-medium text-muted-foreground">
                                   {label}
                                 </p>
-                                {slotFiles.map((file) => {
+                                {slotFiles.map((file, fileIdx) => {
                                   const kind = getPreviewKind(
                                     file.name,
                                     file.url,
@@ -1524,7 +1524,7 @@ function JudgeNominationDetail({
                                   );
                                   return (
                                     <div
-                                      key={file.path}
+                                      key={`${file.path || file.url}-${fileIdx}`}
                                       className="flex flex-wrap items-center gap-2 py-1"
                                     >
                                       <button
