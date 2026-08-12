@@ -8,6 +8,13 @@
   # V8 heap, causing "JavaScript heap out of memory" during `vite build`.
   NODE_OPTIONS = "--max-old-space-size=4096"
 
+# ⚠️ IMPORTANT: AWS Lambda imposes a 4KB limit on environment variables passed to functions.
+# To avoid exceeding this limit:
+# 1. Firebase functions load credentials from netlify/functions/student-services-745d5-firebase-adminsdk-fbsvc-81b1cc07be.json
+# 2. FIREBASE_ADMIN_SDK_B64 should NOT be set in site environment variables
+# 3. If present in Netlify UI, DELETE it from: Site Settings → Environment variables
+# 4. Keep only these variables: EMAILJS_PRIVATE_KEY, OPENAI_API_KEY, VITE_* vars
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
