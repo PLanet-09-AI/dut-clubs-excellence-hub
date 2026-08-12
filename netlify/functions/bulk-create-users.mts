@@ -28,26 +28,14 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import emailjs from '@emailjs/nodejs';
 import type { Handler } from '@netlify/functions';
+import { getAuthService } from './firebase-admin-init';
 
-// Firebase Admin will be initialized in the handler (defer to avoid crash if env var missing)
+// Firebase Admin will be initialized in the handler
 let auth: any = null;
 
 function initializeFirebase() {
   if (auth) return; // Already initialized
-  
-  const credB64 = process.env.FIREBASE_ADMIN_SDK_B64 || '';
-  if (!credB64) {
-    throw new Error('FIREBASE_ADMIN_SDK_B64 environment variable is not set');
-  }
-
-  try {
-    const serviceAccount = JSON.parse(
-      Buffer.from(credB64, 'base64').toString()
-    );
-    initializeApp({
-      credential: cert(serviceAccount),
-    });
-    auth = getAuth();
+  auth = getAuthService();
   } catch (error) {
     throw new Error(`Failed to initialize Firebase: ${error}`);
   }

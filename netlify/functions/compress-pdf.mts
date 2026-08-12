@@ -34,6 +34,7 @@ import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { PDFDocument as PdfLibDocument } from "pdf-lib";
 import { createCanvas, DOMMatrix, Path2D } from "@napi-rs/canvas";
+import { getStorageBucket } from "./firebase-admin-init";
 
 // pdfjs-dist's legacy Node build normally polyfills `DOMMatrix`/`Path2D`
 // (and finds a canvas implementation) itself via a dynamic
@@ -58,15 +59,7 @@ const CACHE_PREFIX = "pdf-compressed-cache/";
 const SIGNED_URL_TTL_MS = 6 * 24 * 60 * 60 * 1000; // 6 days (GCS signed URL max is 7 days)
 
 function getBucket() {
-  if (getApps().length === 0) {
-    const credB64 = process.env.FIREBASE_ADMIN_SDK_B64 || "";
-    if (!credB64) {
-      throw new Error("FIREBASE_ADMIN_SDK_B64 environment variable is not set");
-    }
-    const serviceAccount = JSON.parse(Buffer.from(credB64, "base64").toString());
-    initializeApp({ credential: cert(serviceAccount), storageBucket: STORAGE_BUCKET });
-  }
-  return getStorage().bucket(STORAGE_BUCKET);
+  return getStorageBucket(STORAGE_BUCKET);
 }
 
 function cacheKeyFor(sourceUrl: string): string {

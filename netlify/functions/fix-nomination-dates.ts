@@ -9,19 +9,9 @@ import {
   FieldValue,
 } from "firebase-admin/firestore";
 import type { Config } from "@netlify/functions";
+import { getFirestoreDb } from "./firebase-admin-init";
 
-const serviceAccount = JSON.parse(
-  process.env.FIREBASE_ADMIN_SDK_JSON || "{}"
-);
-
-// Initialize Firebase if not already done
-if (!getApps().length) {
-  initializeApp({
-    credential: cert(serviceAccount),
-  });
-}
-
-const db = getFirestore();
+const db = getFirestoreDb();
 
 export default async (req: any) => {
   // Only allow POST requests

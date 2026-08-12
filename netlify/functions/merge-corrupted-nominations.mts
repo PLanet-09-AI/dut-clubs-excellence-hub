@@ -39,6 +39,7 @@
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import type { Handler } from '@netlify/functions';
+import { getFirestoreDb } from './firebase-admin-init';
 
 // Firebase Admin will be initialized in the handler (defer to avoid crash if env var missing)
 let db: any = null;
@@ -46,19 +47,8 @@ let db: any = null;
 function initializeFirebase() {
   if (db) return; // Already initialized
   
-  const credB64 = process.env.FIREBASE_ADMIN_SDK_B64 || '';
-  if (!credB64) {
-    throw new Error('FIREBASE_ADMIN_SDK_B64 environment variable is not set');
-  }
-
   try {
-    const serviceAccount = JSON.parse(
-      Buffer.from(credB64, 'base64').toString()
-    );
-    initializeApp({
-      credential: cert(serviceAccount),
-    });
-    db = getFirestore();
+    db = getFirestoreDb();
   } catch (error) {
     throw new Error(`Failed to initialize Firebase: ${error}`);
   }

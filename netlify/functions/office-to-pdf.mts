@@ -20,6 +20,7 @@ import { XMLParser } from "fast-xml-parser";
 import { createHash } from "node:crypto";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
+import { getStorageBucket } from "./firebase-admin-init";
 
 // ─── Firebase Admin (lazy init) — used to cache converted PDFs in Storage ───
 // Returning the rendered PDF inline (base64 in the Lambda response body) hits
@@ -34,15 +35,7 @@ const CACHE_PREFIX = "office-preview-cache/";
 const SIGNED_URL_TTL_MS = 6 * 24 * 60 * 60 * 1000; // 6 days (GCS signed URL max is 7 days)
 
 function getBucket() {
-  if (getApps().length === 0) {
-    const credB64 = process.env.FIREBASE_ADMIN_SDK_B64 || "";
-    if (!credB64) {
-      throw new Error("FIREBASE_ADMIN_SDK_B64 environment variable is not set");
-    }
-    const serviceAccount = JSON.parse(Buffer.from(credB64, "base64").toString());
-    initializeApp({ credential: cert(serviceAccount), storageBucket: STORAGE_BUCKET });
-  }
-  return getStorage().bucket(STORAGE_BUCKET);
+  return getStorageBucket(STORAGE_BUCKET);
 }
 
 function cacheKeyFor(sourceUrl: string): string {
