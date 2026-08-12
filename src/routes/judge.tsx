@@ -51,9 +51,7 @@ import {
   computeWeightedAverage,
 } from "@/data/awards";
 import { convertOfficeToPdfUrl } from "@/lib/office-to-pdf";
-import { compressPdfUrl, COMPRESS_THRESHOLD_BYTES } from "@/lib/compress-pdf";
 import { convertOfficeToHtml, isClientConvertible, withZoom } from "@/lib/office-to-html-client";
-import { PdfCanvasViewer } from "@/components/PdfCanvasViewer";
 import SiteNav from "@/components/SiteNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -970,10 +968,6 @@ function JudgeNominationDetail({
   const [runtimePreviewHtml, setRuntimePreviewHtml] = useState<Record<string, string>>({});
   const [runtimeConvertingPath, setRuntimeConvertingPath] = useState<string | null>(null);
   const [runtimeConversionError, setRuntimeConversionError] = useState<string | null>(null);
-  // Large PDFs (>= COMPRESS_THRESHOLD_BYTES) get an on-demand compressed
-  // preview copy instead of streaming the original — see src/lib/compress-pdf.ts.
-  const [compressedPdfUrls, setCompressedPdfUrls] = useState<Record<string, string>>({});
-  const [compressingPath, setCompressingPath] = useState<string | null>(null);
 
   useEffect(() => {
     if (evidenceFiles.length === 0) {
@@ -1037,68 +1031,6 @@ function JudgeNominationDetail({
       ? `${activePdfUrl ?? activePreview.file.url}#page=${previewPage}&zoom=${previewZoom}`
       : activePreview.file.url
     : "";
-
-  /**
-   * All PDFs are rendered via pdf.js onto a <canvas> (PdfCanvasViewer),
-   * regardless of device/browser. Relying on a browser's *built-in* PDF
-   * viewer for <iframe src=pdfUrl> is unreliable in practice — most mobile
-   * browsers and installed PWAs (especially iOS WKWebView-based ones) lack
-   * one entirely, and even some desktop Chromium embedders (Electron apps,
-   * webviews, etc.) don't ship the PDF viewer component either, silently
-   * falling back to a file download instead of an inline preview.
-   */
-  const nativePdfPath =
-    activePreview && activePreview.kind === "pdf" ? activePreview.file.path : null;
-  const needsCompression =
-    nativePdfPath != null && (activePreview?.file.size ?? 0) >= COMPRESS_THRESHOLD_BYTES;
-  const compressedPdfUrl = nativePdfPath ? compressedPdfUrls[nativePdfPath] : undefined;
-
-  // Large native PDFs get a compressed preview copy once it's ready; until
-  // then (or if compression fails) fall back to the original so the user
-  // isn't blocked from previewing.
-  useEffect(() => {
-    if (!nativePdfPath || !needsCompression) return;
-    if (compressedPdfUrls[nativePdfPath]) return;
-    if (compressingPath === nativePdfPath) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        setCompressingPath(nativePdfPath);
-        const url = await compressPdfUrl(activePreview!.file.url);
-        if (cancelled) return;
-        setCompressedPdfUrls((prev) => ({ ...prev, [nativePdfPath]: url }));
-      } catch (err) {
-        console.warn("[judge] PDF compression failed, using original:", err);
-      } finally {
-        if (!cancelled) setCompressingPath((current) => (current === nativePdfPath ? null : current));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [nativePdfPath, needsCompression, compressedPdfUrls, compressingPath, activePreview]);
-
-  const resolvedPdfSrc = resolvedKind === "pdf" && activePreview
-    ? needsCompression
-      ? (compressedPdfUrl ?? activePdfUrl ?? activePreview.file.url)
-      : (activePdfUrl ?? activePreview.file.url)
-    : null;
-  const useCanvasPdfViewer = resolvedPdfSrc != null;
-  const [pdfCanvasError, setPdfCanvasError] = useState<string | null>(null);
-  const [pdfPageCount, setPdfPageCount] = useState<number | null>(null);
-  // Bumped on "Retry" to force PdfCanvasViewer to remount and re-fetch the
-  // PDF (clearing pdfCanvasError alone doesn't retrigger its internal load).
-  const [pdfRetryToken, setPdfRetryToken] = useState(0);
-  const retryPdfCanvas = () => {
-    setPdfCanvasError(null);
-    setPdfRetryToken((t) => t + 1);
-  };
-
-  useEffect(() => {
-    setPdfCanvasError(null);
-    setPdfPageCount(null);
-    setPdfRetryToken(0);
-  }, [previewPath]);
 
   useEffect(() => {
     setOfficePreviewError(false);
@@ -1224,7 +1156,7 @@ function JudgeNominationDetail({
               <option value="">No previewable files available</option>
             ) : (
               evidenceFiles.map(({ file, evidenceLabel, kind }, index) => (
-                <option key={`${file.path || file.url}-${index}`} value={file.path}>
+                <option key={file.path} value={file.path}>
                   {index + 1}. {evidenceLabel} - {file.name} ({kind.toUpperCase()})
                 </option>
               ))
@@ -1387,58 +1319,6 @@ function JudgeNominationDetail({
                 sandbox=""
                 className="h-full w-full rounded-lg border border-primary/20 bg-white"
               />
-            ) : resolvedKind === "pdf" && useCanvasPdfViewer && resolvedPdfSrc ? (
-              /* Mobile browsers + installed PWAs — render via pdf.js onto a
-                 <canvas>. Works identically everywhere (no reliance on a
-                 built-in browser PDF plugin, which most mobile browsers/PWAs
-                 lack) and has no file-size ceiling. */
-              pdfCanvasError ? (
-                <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
-                  <div className="max-w-sm space-y-3">
-                    <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
-                    <p className="text-xs text-amber-800">{pdfCanvasError}</p>
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-8 px-3 text-xs bg-primary text-primary-foreground"
-                        onClick={retryPdfCanvas}
-                      >
-                        <RotateCcw className="mr-1 h-3.5 w-3.5" /> Retry
-                      </Button>
-                      <a href={resolvedPdfSrc} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
-                          <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
-                        </Button>
-                      </a>
-                      <a href={resolvedPdfSrc} download>
-                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
-                          <Download className="mr-1 h-3.5 w-3.5" /> Download
-                        </Button>
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-full flex-col gap-2">
-                  {needsCompression && (
-                    <p className="shrink-0 rounded-md bg-primary/5 px-2 py-1 text-[10px] text-muted-foreground">
-                      {compressedPdfUrl
-                        ? "Showing a compressed preview of this large file for faster loading — download for full quality."
-                        : "Large file — preparing a compressed preview for faster loading…"}
-                    </p>
-                  )}
-                  <PdfCanvasViewer
-                    key={`${activePreview.file.path}-${pdfRetryToken}-${compressedPdfUrl ? "c" : "o"}`}
-                    url={resolvedPdfSrc}
-                    scrollToPage={previewPage}
-                    zoomPercent={previewZoom}
-                    onDocumentLoad={(count) => setPdfPageCount(count)}
-                    onError={(msg) => setPdfCanvasError(msg)}
-                    className="h-full w-full flex-1 rounded-lg border border-primary/20 bg-white"
-                  />
-                </div>
-              )
             ) : activePreview.kind === "image" ? (
               <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
                 <img
@@ -1570,7 +1450,7 @@ function JudgeNominationDetail({
                                 <p className="mb-1 text-[10px] font-medium text-muted-foreground">
                                   {label}
                                 </p>
-                                {slotFiles.map((file, fileIdx) => {
+                                {slotFiles.map((file) => {
                                   const kind = getPreviewKind(
                                     file.name,
                                     file.url,
@@ -1578,7 +1458,7 @@ function JudgeNominationDetail({
                                   );
                                   return (
                                     <div
-                                      key={`${file.path || file.url}-${fileIdx}`}
+                                      key={file.path}
                                       className="flex flex-wrap items-center gap-2 py-1"
                                     >
                                       <button
@@ -1905,57 +1785,6 @@ function JudgeNominationDetail({
                     sandbox=""
                     className="h-full w-full rounded-lg border border-primary/20 bg-white"
                   />
-                ) : resolvedKind === "pdf" && useCanvasPdfViewer && resolvedPdfSrc ? (
-                  /* Mobile browsers + installed PWAs — render via pdf.js onto a
-                     <canvas>. Works identically everywhere and has no
-                     file-size ceiling. */
-                  pdfCanvasError ? (
-                    <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
-                      <div className="max-w-sm space-y-3">
-                        <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
-                        <p className="text-xs text-amber-800">{pdfCanvasError}</p>
-                        <div className="flex flex-wrap items-center justify-center gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="h-8 px-3 text-xs bg-primary text-primary-foreground"
-                            onClick={retryPdfCanvas}
-                          >
-                            <RotateCcw className="mr-1 h-3.5 w-3.5" /> Retry
-                          </Button>
-                          <a href={resolvedPdfSrc} target="_blank" rel="noopener noreferrer">
-                            <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
-                              <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
-                            </Button>
-                          </a>
-                          <a href={resolvedPdfSrc} download>
-                            <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
-                              <Download className="mr-1 h-3.5 w-3.5" /> Download
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex h-full flex-col gap-2">
-                      {needsCompression && (
-                        <p className="shrink-0 rounded-md bg-primary/5 px-2 py-1 text-[10px] text-muted-foreground">
-                          {compressedPdfUrl
-                            ? "Compressed preview shown for faster loading — download for full quality."
-                            : "Large file — preparing a compressed preview…"}
-                        </p>
-                      )}
-                      <PdfCanvasViewer
-                        key={`mobile-canvas-${activePreview.file.path}-${pdfRetryToken}-${compressedPdfUrl ? "c" : "o"}`}
-                        url={resolvedPdfSrc}
-                        scrollToPage={previewPage}
-                        zoomPercent={previewZoom}
-                        onDocumentLoad={(count) => setPdfPageCount(count)}
-                        onError={(msg) => setPdfCanvasError(msg)}
-                        className="h-full w-full flex-1 rounded-lg border border-primary/20 bg-white"
-                      />
-                    </div>
-                  )
                 ) : resolvedKind === "image" ? (
                   <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-white p-3">
                     <img

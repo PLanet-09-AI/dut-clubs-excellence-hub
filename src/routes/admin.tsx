@@ -59,14 +59,19 @@ import {
   OFFICE_FILE_PATTERN,
   IMAGE_FILE_PATTERN,
 } from "@/lib/office-to-pdf";
-import { compressPdfUrl, COMPRESS_THRESHOLD_BYTES } from "@/lib/compress-pdf";
 import {
   convertOfficeToHtml,
   isClientConvertible,
   withZoom,
 } from "@/lib/office-to-html-client";
-import { PdfCanvasViewer } from "@/components/PdfCanvasViewer";
 import { validateDocumentsForCategory, getIncompleteItemsList } from "@/lib/document-validation";
+import {
+  getNominationJudgingStatus,
+  getJudgingDetails,
+  getActivejudgeCount,
+  getJudgeBreakdown,
+  type JudgeScore,
+} from "@/lib/nomination-judging";
 import {
   logCreateAccount,
   logResetVotes,
@@ -692,7 +697,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   const canManage = role === "admin";
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("__all__");
-  const [statusFilter, setStatusFilter] = useState<"all" | NominationStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | NominationStatus | "judging_pending">("all");
   const [selfNomFilter, setSelfNomFilter] = useState(false);
   const [search, setSearch] = useState("");
   const [detailNom, setDetailNom] = useState<Nomination | null>(null);
@@ -1120,14 +1125,21 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   }
 
   const stats = useMemo(
-    () => ({
-      total: nominations.length,
-      pending: nominations.filter((n) => n.status === "pending").length,
-      shortlisted: nominations.filter((n) => n.status === "shortlisted").length,
-      rejected: nominations.filter((n) => n.status === "rejected").length,
-      selfNominated: nominations.filter((n) => n.isSelfNomination).length,
-    }),
-    [nominations],
+    () => {
+      const judgingPendingCount = nominations
+        .filter((n) => n.status === "shortlisted")
+        .filter((n) => getNominationJudgingStatus(n.id, n.categoryId, judgeScores) === "pending").length;
+      
+      return {
+        total: nominations.length,
+        pending: nominations.filter((n) => n.status === "pending").length,
+        shortlisted: nominations.filter((n) => n.status === "shortlisted").length,
+        judgingPending: judgingPendingCount,
+        rejected: nominations.filter((n) => n.status === "rejected").length,
+        selfNominated: nominations.filter((n) => n.isSelfNomination).length,
+      };
+    },
+    [nominations, judgeScores],
   );
 
   // Build category tiles — only categories that have at least one nomination
@@ -1144,7 +1156,15 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   const filtered = useMemo(() => {
     return nominations.filter((n) => {
       if (selectedCategory !== "__all__" && n.categoryId !== selectedCategory) return false;
-      if (statusFilter !== "all" && n.status !== statusFilter) return false;
+      
+      // Handle special "judging_pending" filter
+      if (statusFilter === "judging_pending") {
+        if (n.status !== "shortlisted") return false;
+        if (getNominationJudgingStatus(n.id, n.categoryId, judgeScores) !== "pending") return false;
+      } else if (statusFilter !== "all" && n.status !== statusFilter) {
+        return false;
+      }
+      
       if (selfNomFilter && !n.isSelfNomination) return false;
       if (search.trim()) {
         const s = search.toLowerCase();
@@ -1157,7 +1177,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
       }
       return true;
     });
-  }, [nominations, selectedCategory, statusFilter, selfNomFilter, search]);
+  }, [nominations, selectedCategory, statusFilter, selfNomFilter, search, judgeScores]);
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
 
@@ -1527,10 +1547,11 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
     return !ts;
   }
 
-  const STATUS_FILTERS: { label: string; value: "all" | NominationStatus }[] = [
+  const STATUS_FILTERS: { label: string; value: "all" | NominationStatus | "judging_pending" }[] = [
     { label: "All", value: "all" },
     { label: "Pending", value: "pending" },
     { label: "Shortlisted", value: "shortlisted" },
+    { label: "Pending Judging", value: "judging_pending" },
     { label: "Rejected", value: "rejected" },
   ];
 
@@ -1739,10 +1760,11 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
       <AdminQuickGuide canManage={canManage} />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <StatCard label="Total" value={stats.total} />
         <StatCard label="Pending" value={stats.pending} color="amber" />
         <StatCard label="Shortlisted" value={stats.shortlisted} color="gold" />
+        <StatCard label="Pending Judging" value={stats.judgingPending} color="amber" />
         <StatCard label="Rejected" value={stats.rejected} color="red" />
         <button
           onClick={() => setSelfNomFilter((v) => !v)}
@@ -1994,7 +2016,23 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
                       <p className="text-[11px] text-muted-foreground line-clamp-1">
                         By {n.nominatorName}
                       </p>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        {n.status === "shortlisted" && (
+                          (() => {
+                            const judgingDetails = getJudgingDetails(n.id, n.categoryId, judgeScores);
+                            return judgingDetails.status === "pending" ? (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                Judging pending
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700 flex items-center gap-1">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Judging complete
+                              </span>
+                            );
+                          })()
+                        )}
                         {n.isSelfNomination && (
                           <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
                             Self-nominated
@@ -2591,6 +2629,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
               isDateMissing={isDateMissing}
               canManage={canManage}
               setShowVideoPreview={setShowVideoPreview}
+              judgeScores={judgeScores}
             />
           )}
         </SheetContent>
@@ -3213,6 +3252,7 @@ function NominationDetail({
   isDateMissing,
   canManage,
   setShowVideoPreview,
+  judgeScores,
 }: {
   nom: Nomination;
   onUpdate: (id: string, s: NominationStatus) => Promise<void>;
@@ -3221,6 +3261,18 @@ function NominationDetail({
   isDateMissing: (ts: Nomination["createdAt"]) => boolean;
   canManage: boolean;
   setShowVideoPreview: (state: { url: string; name: string } | null) => void;
+  judgeScores: Array<{
+    id: string;
+    nominationId: string;
+    judgeUid: string;
+    judgeEmail: string;
+    nomineeName: string;
+    categoryName: string;
+    score: number;
+    criteriaScores?: Record<string, number>;
+    comment: string;
+    updatedAt: { toDate?: () => Date } | null;
+  }>;
 }) {
   const catData = AWARD_CATEGORIES.find((c) => c.id === nom.categoryId);
   const totalFiles = nom.uploads
@@ -3285,10 +3337,6 @@ function NominationDetail({
   const [runtimeConvertingPath, setRuntimeConvertingPath] = useState<string | null>(null);
   const [runtimeConversionError, setRuntimeConversionError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  // Large PDFs (>= COMPRESS_THRESHOLD_BYTES) get an on-demand compressed
-  // preview copy instead of streaming the original — see src/lib/compress-pdf.ts.
-  const [compressedPdfUrls, setCompressedPdfUrls] = useState<Record<string, string>>({});
-  const [compressingPath, setCompressingPath] = useState<string | null>(null);
 
   useEffect(() => {
     if (previewableFiles.length === 0) {
@@ -3361,74 +3409,22 @@ function NominationDetail({
     : "";
 
   /**
-   * All PDFs are rendered via pdf.js onto a <canvas> (PdfCanvasViewer),
-   * regardless of device/browser. Relying on a browser's *built-in* PDF
-   * viewer for <iframe src=pdfUrl> is unreliable in practice — most mobile
-   * browsers and installed PWAs (especially iOS WKWebView-based ones) lack
-   * one entirely, and even some desktop Chromium embedders (Electron apps,
-   * webviews, etc.) don't ship the PDF viewer component either, silently
-   * falling back to a file download instead of an inline preview. Canvas
-   * rendering works identically everywhere and has no file-size ceiling —
-   * pages are streamed/rendered on demand instead of loading the whole
-   * document into the DOM.
+   * Returns a PWA-safe viewer URL for PDFs.
+   * - Blob URLs (runtime-converted): returned as-is; caller should use <object>.
+   * - Remote URLs: wrapped in Google Docs viewer so iOS PWA can render them.
    */
-  function getPwaViewerUrl(rawPdfUrl: string): { kind: "canvas"; src: string } {
-    return { kind: "canvas", src: rawPdfUrl };
+  function getPwaViewerUrl(rawPdfUrl: string): { kind: "blob" | "gdocs"; src: string } {
+    if (rawPdfUrl.startsWith("blob:")) return { kind: "blob", src: rawPdfUrl };
+    return {
+      kind: "gdocs",
+      src: `https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`,
+    };
   }
 
-  const nativePdfPath =
-    activePreviewMeta?.kind === "pdf" && activePreview ? activePreview.path : null;
-  const needsCompression =
-    nativePdfPath != null && (activePreview?.size ?? 0) >= COMPRESS_THRESHOLD_BYTES;
-  const compressedPdfUrl = nativePdfPath ? compressedPdfUrls[nativePdfPath] : undefined;
-
-  // Large native PDFs get a compressed preview copy once it's ready; until
-  // then (or if compression fails) fall back to the original so the user
-  // isn't blocked from previewing.
-  useEffect(() => {
-    if (!nativePdfPath || !needsCompression || !activePreview) return;
-    if (compressedPdfUrls[nativePdfPath]) return;
-    if (compressingPath === nativePdfPath) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        setCompressingPath(nativePdfPath);
-        const url = await compressPdfUrl(activePreview.url);
-        if (cancelled) return;
-        setCompressedPdfUrls((prev) => ({ ...prev, [nativePdfPath]: url }));
-      } catch (err) {
-        console.warn("[admin] PDF compression failed, using original:", err);
-      } finally {
-        if (!cancelled) setCompressingPath((current) => (current === nativePdfPath ? null : current));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [nativePdfPath, needsCompression, compressedPdfUrls, compressingPath, activePreview]);
-
   const resolvedPdfSrc = resolvedKind === "pdf" && activePreview
-    ? needsCompression
-      ? (compressedPdfUrl ?? activePdfUrl ?? activePreview.url)
-      : (activePdfUrl ?? activePreview.url)
+    ? (activePdfUrl ?? activePreview.url)
     : null;
   const pwaViewer = resolvedPdfSrc ? getPwaViewerUrl(resolvedPdfSrc) : null;
-  const [pdfCanvasError, setPdfCanvasError] = useState<string | null>(null);
-  const [pdfPageCount, setPdfPageCount] = useState<number | null>(null);
-  // Bumped on "Retry" to force PdfCanvasViewer to remount and re-fetch the
-  // PDF (clearing pdfCanvasError alone doesn't retrigger its internal load).
-  const [pdfRetryToken, setPdfRetryToken] = useState(0);
-  const retryPdfCanvas = () => {
-    setPdfCanvasError(null);
-    setPdfRetryToken((t) => t + 1);
-  };
-
-  useEffect(() => {
-    setPdfCanvasError(null);
-    setPdfPageCount(null);
-    setPdfRetryToken(0);
-  }, [previewPath]);
-
 
   useEffect(() => {
     setOfficePreviewError(false);
@@ -3597,7 +3593,7 @@ function NominationDetail({
               <option value="">No previewable files available</option>
             ) : (
               previewableFiles.map(({ file, evidenceLabel, kind }, index) => (
-                <option key={`${file.path || file.url}-${index}`} value={file.path}>
+                <option key={file.path} value={file.path}>
                   {index + 1}. {evidenceLabel} - {file.name} ({kind.toUpperCase()})
                 </option>
               ))
@@ -3646,8 +3642,8 @@ function NominationDetail({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setPreviewPage((p) => (pdfPageCount ? Math.min(pdfPageCount, p + 1) : p + 1))}
-              disabled={!activePreview || activePreviewMeta?.kind !== "pdf" || (pdfPageCount != null && previewPage >= pdfPageCount)}
+              onClick={() => setPreviewPage((p) => p + 1)}
+              disabled={!activePreview || activePreviewMeta?.kind !== "pdf"}
               aria-label="Next PDF page"
             >
               Page +
@@ -3792,62 +3788,36 @@ function NominationDetail({
                   onError={() => setPreviewLoading(false)}
                 />
               </div>
-            ) : resolvedKind === "pdf" && pwaViewer?.kind === "canvas" ? (
-              /* Mobile browsers + installed PWAs — render via pdf.js onto a
-                 <canvas>. Works identically everywhere (no reliance on a
-                 built-in browser PDF plugin, which most mobile browsers/PWAs
-                 lack) and has no file-size ceiling. */
-              pdfCanvasError ? (
-                <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
-                  <div className="max-w-sm space-y-3">
-                    <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
-                    <p className="text-xs text-amber-800">{pdfCanvasError}</p>
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-8 px-3 text-xs bg-primary text-primary-foreground"
-                        onClick={retryPdfCanvas}
-                      >
-                        <RotateCcw className="mr-1 h-3.5 w-3.5" /> Retry
+            ) : resolvedKind === "pdf" && pwaViewer?.kind === "blob" ? (
+              /* Runtime-converted blob PDF — use <object> which works across all PWA environments */
+              <object
+                key={activePreview.path}
+                data={pwaViewer.src}
+                type="application/pdf"
+                className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                onLoad={() => setPreviewLoading(false)}
+              >
+                <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold">PDF ready</p>
+                    <p className="text-xs text-muted-foreground">Your browser cannot embed this PDF inline.</p>
+                    <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
+                      <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                        <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open PDF
                       </Button>
-                      <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
-                          <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
-                        </Button>
-                      </a>
-                      <a href={pwaViewer.src} download>
-                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
-                          <Download className="mr-1 h-3.5 w-3.5" /> Download
-                        </Button>
-                      </a>
-                    </div>
+                    </a>
                   </div>
                 </div>
-              ) : (
-                <div className="flex h-full flex-col gap-2">
-                  {needsCompression && (
-                    <p className="shrink-0 rounded-md bg-primary/5 px-2 py-1 text-[10px] text-muted-foreground">
-                      {compressedPdfUrl
-                        ? "Showing a compressed preview of this large file for faster loading — download for full quality."
-                        : "Large file — preparing a compressed preview for faster loading…"}
-                    </p>
-                  )}
-                  <PdfCanvasViewer
-                    key={`${activePreview.path}-${pdfRetryToken}-${compressedPdfUrl ? "c" : "o"}`}
-                    url={pwaViewer.src}
-                    scrollToPage={previewPage}
-                    zoomPercent={previewZoom}
-                    onDocumentLoad={(count) => setPdfPageCount(count)}
-                    onError={(msg) => {
-                      setPdfCanvasError(msg);
-                      setPreviewLoading(false);
-                    }}
-                    onLoadingChange={setPreviewLoading}
-                    className="h-full w-full flex-1 rounded-lg border border-primary/20 bg-white"
-                  />
-                </div>
-              )
+              </object>
+            ) : resolvedKind === "pdf" && pwaViewer?.kind === "gdocs" ? (
+              /* Remote PDF — Google Docs viewer works in iOS PWA, Android PWA, and all browsers */
+              <iframe
+                key={activePreview.path}
+                src={pwaViewer.src}
+                title={`Document preview for ${activePreview.name}`}
+                className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                onLoad={() => setPreviewLoading(false)}
+              />
             ) : resolvedKind === "video" ? (
               /* HTML5 video player */
               <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-primary/20 bg-black">
@@ -3976,6 +3946,69 @@ function NominationDetail({
             )}
           </div>
 
+          {/* Judge Scoring Breakdown — Only for shortlisted nominations */}
+          {nom.status === "shortlisted" && judgeScores.length > 0 && (() => {
+            const judgeBreakdown = getJudgeBreakdown(nom.id, nom.categoryId, judgeScores);
+            const judgingDetails = getJudgingDetails(nom.id, nom.categoryId, judgeScores);
+            
+            return (
+              <div className="space-y-2 rounded-xl border border-primary/15 bg-gradient-to-br from-blue-50 to-blue-50/30 p-4">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-primary">
+                  Judge Scores
+                </p>
+                <div className="flex items-center gap-2 mb-3">
+                  {judgingDetails.status === "complete" ? (
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-semibold text-green-700">All judges completed</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm font-semibold text-amber-700">
+                        {judgingDetails.pendingJudges} of {judgingDetails.activeJudges} judges pending
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1.5 mt-2">
+                  {judgeBreakdown.map((judge) => (
+                    <div
+                      key={judge.judgeUid}
+                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${
+                        judge.isComplete
+                          ? "bg-white border border-green-200/50"
+                          : "bg-white border border-amber-200/50"
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground truncate">{judge.judgeEmail}</p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-2 shrink-0">
+                        {judge.isComplete && (
+                          <>
+                            {judge.score !== null && (
+                              <span className="font-semibold text-green-700 text-[11px] bg-green-100 px-2 py-0.5 rounded">
+                                {judge.score.toFixed(1)}/5
+                              </span>
+                            )}
+                            <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                          </>
+                        )}
+                        {!judge.isComplete && !judge.hasSubmittedScore && (
+                          <Clock className="h-3.5 w-3.5 text-amber-600" />
+                        )}
+                        {!judge.isComplete && judge.hasSubmittedScore && (
+                          <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Answers */}
           {nom.answers && Object.keys(nom.answers).length > 0 && (
             <div>
@@ -4007,7 +4040,7 @@ function NominationDetail({
                                 <p className="mb-1 text-[10px] font-medium text-muted-foreground">
                                   {label}
                                 </p>
-                                {slotFiles.map((file, fileIdx) => {
+                                {slotFiles.map((file) => {
                                   const previewKind = getPreviewKind(
                                     file.name,
                                     file.url,
@@ -4016,7 +4049,7 @@ function NominationDetail({
                                   const isPreviewable = previewKind !== null;
                                   return (
                                     <div
-                                      key={`${file.path || file.url}-${fileIdx}`}
+                                      key={file.path}
                                       className="flex flex-wrap items-center gap-2 py-1"
                                     >
                                       <button
@@ -4263,7 +4296,7 @@ function NominationDetail({
                   <option value="">No previewable files available</option>
                 ) : (
                   previewableFiles.map(({ file, evidenceLabel, kind }, index) => (
-                    <option key={`${file.path || file.url}-${index}`} value={file.path}>
+                    <option key={file.path} value={file.path}>
                       {index + 1}. {evidenceLabel} - {file.name} ({kind.toUpperCase()})
                     </option>
                   ))
@@ -4341,58 +4374,34 @@ function NominationDetail({
                     className="max-h-full max-w-full rounded object-contain"
                   />
                 </div>
-              ) : resolvedKind === "pdf" && pwaViewer?.kind === "canvas" ? (
-                /* Mobile browsers + installed PWAs — render via pdf.js onto a
-                   <canvas>. Works identically everywhere and has no file-size
-                   ceiling, unlike the built-in browser PDF plugin (which most
-                   mobile browsers/PWAs lack) or Google Docs Viewer. */
-                pdfCanvasError ? (
-                  <div className="grid h-full place-items-center rounded-lg border border-dashed border-amber-300/80 bg-amber-50 p-4 text-center">
-                    <div className="max-w-sm space-y-3">
-                      <p className="text-sm font-semibold text-amber-900">Preview unavailable</p>
-                      <p className="text-xs text-amber-800">{pdfCanvasError}</p>
-                      <div className="flex flex-wrap items-center justify-center gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="h-8 px-3 text-xs bg-primary text-primary-foreground"
-                          onClick={retryPdfCanvas}
-                        >
-                          <RotateCcw className="mr-1 h-3.5 w-3.5" /> Retry
+              ) : resolvedKind === "pdf" && pwaViewer?.kind === "blob" ? (
+                /* Runtime-converted blob PDF — <object> works reliably in PWA */
+                <object
+                  key={`mobile-blob-${activePreview.path}`}
+                  data={pwaViewer.src}
+                  type="application/pdf"
+                  className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                >
+                  <div className="grid h-full place-items-center rounded-lg border border-dashed border-primary/20 bg-white p-4 text-center">
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold">PDF ready</p>
+                      <p className="text-xs text-muted-foreground">Your browser cannot embed this PDF inline.</p>
+                      <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                          <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open PDF
                         </Button>
-                        <a href={pwaViewer.src} target="_blank" rel="noopener noreferrer">
-                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
-                            <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open
-                          </Button>
-                        </a>
-                        <a href={pwaViewer.src} download>
-                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
-                            <Download className="mr-1 h-3.5 w-3.5" /> Download
-                          </Button>
-                        </a>
-                      </div>
+                      </a>
                     </div>
                   </div>
-                ) : (
-                  <div className="flex h-full flex-col gap-2">
-                    {needsCompression && (
-                      <p className="shrink-0 rounded-md bg-primary/5 px-2 py-1 text-[10px] text-muted-foreground">
-                        {compressedPdfUrl
-                          ? "Compressed preview shown for faster loading — download for full quality."
-                          : "Large file — preparing a compressed preview…"}
-                      </p>
-                    )}
-                    <PdfCanvasViewer
-                      key={`mobile-canvas-${activePreview.path}-${pdfRetryToken}-${compressedPdfUrl ? "c" : "o"}`}
-                      url={pwaViewer.src}
-                      scrollToPage={previewPage}
-                      zoomPercent={previewZoom}
-                      onDocumentLoad={(count) => setPdfPageCount(count)}
-                      onError={(msg) => setPdfCanvasError(msg)}
-                      className="h-full w-full flex-1 rounded-lg border border-primary/20 bg-white"
-                    />
-                  </div>
-                )
+                </object>
+              ) : resolvedKind === "pdf" && pwaViewer?.kind === "gdocs" ? (
+                /* Remote PDF — Google Docs viewer works in iOS PWA + Android PWA */
+                <iframe
+                  key={`mobile-gdocs-${activePreview.path}`}
+                  src={pwaViewer.src}
+                  title={`Document preview for ${activePreview.name}`}
+                  className="h-full w-full rounded-lg border border-primary/20 bg-white"
+                />
               ) : (
                 /* Office Online or other embeddable content */
                 <iframe
