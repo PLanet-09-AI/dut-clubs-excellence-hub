@@ -28,7 +28,7 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import emailjs from '@emailjs/nodejs';
 import type { Handler } from '@netlify/functions';
-import { getAuthService } from './firebase-admin-init';
+import { getAuthService } from './firebase-admin-init.js';
 
 // Firebase Admin will be initialized in the handler
 let auth: any = null;

@@ -20,7 +20,7 @@ import { XMLParser } from "fast-xml-parser";
 import { createHash } from "node:crypto";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
-import { getStorageBucket } from "./firebase-admin-init";
+import { getStorageBucket } from "./firebase-admin-init.js";
 
 // ─── Firebase Admin (lazy init) — used to cache converted PDFs in Storage ───
 // Returning the rendered PDF inline (base64 in the Lambda response body) hits

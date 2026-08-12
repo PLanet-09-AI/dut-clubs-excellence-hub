@@ -39,7 +39,7 @@
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import type { Handler } from '@netlify/functions';
-import { getFirestoreDb } from './firebase-admin-init';
+import { getFirestoreDb } from './firebase-admin-init.js';
 
 // Firebase Admin will be initialized in the handler (defer to avoid crash if env var missing)
 let db: any = null;

@@ -9,7 +9,7 @@ import {
   FieldValue,
 } from "firebase-admin/firestore";
 import type { Config } from "@netlify/functions";
-import { getFirestoreDb } from "./firebase-admin-init";
+import { getFirestoreDb } from "./firebase-admin-init.js";
 
 const db = getFirestoreDb();
 

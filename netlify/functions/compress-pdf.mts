@@ -34,7 +34,7 @@ import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { PDFDocument as PdfLibDocument } from "pdf-lib";
 import { createCanvas, DOMMatrix, Path2D } from "@napi-rs/canvas";
-import { getStorageBucket } from "./firebase-admin-init";
+import { getStorageBucket } from "./firebase-admin-init.js";
 
 // pdfjs-dist's legacy Node build normally polyfills `DOMMatrix`/`Path2D`
 // (and finds a canvas implementation) itself via a dynamic
