@@ -50,6 +50,7 @@ import {
   getCriteriaForCategory,
   computeWeightedAverage,
 } from "@/data/awards";
+import { getJudgeBreakdown, isJudgeScoreComplete } from "@/lib/nomination-judging";
 import { convertOfficeToPdfUrl } from "@/lib/office-to-pdf";
 import { convertOfficeToHtml, isClientConvertible, withZoom } from "@/lib/office-to-html-client";
 import SiteNav from "@/components/SiteNav";
@@ -568,6 +569,7 @@ function JudgeDashboard({ onLogout, loggingOut }: { onLogout: () => void; loggin
   const [realJudgingActive, setRealJudgingActive] = useState(false);
   const [judgeActivityLogs, setJudgeActivityLogs] = useState<any[]>([]);
   const [showActivity, setShowActivity] = useState(false);
+  const [allJudgeScores, setAllJudgeScores] = useState<JudgeScore[]>([]);
 
   const scoringOpen = realJudgingActive;
 
@@ -613,6 +615,17 @@ function JudgeDashboard({ onLogout, loggingOut }: { onLogout: () => void; loggin
     });
     return () => unsub();
   }, [uid]);
+
+  // All judge scores (for showing progress breakdown)
+  useEffect(() => {
+    const q = query(collection(db, "judge_scores"));
+    const unsub = onSnapshot(q, (snap) => {
+      setAllJudgeScores(
+        snap.docs.map((d) => ({ id: d.id, ...d.data() }) as JudgeScore)
+      );
+    });
+    return () => unsub();
+  }, []);
 
   // Listen for real judging activation status
   useEffect(() => {
@@ -894,6 +907,7 @@ function JudgeDashboard({ onLogout, loggingOut }: { onLogout: () => void; loggin
               scoringOpen={scoringOpen}
               hasScore={!!myScores[detail.id]}
               realJudgingActive={realJudgingActive}
+              allJudgeScores={allJudgeScores}
               onSave={saveScore}
             />
           )}
@@ -914,6 +928,7 @@ function JudgeNominationDetail({
   scoringOpen,
   hasScore,
   realJudgingActive,
+  allJudgeScores,
   onSave,
 }: {
   nom: Nomination;
@@ -925,6 +940,7 @@ function JudgeNominationDetail({
   scoringOpen: boolean;
   hasScore: boolean;
   realJudgingActive: boolean;
+  allJudgeScores: JudgeScore[];
   onSave: () => void;
 }) {
   const catData = AWARD_CATEGORIES.find((c) => c.id === nom.categoryId);
@@ -1538,6 +1554,76 @@ function JudgeNominationDetail({
 
           {/* Scoring */}
           <div className="space-y-5 border-t pt-6">
+            {/* Judge Progress Breakdown */}
+            {(() => {
+              const judgeBreakdown = getJudgeBreakdown(nom.id, nom.categoryId, allJudgeScores);
+              const pendingCount = judgeBreakdown.filter((j) => !j.isComplete).length;
+              const completedCount = judgeBreakdown.filter((j) => j.isComplete).length;
+              
+              return (
+                <div className="rounded-xl border border-blue-200/60 bg-blue-50/40 p-4 space-y-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                    <p className="font-semibold text-sm text-foreground">Judge Progress</p>
+                  </div>
+                  
+                  {pendingCount > 0 && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-amber-600" />
+                      <span className="text-amber-700 font-medium">
+                        {pendingCount} of {judgeBreakdown.length} judges pending
+                      </span>
+                    </div>
+                  )}
+                  
+                  {completedCount > 0 && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <span className="text-green-700 font-medium">
+                        {completedCount} completed scoring
+                      </span>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-1.5 mt-3">
+                    {judgeBreakdown
+                      .sort((a, b) => {
+                        if (a.isComplete !== b.isComplete) {
+                          return a.isComplete ? -1 : 1;
+                        }
+                        return (a.judgeEmail || '').localeCompare(b.judgeEmail || '');
+                      })
+                      .map((judge) => (
+                        <div
+                          key={judge.judgeUid}
+                          className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${
+                            judge.isComplete
+                              ? "bg-white border border-green-200/50"
+                              : "bg-white border border-amber-200/50"
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-foreground truncate">{judge.judgeEmail}</p>
+                          </div>
+                          <div className="flex items-center gap-2 ml-2 shrink-0">
+                            {judge.isComplete && judge.score !== null && (
+                              <span className="font-semibold text-green-700 text-[11px] bg-green-100 px-2 py-0.5 rounded">
+                                {judge.score.toFixed(1)}/5
+                              </span>
+                            )}
+                            {judge.isComplete ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                            ) : (
+                              <Clock className="h-3.5 w-3.5 text-amber-600" />
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Section header */}
             <div className="flex items-center justify-between gap-2">
               <p className="flex items-center gap-2 text-base font-bold">
