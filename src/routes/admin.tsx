@@ -821,12 +821,26 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   }, []);
 
   // Real-time Firestore listener — all judge scores (admin supervision)
+  // Pre-load initial data to prevent stats from showing stale "pending" while listener loads
   useEffect(() => {
     const q = query(
       collection(db, "judge_scores"),
       orderBy("updatedAt", "desc"),
       limit(500), // Limit to 500 most recent scores for performance
     );
+
+    // First: Try to load from cache for instant display
+    getDocs(q)
+      .then((snap) => {
+        setJudgeScores(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() }) as (typeof judgeScores)[number]),
+        );
+      })
+      .catch((error) => {
+        console.error("[Firestore] Failed to pre-load judge scores:", error);
+      });
+
+    // Then: Attach real-time listener for updates
     const unsub = onSnapshot(
       q,
       (snap) => {
@@ -835,7 +849,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
         );
       },
       (error) => {
-        console.error("[Firestore] Failed to load judge scores:", error);
+        console.error("[Firestore] Real-time listener failed for judge scores:", error);
       },
     );
     return () => unsub();
