@@ -21,8 +21,9 @@ export type JudgeScore = {
 };
 
 /**
- * Determines if a judge's score for a nomination is "complete" (all criteria rated)
- * A score is complete only if every criterion has a rating (no 0 or undefined values)
+ * Determines if a judge's score for a nomination is "complete"
+ * A score is complete if the judge has started scoring (has a non-zero score value)
+ * Missing individual criteria are treated as 0 for calculation purposes
  */
 export function isJudgeScoreComplete(
   judgeScore: JudgeScore | undefined,
@@ -30,16 +31,9 @@ export function isJudgeScoreComplete(
 ): boolean {
   if (!judgeScore) return false;
   
-  const criteria = getCriteriaForCategory(categoryId);
-  if (!criteria || criteria.length === 0) return false;
-  
-  const criteriaScores = judgeScore.criteriaScores || {};
-  
-  // Check if all criteria have a non-zero rating
-  return criteria.every((criterion) => {
-    const score = criteriaScores[criterion.id];
-    return typeof score === "number" && score > 0;
-  });
+  // If they have any score value > 0, they started judging - count as complete
+  // Individual missing criteria will be treated as 0 in calculations
+  return judgeScore.score > 0;
 }
 
 /**
@@ -76,7 +70,22 @@ export function getNominationJudgingStatus(
   const activeJudges = getActivejudgeCount(allJudgeScores);
   const completedJudges = getCompletedJudgeCount(nominationId, allJudgeScores, categoryId);
   
-  return activeJudges > 0 && completedJudges === activeJudges ? "complete" : "pending";
+  const status = activeJudges > 0 && completedJudges === activeJudges ? "complete" : "pending";
+  
+  // Debug logging for pending nominations
+  if (status === "pending") {
+    const nomScores = allJudgeScores.filter(s => s.nominationId === nominationId);
+    const missingJudges = nomScores
+      .filter(s => {
+        const complete = isJudgeScoreComplete(s, categoryId);
+        return !complete;
+      })
+      .map(s => s.judgeEmail);
+    
+    console.log(`[JUDGING] ${nominationId} - PENDING: ${completedJudges}/${activeJudges} judges complete. Missing: ${missingJudges.join(', ')}`);
+  }
+  
+  return status;
 }
 
 /**

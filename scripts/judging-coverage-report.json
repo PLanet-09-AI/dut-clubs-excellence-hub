@@ -1,0 +1,199 @@
+{
+  "generatedAt": "2026-08-18T14:05:43.757Z",
+  "totalJudges": 6,
+  "totalPendingNominations": 9,
+  "coverageByNomination": [
+    {
+      "index": 1,
+      "nominationId": "3WJHAsUUH97K9KhXYFvd",
+      "category": "dean",
+      "totalJudges": 6,
+      "judgesScored": 6,
+      "judgesPending": 0,
+      "judgesWhoScored": [
+        "absolomm@dut.ac.za",
+        "bonganiy@dut.ac.za",
+        "sihlem1@dut.ac.za",
+        "masizan@dut.ac.za",
+        "sthembilem2@dut.ac.za",
+        "reginaldm1@dut.ac.za"
+      ],
+      "judgesWhoPending": []
+    },
+    {
+      "index": 2,
+      "nominationId": "5CAMypwysO1jvwHnVbtc",
+      "category": "residence",
+      "totalJudges": 6,
+      "judgesScored": 6,
+      "judgesPending": 0,
+      "judgesWhoScored": [
+        "absolomm@dut.ac.za",
+        "bonganiy@dut.ac.za",
+        "sihlem1@dut.ac.za",
+        "masizan@dut.ac.za",
+        "sthembilem2@dut.ac.za",
+        "reginaldm1@dut.ac.za"
+      ],
+      "judgesWhoPending": []
+    },
+    {
+      "index": 3,
+      "nominationId": "5H4iP3nhzBr7BjjvfLRA",
+      "category": "residence",
+      "totalJudges": 6,
+      "judgesScored": 6,
+      "judgesPending": 0,
+      "judgesWhoScored": [
+        "absolomm@dut.ac.za",
+        "bonganiy@dut.ac.za",
+        "sihlem1@dut.ac.za",
+        "masizan@dut.ac.za",
+        "sthembilem2@dut.ac.za",
+        "reginaldm1@dut.ac.za"
+      ],
+      "judgesWhoPending": []
+    },
+    {
+      "index": 4,
+      "nominationId": "6K2Ckqfgy4FGdsWY1Ixs",
+      "category": "entrepreneur",
+      "totalJudges": 6,
+      "judgesScored": 6,
+      "judgesPending": 0,
+      "judgesWhoScored": [
+        "absolomm@dut.ac.za",
+        "bonganiy@dut.ac.za",
+        "sihlem1@dut.ac.za",
+        "masizan@dut.ac.za",
+        "sthembilem2@dut.ac.za",
+        "reginaldm1@dut.ac.za"
+      ],
+      "judgesWhoPending": []
+    },
+    {
+      "index": 5,
+      "nominationId": "7n9D8azTGK1mMln1EokN",
+      "category": "emerging",
+      "totalJudges": 6,
+      "judgesScored": 6,
+      "judgesPending": 0,
+      "judgesWhoScored": [
+        "absolomm@dut.ac.za",
+        "bonganiy@dut.ac.za",
+        "sihlem1@dut.ac.za",
+        "masizan@dut.ac.za",
+        "sthembilem2@dut.ac.za",
+        "reginaldm1@dut.ac.za"
+      ],
+      "judgesWhoPending": []
+    },
+    {
+      "index": 6,
+      "nominationId": "7qpjQ6myOAGgDJZ6ItMq",
+      "category": "dean",
+      "totalJudges": 6,
+      "judgesScored": 6,
+      "judgesPending": 0,
+      "judgesWhoScored": [
+        "absolomm@dut.ac.za",
+        "bonganiy@dut.ac.za",
+        "sihlem1@dut.ac.za",
+        "masizan@dut.ac.za",
+        "sthembilem2@dut.ac.za",
+        "reginaldm1@dut.ac.za"
+      ],
+      "judgesWhoPending": []
+    },
+    {
+      "index": 7,
+      "nominationId": "7tGo1esF3M7Or5hu7zbO",
+      "category": "residence",
+      "totalJudges": 6,
+      "judgesScored": 6,
+      "judgesPending": 0,
+      "judgesWhoScored": [
+        "absolomm@dut.ac.za",
+        "bonganiy@dut.ac.za",
+        "sihlem1@dut.ac.za",
+        "masizan@dut.ac.za",
+        "sthembilem2@dut.ac.za",
+        "reginaldm1@dut.ac.za"
+      ],
+      "judgesWhoPending": []
+    },
+    {
+      "index": 8,
+      "nominationId": "83JtIjN0cd9sHZAMx8lS",
+      "category": "residence",
+      "totalJudges": 6,
+      "judgesScored": 6,
+      "judgesPending": 0,
+      "judgesWhoScored": [
+        "absolomm@dut.ac.za",
+        "bonganiy@dut.ac.za",
+        "sihlem1@dut.ac.za",
+        "masizan@dut.ac.za",
+        "sthembilem2@dut.ac.za",
+        "reginaldm1@dut.ac.za"
+      ],
+      "judgesWhoPending": []
+    },
+    {
+      "index": 9,
+      "nominationId": "8Av8GXhbBXEKCtr1gdMd",
+      "category": "diversity",
+      "totalJudges": 6,
+      "judgesScored": 6,
+      "judgesPending": 0,
+      "judgesWhoScored": [
+        "absolomm@dut.ac.za",
+        "bonganiy@dut.ac.za",
+        "sihlem1@dut.ac.za",
+        "masizan@dut.ac.za",
+        "sthembilem2@dut.ac.za",
+        "reginaldm1@dut.ac.za"
+      ],
+      "judgesWhoPending": []
+    }
+  ],
+  "judgeStats": {
+    "absolomm@dut.ac.za": {
+      "name": "absolomm",
+      "completed": 9,
+      "pending": 0,
+      "nominations": []
+    },
+    "bonganiy@dut.ac.za": {
+      "name": "bonganiy",
+      "completed": 9,
+      "pending": 0,
+      "nominations": []
+    },
+    "sihlem1@dut.ac.za": {
+      "name": "sihlem1",
+      "completed": 9,
+      "pending": 0,
+      "nominations": []
+    },
+    "masizan@dut.ac.za": {
+      "name": "masizan",
+      "completed": 9,
+      "pending": 0,
+      "nominations": []
+    },
+    "sthembilem2@dut.ac.za": {
+      "name": "sthembilem2",
+      "completed": 9,
+      "pending": 0,
+      "nominations": []
+    },
+    "reginaldm1@dut.ac.za": {
+      "name": "reginaldm1",
+      "completed": 9,
+      "pending": 0,
+      "nominations": []
+    }
+  },
+  "remindersNeeded": []
+}

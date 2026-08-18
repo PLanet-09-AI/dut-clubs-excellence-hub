@@ -14,7 +14,7 @@ import {
   ChevronDown,
   Award,
 } from "lucide-react";
-import { collection, onSnapshot, query, orderBy, doc, getDoc, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, getDoc, addDoc, serverTimestamp, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { signIn, signOut as firebaseSignOut, subscribeToAuthState } from "@/lib/auth-firebase";
 import { AWARD_THEME, AWARD_CATEGORIES, getCriteriaForCategory } from "@/data/awards";
@@ -438,6 +438,7 @@ function LeaderboardPage() {
 // ─── Leaderboard content (rendered once access is granted) ─────────────────────
 function LeaderboardContent({ role }: { role: string | null }) {
   const [allScores, setAllScores] = useState<JudgeScoreDoc[]>([]);
+  const [scoresLoaded, setScoresLoaded] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"unified" | "bycategory">(role === "admin" ? "unified" : "bycategory");
   const [expandedJudges, setExpandedJudges] = useState<Set<string>>(new Set());
@@ -446,11 +447,31 @@ function LeaderboardContent({ role }: { role: string | null }) {
   console.log("🔷 LeaderboardContent rendered - viewMode:", viewMode, "selectedCategory:", selectedCategory);
 
   useEffect(() => {
+    let isMounted = true;
     const q = query(collection(db, "judge_scores"), orderBy("updatedAt", "desc"));
-    const unsub = onSnapshot(q, (snap) => {
-      setAllScores(snap.docs.map((d) => ({ ...d.data() } as JudgeScoreDoc)));
+    
+    // Pre-load from cache
+    getDocs(q).then((snap) => {
+      if (isMounted) {
+        const scores = snap.docs.map((d) => ({ ...d.data() } as JudgeScoreDoc));
+        setAllScores(scores);
+        setScoresLoaded(true);
+        console.log(`[Firestore] ✅ PRE-LOADED ${scores.length} judge scores for leaderboard`);
+      }
+    }).catch(err => {
+      console.error("[Firestore] Failed to pre-load scores:", err);
+      if (isMounted) setScoresLoaded(true);
     });
-    return () => unsub();
+
+    // Attach listener for updates
+    const unsub = onSnapshot(q, (snap) => {
+      if (isMounted) {
+        const scores = snap.docs.map((d) => ({ ...d.data() } as JudgeScoreDoc));
+        setAllScores(scores);
+      }
+    });
+    
+    return () => { isMounted = false; unsub(); };
   }, []);
 
   // Build per-category ranking

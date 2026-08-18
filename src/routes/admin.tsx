@@ -707,7 +707,8 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   const [newCat, setNewCat] = useState({ name: "", tagline: "" });
   const [activeSection, setActiveSection] = useState<"nominations" | "categories" | "winners" | "judges" | "leaderboard" | "accounts" | "audit-logs" | "settings">("nominations");
   const [showMobileNav, setShowMobileNav] = useState(false);
-  const [judgeScores, setJudgeScores] = useState<
+  const [
+    judgeScores, setJudgeScores] = useState<
     Array<{
       id: string;
       nominationId: string;
@@ -721,6 +722,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
       updatedAt: { toDate?: () => Date } | null;
     }>
   >([]);
+  const [judgeScoresLoaded, setJudgeScoresLoaded] = useState(false);
   const [realJudgingActive, setRealJudgingActive] = useState(false);
   const [resettingVotes, setResettingVotes] = useState(false);
   const [resettingNominations, setResettingNominations] = useState(false);
@@ -823,36 +825,48 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   // Real-time Firestore listener — all judge scores (admin supervision)
   // Pre-load initial data to prevent stats from showing stale "pending" while listener loads
   useEffect(() => {
+    let isMounted = true;
+    
     const q = query(
       collection(db, "judge_scores"),
       orderBy("updatedAt", "desc"),
       limit(500), // Limit to 500 most recent scores for performance
     );
 
-    // First: Try to load from cache for instant display
-    getDocs(q)
+    // First: Load from cache for instant display
+    const preloadTask = getDocs(q)
       .then((snap) => {
-        setJudgeScores(
-          snap.docs.map((d) => ({ id: d.id, ...d.data() }) as (typeof judgeScores)[number]),
-        );
+        if (isMounted) {
+          const scores = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as (typeof judgeScores)[number]);
+          console.log(`[Firestore] ✅ PRE-LOADED ${scores.length} judge scores from cache at ${new Date().toLocaleTimeString()}`);
+          setJudgeScores(scores);
+          setJudgeScoresLoaded(true);  // Mark loaded so stats can calculate correctly
+        }
       })
       .catch((error) => {
-        console.error("[Firestore] Failed to pre-load judge scores:", error);
+        console.error("[Firestore] ❌ Failed to pre-load judge scores:", error);
+        if (isMounted) setJudgeScoresLoaded(true);  // Still mark as loaded even on error
       });
 
-    // Then: Attach real-time listener for updates
+    // Then: Attach real-time listener for updates (runs alongside preload, doesn't wait)
     const unsub = onSnapshot(
       q,
       (snap) => {
-        setJudgeScores(
-          snap.docs.map((d) => ({ id: d.id, ...d.data() }) as (typeof judgeScores)[number]),
-        );
+        if (isMounted) {
+          const scores = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as (typeof judgeScores)[number]);
+          console.log(`[Firestore] 🔄 LISTENER UPDATE: ${scores.length} judge scores at ${new Date().toLocaleTimeString()}`);
+          setJudgeScores(scores);
+        }
       },
       (error) => {
         console.error("[Firestore] Real-time listener failed for judge scores:", error);
       },
     );
-    return () => unsub();
+    
+    return () => {
+      isMounted = false;
+      unsub();
+    };
   }, []);
 
   // Real-time Firestore listener — admin settings (judging activation)
@@ -1140,11 +1154,26 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
 
   const stats = useMemo(
     () => {
+      console.log(`[STATS] Calculating with ${judgeScores.length} judge scores loaded (ready: ${judgeScoresLoaded})`);
+      
+      // Don't calculate until judge scores are pre-loaded
+      if (!judgeScoresLoaded) {
+        console.log(`[STATS] Skipping calculation - judge scores not yet loaded`);
+        return {
+          total: nominations.length,
+          pending: nominations.filter((n) => n.status === "pending").length,
+          shortlisted: nominations.filter((n) => n.status === "shortlisted").length,
+          judgingPending: 0,  // Show 0 while loading instead of false positive
+          rejected: nominations.filter((n) => n.status === "rejected").length,
+          selfNominated: nominations.filter((n) => n.isSelfNomination).length,
+        };
+      }
+      
       const judgingPendingCount = nominations
         .filter((n) => n.status === "shortlisted")
         .filter((n) => getNominationJudgingStatus(n.id, n.categoryId, judgeScores) === "pending").length;
       
-      return {
+      const result = {
         total: nominations.length,
         pending: nominations.filter((n) => n.status === "pending").length,
         shortlisted: nominations.filter((n) => n.status === "shortlisted").length,
@@ -1152,8 +1181,11 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
         rejected: nominations.filter((n) => n.status === "rejected").length,
         selfNominated: nominations.filter((n) => n.isSelfNomination).length,
       };
+      
+      console.log(`[STATS] Result:`, result);
+      return result;
     },
-    [nominations, judgeScores],
+    [nominations, judgeScores, judgeScoresLoaded],
   );
 
   // Build category tiles — only categories that have at least one nomination
