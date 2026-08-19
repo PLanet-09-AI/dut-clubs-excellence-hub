@@ -35,7 +35,8 @@ let auth: any = null;
 
 function initializeFirebase() {
   if (auth) return; // Already initialized
-  auth = getAuthService();
+  try {
+    auth = getAuthService();
   } catch (error) {
     throw new Error(`Failed to initialize Firebase: ${error}`);
   }

@@ -11,12 +11,23 @@ interface JudgeReportData {
   "Last Updated"?: string;
 }
 
+interface ScoresByNomineeEntry {
+  nominationId: string;
+  nomineeName: string;
+  categoryName: string;
+  judges: string[];
+  scores: number[];
+  submittedDates: string[];
+}
+
 /**
  * Export judge scores to Excel
  * Organized by category with multiple sheets for summary, details, and performance
  */
 export function exportJudgesToExcel(judgeScores: JudgeScore[], nominations: any[]) {
   try {
+    console.log('[Export] Starting judge summary report export with', judgeScores.length, 'scores');
+    
     // Prepare data by category
     const categories = [...new Set(judgeScores.map((s) => s.categoryName))];
     const workbook = XLSX.utils.book_new();
@@ -42,7 +53,7 @@ export function exportJudgesToExcel(judgeScores: JudgeScore[], nominations: any[
     XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
 
     // Sheet 2: All scores detailed - grouped by nominee to show judge contribution
-    const scoresByNominee = {};
+    const scoresByNominee: Record<string, ScoresByNomineeEntry> = {};
     for (const score of judgeScores) {
       const key = `${score.nominationId}|${score.nomineeName}|${score.categoryName}`;
       if (!scoresByNominee[key]) {
@@ -64,14 +75,14 @@ export function exportJudgesToExcel(judgeScores: JudgeScore[], nominations: any[
       scoresByNominee[key].submittedDates.push(submitted);
     }
 
-    const detailedData: any[] = Object.values(scoresByNominee)
-      .sort((a, b) => {
+    const detailedData: JudgeReportData[] = (Object.values(scoresByNominee) as ScoresByNomineeEntry[])
+      .sort((a: ScoresByNomineeEntry, b: ScoresByNomineeEntry) => {
         if (a.categoryName !== b.categoryName) return a.categoryName.localeCompare(b.categoryName);
         return a.nomineeName.localeCompare(b.nomineeName);
       })
-      .map((item) => {
-        const nom = nominations.find((n) => n.id === item.nominationId);
-        const totalScore = item.scores.reduce((a, b) => a + b, 0);
+      .map((item: ScoresByNomineeEntry) => {
+        const nom = nominations.find((n: any) => n.id === item.nominationId);
+        const totalScore = item.scores.reduce((a: number, b: number) => a + b, 0);
         const avgScore = (totalScore / item.scores.length).toFixed(2);
 
         return {
@@ -110,9 +121,12 @@ export function exportJudgesToExcel(judgeScores: JudgeScore[], nominations: any[
 
     // Save the workbook
     const timestamp = new Date().toISOString().split("T")[0];
-    XLSX.writeFile(workbook, `judges-report-${timestamp}.xlsx`);
+    const filename = `judges-report-${timestamp}.xlsx`;
+    console.log('[Export] Writing file:', filename);
+    XLSX.writeFile(workbook, filename);
+    console.log('[Export] File written successfully');
 
-    return { success: true, message: `Report exported successfully as judges-report-${timestamp}.xlsx` };
+    return { success: true, message: `Report exported successfully as ${filename}` };
   } catch (error) {
     console.error("Export failed:", error);
     return { success: false, message: `Export failed: ${error instanceof Error ? error.message : "Unknown error"}` };
@@ -125,6 +139,8 @@ export function exportJudgesToExcel(judgeScores: JudgeScore[], nominations: any[
  */
 export function exportByCategory(judgeScores: JudgeScore[], nominations: any[]) {
   try {
+    console.log('[Export] Starting judge by-category export with', judgeScores.length, 'scores');
+    
     const categories = [...new Set(judgeScores.map((s) => s.categoryName))];
     const workbook = XLSX.utils.book_new();
 
@@ -152,7 +168,10 @@ export function exportByCategory(judgeScores: JudgeScore[], nominations: any[]) 
     }
 
     const timestamp = new Date().toISOString().split("T")[0];
-    XLSX.writeFile(workbook, `judges-by-category-${timestamp}.xlsx`);
+    const filename = `judges-by-category-${timestamp}.xlsx`;
+    console.log('[Export] Writing file:', filename);
+    XLSX.writeFile(workbook, filename);
+    console.log('[Export] File written successfully');
 
     return { success: true, message: "Category report exported successfully" };
   } catch (error) {

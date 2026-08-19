@@ -94,6 +94,7 @@ import {
   type AuditAction,
 } from "@/lib/audit-logging";
 import { exportJudgesToExcel, exportByCategory } from "@/lib/export-judges";
+import { exportLeaderboardByCategory, exportLeaderboardUnified } from "@/lib/export-leaderboard";
 import {
   signIn,
   signOut as firebaseSignOut,
@@ -2227,7 +2228,9 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
                       variant="default"
                       className="gap-1"
                       onClick={() => {
+                        console.log('[Judge Export] Clicked Summary Report button');
                         const result = exportJudgesToExcel(judgeScores, nominations);
+                        console.log('[Judge Export] Result:', result);
                         if (result.success) {
                           logExportJudgeReport('summary', judgeScores.length);
                         }
@@ -2235,20 +2238,6 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
                     >
                       <Download className="h-4 w-4" />
                       Summary Report
-                    </Button>
-                    <Button 
-                      size="sm"
-                      variant="outline"
-                      className="gap-1"
-                      onClick={() => {
-                        const result = exportByCategory(judgeScores, nominations);
-                        if (result.success) {
-                          logExportJudgeReport('category', judgeScores.length);
-                        }
-                      }}
-                    >
-                      <Download className="h-4 w-4" />
-                      By Category
                     </Button>
                   </div>
                 </div>
@@ -4630,9 +4619,16 @@ function NominationDetail({
 
 function LeaderboardAdminPanel() {
   const [allScores, setAllScores] = useState<any[]>([]);
+  const [nominations, setNominations] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   useEffect(() => {
+    // Fetch nominations
+    getDocs(collection(db, "nominations")).then((snap) => {
+      setNominations(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+
+    // Listen to scores
     const q = query(collection(db, "judge_scores"), orderBy("updatedAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setAllScores(snap.docs.map((d) => ({ ...d.data() } as any)));
@@ -4686,7 +4682,39 @@ function LeaderboardAdminPanel() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Export options */}
+      <Card className="p-4 bg-blue-50 border-blue-200">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h4 className="font-medium text-sm">Export Leaderboard</h4>
+            <p className="text-xs text-muted-foreground mt-1">
+              Download rankings organized by category or unified global rankings.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button 
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              onClick={() => {
+                console.log('[Leaderboard Export] Clicked Global Rankings button');
+                const result = exportLeaderboardUnified(allScores, nominations);
+                console.log('[Leaderboard Export] Result:', result);
+                if (result.success) {
+                  logExportJudgeReport('leaderboard-unified', allScores.length);
+                }
+              }}
+            >
+              <Download className="h-4 w-4" />
+              Global Rankings
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {/* Category filter and leaderboard */}
+      <div className="space-y-4">
       {/* Category filter */}
       <div className="flex flex-wrap gap-2">
         <button
@@ -4783,6 +4811,7 @@ function LeaderboardAdminPanel() {
             );
           })
         )}
+      </div>
       </div>
     </div>
   );
