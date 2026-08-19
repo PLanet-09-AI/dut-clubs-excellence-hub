@@ -93,6 +93,7 @@ import {
   type AuditLog,
   type AuditAction,
 } from "@/lib/audit-logging";
+import { exportJudgesToExcel, exportByCategory } from "@/lib/export-judges";
 import {
   signIn,
   signOut as firebaseSignOut,
@@ -2211,6 +2212,48 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
         {/* ── Judge Activity section ─── */}
         {canManage && activeSection === "judges" && <div>
             <div className="space-y-6">
+              {/* Export options */}
+              <Card className="p-4 bg-blue-50 border-blue-200">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="font-medium text-sm">Export Judge Data</h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Download judge scores organized by category or performance metrics.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button 
+                      size="sm"
+                      variant="default"
+                      className="gap-1"
+                      onClick={() => {
+                        const result = exportJudgesToExcel(judgeScores, nominations);
+                        if (result.success) {
+                          logExportJudgeReport('summary', judgeScores.length);
+                        }
+                      }}
+                    >
+                      <Download className="h-4 w-4" />
+                      Summary Report
+                    </Button>
+                    <Button 
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      onClick={() => {
+                        const result = exportByCategory(judgeScores, nominations);
+                        if (result.success) {
+                          logExportJudgeReport('category', judgeScores.length);
+                        }
+                      }}
+                    >
+                      <Download className="h-4 w-4" />
+                      By Category
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+
               {/* Judges with incomplete work */}
               {Object.keys(judgeNotifications).length > 0 && (
                 <div className="space-y-3">
@@ -2220,12 +2263,12 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
                   </p>
                   <div className="space-y-2">
                     {Object.entries(judgeNotifications).map(([judgeEmail, notif]) => (
-                      <Card key={judgeEmail} className="p-4">
+                      <Card key={judgeEmail} className="p-4 border-amber-200 bg-amber-50/30">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm">{judgeEmail}</p>
-                            <p className="text-xs text-amber-700 mt-1">
-                              {notif.incompleteCount} nomination{notif.incompleteCount !== 1 ? 's' : ''} need completion
+                            <p className="text-xs text-amber-700 font-semibold mt-1">
+                              ⚠️ {notif.incompleteCount} nomination{notif.incompleteCount !== 1 ? 's' : ''} need completion
                             </p>
                             {notif.incompleteNominations && notif.incompleteNominations.slice(0, 2).map((inc: any) => (
                               <div key={inc.nominationId} className="text-xs text-muted-foreground mt-1">
@@ -2241,7 +2284,11 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
                           <Button 
                             size="sm"
                             variant="outline"
-                            className="shrink-0 border-red-200 text-red-600 hover:bg-red-50"
+                            className="shrink-0 border-red-200 text-red-600 hover:bg-red-50 gap-1"
+                            onClick={() => {
+                              // TODO: Implement email alert to judge
+                              console.log(`Send alert to ${judgeEmail}`);
+                            }}
                           >
                             📢 Alert Judge
                           </Button>
@@ -2251,6 +2298,37 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
                   </div>
                 </div>
               )}
+
+              {/* Judge performance summary */}
+              <div className="space-y-3">
+                <h3 className="font-serif text-lg font-bold">Judge Performance Summary</h3>
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                  {Array.from(new Set(judgeScores.map(s => s.judgeEmail))).map(email => {
+                    const judgeScores_ = judgeScores.filter(s => s.judgeEmail === email);
+                    const avgScore = (judgeScores_.reduce((a, b) => a + b.score, 0) / judgeScores_.length).toFixed(1);
+                    const categories = new Set(judgeScores_.map(s => s.categoryName));
+                    return (
+                      <Card key={email} className="p-4">
+                        <p className="font-medium text-sm truncate">{email}</p>
+                        <div className="mt-3 space-y-2 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Scores</span>
+                            <span className="font-semibold">{judgeScores_.length}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Avg Score</span>
+                            <span className="font-semibold">{avgScore}/5</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Categories</span>
+                            <span className="font-semibold">{categories.size}</span>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* All judge scores */}
               <div>
