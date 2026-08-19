@@ -570,6 +570,7 @@ function JudgeDashboard({ onLogout, loggingOut }: { onLogout: () => void; loggin
   const [judgeActivityLogs, setJudgeActivityLogs] = useState<any[]>([]);
   const [showActivity, setShowActivity] = useState(false);
   const [allJudgeScores, setAllJudgeScores] = useState<JudgeScore[]>([]);
+  const [incompleteNotification, setIncompleteNotification] = useState<any>(null);
 
   const scoringOpen = realJudgingActive;
 
@@ -621,7 +622,7 @@ function JudgeDashboard({ onLogout, loggingOut }: { onLogout: () => void; loggin
     const q = query(collection(db, "judge_scores"));
     const unsub = onSnapshot(q, (snap) => {
       setAllJudgeScores(
-        snap.docs.map((d) => ({ id: d.id, ...d.data() }) as JudgeScore)
+        snap.docs.map((d) => ({ id: d.id, ...d.data() } as unknown as JudgeScore))
       );
     });
     return () => unsub();
@@ -652,6 +653,17 @@ function JudgeDashboard({ onLogout, loggingOut }: { onLogout: () => void; loggin
       }
     };
     loadLogs();
+  }, [judgeEmail]);
+
+  // Listen for incomplete submission notifications
+  useEffect(() => {
+    if (!judgeEmail) return;
+    const unsub = onSnapshot(doc(db, "judge_notifications", judgeEmail), (snap) => {
+      if (snap.exists()) {
+        setIncompleteNotification(snap.data());
+      }
+    });
+    return () => unsub();
   }, [judgeEmail]);
 
   const categories = useMemo(() => {
@@ -764,6 +776,33 @@ function JudgeDashboard({ onLogout, loggingOut }: { onLogout: () => void; loggin
         </div>
       )}
 
+      {/* Incomplete criteria notification */}
+      {incompleteNotification?.incompleteCount > 0 && (
+        <div className="mt-6 rounded-xl border border-red-300 bg-red-50 px-4 py-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-red-600 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-red-900">
+                ⚠️ {incompleteNotification.incompleteCount} Nomination{incompleteNotification.incompleteCount !== 1 ? 's' : ''} Need Completion
+              </p>
+              <p className="text-xs text-red-700 mt-1">
+                You have started scoring but haven't filled in all criteria for some nominations. Please complete these below.
+              </p>
+              <div className="mt-2 space-y-1 text-xs text-red-700">
+                {incompleteNotification.incompleteNominations?.slice(0, 3).map((inc: any) => (
+                  <div key={inc.nominationId}>
+                    • <strong>{inc.nomineeName}</strong> ({inc.categoryId}): Missing {inc.totalMissing}/{inc.totalCriteria} criteria
+                  </div>
+                ))}
+                {incompleteNotification.incompleteNominations?.length > 3 && (
+                  <div>+ {incompleteNotification.incompleteNominations.length - 3} more</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quick-start guide */}
       <JudgeQuickGuide />
 
@@ -850,6 +889,11 @@ function JudgeDashboard({ onLogout, loggingOut }: { onLogout: () => void; loggin
         )}
         {filtered.map((nom) => {
           const scored = myScores[nom.id];
+          const criteria = getCriteriaForCategory(nom.categoryId);
+          const completedCount = scored ? Object.keys((scored.criteriaScores || {})).filter(k => (scored.criteriaScores || {})[k] > 0).length : 0;
+          const totalCount = criteria.length;
+          const isIncomplete = scored && completedCount < totalCount;
+          
           return (
             <Card
               key={nom.id}
@@ -869,15 +913,21 @@ function JudgeDashboard({ onLogout, loggingOut }: { onLogout: () => void; loggin
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {scored ? (
-                  <Badge className="gap-1 border-green-400/30 bg-green-500/10 text-green-700">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-3 w-3 ${i < Math.round(scored.score) ? "fill-green-600 text-green-600" : "fill-muted text-muted-foreground/20"}`}
-                      />
-                    ))}
-                    <span className="ml-0.5">{scored.score.toFixed(1)}/5</span>
-                  </Badge>
+                  isIncomplete ? (
+                    <Badge className="gap-1 border-red-400/30 bg-red-500/10 text-red-700">
+                      ⚠️ INCOMPLETE ({completedCount}/{totalCount})
+                    </Badge>
+                  ) : (
+                    <Badge className="gap-1 border-green-400/30 bg-green-500/10 text-green-700">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`h-3 w-3 ${i < Math.round(scored.score) ? "fill-green-600 text-green-600" : "fill-muted text-muted-foreground/20"}`}
+                        />
+                      ))}
+                      <span className="ml-0.5">{scored.score.toFixed(1)}/5</span>
+                    </Badge>
+                  )
                 ) : (
                   <Badge variant="outline" className="border-amber-400/40 text-amber-600">
                     Awaiting score

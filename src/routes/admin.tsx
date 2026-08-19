@@ -117,7 +117,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 // Tabs components removed — sidebar navigation used instead
-import { AWARD_CATEGORIES, FACULTIES } from "@/data/awards";
+import { AWARD_CATEGORIES, FACULTIES, getCriteriaForCategory } from "@/data/awards";
 import {
   subscribePastWinners,
   addPastWinner,
@@ -724,6 +724,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   >([]);
   const [judgeScoresLoaded, setJudgeScoresLoaded] = useState(false);
   const [realJudgingActive, setRealJudgingActive] = useState(false);
+  const [judgeNotifications, setJudgeNotifications] = useState<Record<string, any>>({});
   const [resettingVotes, setResettingVotes] = useState(false);
   const [resettingNominations, setResettingNominations] = useState(false);
   const [newAccountEmail, setNewAccountEmail] = useState("");
@@ -882,6 +883,24 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
       },
       (error) => {
         console.error("[Firestore] Failed to load admin settings:", error);
+      },
+    );
+    return () => unsub();
+  }, []);
+
+  // Listen for judge notifications (incomplete submissions)
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, "judge_notifications"),
+      (snap) => {
+        const notifs: Record<string, any> = {};
+        snap.docs.forEach(doc => {
+          notifs[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        setJudgeNotifications(notifs);
+      },
+      (error) => {
+        console.error("[Firestore] Failed to load judge notifications:", error);
       },
     );
     return () => unsub();
@@ -2191,63 +2210,110 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
 
         {/* ── Judge Activity section ─── */}
         {canManage && activeSection === "judges" && <div>
-            {judgeScores.length === 0 ? (
-              <Card className="p-12 text-center text-muted-foreground">
-                No judge scores submitted yet.
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  All judge evaluations in real time — sorted newest first. Each entry is
-                  timestamped.
-                </p>
+            <div className="space-y-6">
+              {/* Judges with incomplete work */}
+              {Object.keys(judgeNotifications).length > 0 && (
                 <div className="space-y-3">
-                  {judgeScores.map((s) => (
-                    <div
-                      key={s.id}
-                      className="rounded-2xl border border-primary/15 bg-white px-5 py-4"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <p className="font-semibold text-sm">{s.nomineeName}</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">{s.categoryName}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="flex items-center gap-0.5 rounded-full bg-gold/10 px-3 py-1 font-bold text-yellow-700">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`h-4 w-4 ${i < Math.round(s.score) ? "fill-yellow-500 text-yellow-500" : "fill-muted text-muted-foreground/20"}`}
-                              />
+                  <h3 className="font-serif text-lg font-bold">Judges with Incomplete Submissions</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Judges below have started scoring but haven't completed all criteria. Alert them to finish.
+                  </p>
+                  <div className="space-y-2">
+                    {Object.entries(judgeNotifications).map(([judgeEmail, notif]) => (
+                      <Card key={judgeEmail} className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm">{judgeEmail}</p>
+                            <p className="text-xs text-amber-700 mt-1">
+                              {notif.incompleteCount} nomination{notif.incompleteCount !== 1 ? 's' : ''} need completion
+                            </p>
+                            {notif.incompleteNominations && notif.incompleteNominations.slice(0, 2).map((inc: any) => (
+                              <div key={inc.nominationId} className="text-xs text-muted-foreground mt-1">
+                                • {inc.nomineeName}: Missing {inc.totalMissing}/{inc.totalCriteria} criteria
+                              </div>
                             ))}
-                            <span className="ml-1 text-sm">{s.score.toFixed(1)}/5</span>
-                          </span>
+                            {notif.incompleteNominations && notif.incompleteNominations.length > 2 && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                + {notif.incompleteNominations.length - 2} more
+                              </div>
+                            )}
+                          </div>
+                          <Button 
+                            size="sm"
+                            variant="outline"
+                            className="shrink-0 border-red-200 text-red-600 hover:bg-red-50"
+                          >
+                            📢 Alert Judge
+                          </Button>
                         </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-                        <span>
-                          <span className="font-medium text-foreground/70">Judge</span> {s.judgeEmail}
-                        </span>
-                        <span>
-                          <span className="font-medium text-foreground/70">Submitted</span>{" "}
-                          {s.updatedAt && typeof s.updatedAt === "object" && s.updatedAt.toDate
-                            ? s.updatedAt
-                                .toDate()
-                                .toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })
-                            : "—"}
-                        </span>
-                      </div>
-                      {s.comment && (
-                        <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2">
-                          <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-600">Judge's comment</p>
-                          <p className="text-sm italic text-foreground/80">"{s.comment}"</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                      </Card>
+                    ))}
+                  </div>
                 </div>
+              )}
+
+              {/* All judge scores */}
+              <div>
+                <h3 className="font-serif text-lg font-bold mb-3">All Judge Submissions</h3>
+                {judgeScores.length === 0 ? (
+                  <Card className="p-12 text-center text-muted-foreground">
+                    No judge scores submitted yet.
+                  </Card>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      All judge evaluations in real time — sorted newest first. Each entry is
+                      timestamped.
+                    </p>
+                    <div className="space-y-3">
+                      {judgeScores.map((s) => (
+                        <div
+                          key={s.id}
+                          className="rounded-2xl border border-primary/15 bg-white px-5 py-4"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <p className="font-semibold text-sm">{s.nomineeName}</p>
+                              <p className="mt-0.5 text-xs text-muted-foreground">{s.categoryName}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="flex items-center gap-0.5 rounded-full bg-gold/10 px-3 py-1 font-bold text-yellow-700">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`h-4 w-4 ${i < Math.round(s.score) ? "fill-yellow-500 text-yellow-500" : "fill-muted text-muted-foreground/20"}`}
+                                  />
+                                ))}
+                                <span className="ml-1 text-sm">{s.score.toFixed(1)}/5</span>
+                              </span>
+                            </div>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+                            <span>
+                              <span className="font-medium text-foreground/70">Judge</span> {s.judgeEmail}
+                            </span>
+                            <span>
+                              <span className="font-medium text-foreground/70">Submitted</span>{" "}
+                              {s.updatedAt && typeof s.updatedAt === "object" && s.updatedAt.toDate
+                                ? s.updatedAt
+                                    .toDate()
+                                    .toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })
+                                : "—"}
+                            </span>
+                          </div>
+                          {s.comment && (
+                            <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2">
+                              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-600">Judge's comment</p>
+                              <p className="text-sm italic text-foreground/80">"{s.comment}"</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>}
 
         {/* ── Leaderboard section ─── */}
@@ -4018,38 +4084,50 @@ function NominationDetail({
                   )}
                 </div>
                 <div className="space-y-1.5 mt-2">
-                  {judgeBreakdown.map((judge) => (
-                    <div
-                      key={judge.judgeUid}
-                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${
-                        judge.isComplete
-                          ? "bg-white border border-green-200/50"
-                          : "bg-white border border-amber-200/50"
-                      }`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">{judge.judgeEmail}</p>
+                  {judgeBreakdown.map((judge) => {
+                    const hasIncompleteSubmission = judgeScores.some(s => 
+                      s.nominationId === nom.id && 
+                      s.judgeUid === judge.judgeUid && 
+                      s.score > 0 && 
+                      Object.keys((s.criteriaScores || {})).filter(k => (s.criteriaScores || {})[k] > 0).length < getCriteriaForCategory(nom.categoryId).length
+                    );
+                    
+                    return (
+                      <div
+                        key={judge.judgeUid}
+                        className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${
+                          judge.isComplete
+                            ? "bg-white border border-green-200/50"
+                            : "bg-white border border-amber-200/50"
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground truncate">{judge.judgeEmail}</p>
+                          {hasIncompleteSubmission && (
+                            <p className="text-[10px] text-red-600 mt-0.5">⚠️ Incomplete submission</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 ml-2 shrink-0">
+                          {judge.isComplete && (
+                            <>
+                              {judge.score !== null && (
+                                <span className="font-semibold text-green-700 text-[11px] bg-green-100 px-2 py-0.5 rounded">
+                                  {judge.score.toFixed(1)}/5
+                                </span>
+                              )}
+                              <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                            </>
+                          )}
+                          {!judge.isComplete && !judge.hasSubmittedScore && (
+                            <Clock className="h-3.5 w-3.5 text-amber-600" />
+                          )}
+                          {!judge.isComplete && judge.hasSubmittedScore && (
+                            <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 ml-2 shrink-0">
-                        {judge.isComplete && (
-                          <>
-                            {judge.score !== null && (
-                              <span className="font-semibold text-green-700 text-[11px] bg-green-100 px-2 py-0.5 rounded">
-                                {judge.score.toFixed(1)}/5
-                              </span>
-                            )}
-                            <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-                          </>
-                        )}
-                        {!judge.isComplete && !judge.hasSubmittedScore && (
-                          <Clock className="h-3.5 w-3.5 text-amber-600" />
-                        )}
-                        {!judge.isComplete && judge.hasSubmittedScore && (
-                          <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
