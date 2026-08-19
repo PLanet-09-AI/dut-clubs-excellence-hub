@@ -42,12 +42,9 @@ async function sendJudgeNotifications() {
     for (const score of allScores) {
       const judgeEmail = score.judgeEmail;
       const categoryId = score.categoryId;
-      const criteria = getCriteriaForCategory(categoryId);
-      const criteriaScores = score.criteriaScores || {};
       
-      const missingCriteria = criteria.filter(c => !criteriaScores[c] || criteriaScores[c] === 0);
-      
-      if (missingCriteria.length > 0) {
+      // Only flag nominations the judge hasn't started (score = 0 or undefined)
+      if (!score.score || score.score === 0) {
         if (!incompleteByJudge[judgeEmail]) {
           incompleteByJudge[judgeEmail] = [];
         }
@@ -55,9 +52,7 @@ async function sendJudgeNotifications() {
           nominationId: score.nominationId,
           nomineeName: score.nomineeName,
           categoryId: categoryId,
-          missingCriteria: missingCriteria,
-          totalMissing: missingCriteria.length,
-          totalCriteria: criteria.length
+          categoryName: score.categoryName
         });
       }
     }

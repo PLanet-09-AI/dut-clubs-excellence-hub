@@ -5,9 +5,10 @@ interface JudgeReportData {
   participant: string;
   faculty: string;
   category: string;
-  judge: string;
-  score: number;
-  submitted: string;
+  "Judge Breakdown"?: string;
+  "Total Score"?: number;
+  "Avg Score"?: string;
+  "Last Updated"?: string;
 }
 
 /**
@@ -20,16 +21,19 @@ export function exportJudgesToExcel(judgeScores: JudgeScore[], nominations: any[
     const categories = [...new Set(judgeScores.map((s) => s.categoryName))];
     const workbook = XLSX.utils.book_new();
 
-    // Sheet 1: Summary by Category
+    // Sheet 1: Summary by Category with Judge Names
     const summaryData = categories.map((catName) => {
       const catScores = judgeScores.filter((s) => s.categoryName === catName);
       const judges = [...new Set(catScores.map((s) => s.judgeEmail))];
-      const avgScore = catScores.length > 0 ? (catScores.reduce((a, b) => a + b.score, 0) / catScores.length).toFixed(2) : "N/A";
+      const totalScore = catScores.reduce((a, b) => a + b.score, 0);
+      const avgScore = catScores.length > 0 ? (totalScore / catScores.length).toFixed(2) : "N/A";
 
       return {
         Category: catName.toUpperCase(),
         "Total Scores": catScores.length,
-        "Judges": judges.length,
+        "Judge Names": judges.join("; "),
+        "# Judges": judges.length,
+        "Total Score": totalScore,
         "Avg Score": avgScore,
       };
     });
@@ -37,27 +41,49 @@ export function exportJudgesToExcel(judgeScores: JudgeScore[], nominations: any[
     const summarySheet = XLSX.utils.json_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
 
-    // Sheet 2: All scores detailed
-    const detailedData: JudgeReportData[] = judgeScores
+    // Sheet 2: All scores detailed - grouped by nominee to show judge contribution
+    const scoresByNominee = {};
+    for (const score of judgeScores) {
+      const key = `${score.nominationId}|${score.nomineeName}|${score.categoryName}`;
+      if (!scoresByNominee[key]) {
+        scoresByNominee[key] = {
+          nominationId: score.nominationId,
+          nomineeName: score.nomineeName,
+          categoryName: score.categoryName,
+          judges: [],
+          scores: [],
+          submittedDates: []
+        };
+      }
+      scoresByNominee[key].judges.push(score.judgeEmail);
+      scoresByNominee[key].scores.push(score.score);
+      const submitted =
+        score.updatedAt && typeof score.updatedAt === "object" && score.updatedAt.toDate
+          ? score.updatedAt.toDate().toLocaleDateString("en-ZA")
+          : "N/A";
+      scoresByNominee[key].submittedDates.push(submitted);
+    }
+
+    const detailedData: any[] = Object.values(scoresByNominee)
       .sort((a, b) => {
         if (a.categoryName !== b.categoryName) return a.categoryName.localeCompare(b.categoryName);
-        if (a.nomineeName !== b.nomineeName) return a.nomineeName.localeCompare(b.nomineeName);
-        return a.judgeEmail.localeCompare(b.judgeEmail);
+        return a.nomineeName.localeCompare(b.nomineeName);
       })
-      .map((score) => {
-        const nom = nominations.find((n) => n.id === score.nominationId);
-        const submitted =
-          score.updatedAt && typeof score.updatedAt === "object" && score.updatedAt.toDate
-            ? score.updatedAt.toDate().toLocaleDateString("en-ZA")
-            : "N/A";
+      .map((item) => {
+        const nom = nominations.find((n) => n.id === item.nominationId);
+        const totalScore = item.scores.reduce((a, b) => a + b, 0);
+        const avgScore = (totalScore / item.scores.length).toFixed(2);
 
         return {
-          participant: score.nomineeName,
+          participant: item.nomineeName,
           faculty: nom?.faculty || "N/A",
-          category: score.categoryName.toUpperCase(),
-          judge: score.judgeEmail,
-          score: score.score,
-          submitted,
+          category: item.categoryName.toUpperCase(),
+          "Judge Breakdown": item.judges
+            .map((j, i) => `${j} (${item.scores[i]})`)
+            .join("; "),
+          "Total Score": totalScore,
+          "Avg Score": avgScore,
+          "Last Updated": item.submittedDates[item.submittedDates.length - 1],
         };
       });
 
