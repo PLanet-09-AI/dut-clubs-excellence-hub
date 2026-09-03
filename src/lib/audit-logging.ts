@@ -26,6 +26,7 @@ export type AuditAction =
   | 'EXPORT_RESULTS'
   | 'EXPORT_SHORTLISTED'
   | 'TOGGLE_JUDGING'
+  | 'TOGGLE_NOMINATIONS'
   | 'ADD_CATEGORY'
   | 'DELETE_CATEGORY'
   | 'UPDATE_NOMINATION_STATUS'
@@ -155,6 +156,18 @@ export async function logToggleJudging(isActive: boolean): Promise<string> {
     action: 'TOGGLE_JUDGING',
     description: `${isActive ? 'Activated' : 'Deactivated'} real judging`,
     metadata: { isActive },
+    status: 'success',
+  });
+}
+
+/**
+ * Log nominations open/close toggle
+ */
+export async function logToggleNominations(isOpen: boolean): Promise<string> {
+  return logAuditAction({
+    action: 'TOGGLE_NOMINATIONS',
+    description: `${isOpen ? 'Opened' : 'Closed'} the nomination period`,
+    metadata: { isOpen },
     status: 'success',
   });
 }

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { addDoc, collection, serverTimestamp, updateDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useNominationsOpen } from "@/lib/nomination-settings";
 import { AWARD_CATEGORIES, FACULTIES, type AwardCategory } from "@/data/awards";
 import { useDraftForm } from "@/hooks/useDraftForm";
 import { EvidenceUploader, type UploadedFile, type EvidenceUploads } from "@/components/EvidenceUploader";
@@ -71,27 +72,6 @@ const RELATIONSHIP_OPTIONS = [
 ];
 
 const STEP_LABELS = ["Nominee Details", "Your Details", "Nomination Questions"];
-
-// Nomination period deadline: August 2, 2026 at midnight (00:00:00)
-const NOMINATION_DEADLINE = new Date("2026-08-02T00:00:00").getTime();
-
-// Check if nomination period is closed
-function isNominationPeriodClosed(): boolean {
-  const now = new Date().getTime();
-  return now > NOMINATION_DEADLINE;
-}
-
-// Format the deadline for display
-function formatDeadline(): string {
-  const deadline = new Date(NOMINATION_DEADLINE);
-  return deadline.toLocaleDateString("en-ZA", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 type Step = 1 | 2 | 3;
 
@@ -164,6 +144,7 @@ function getSelectValue(value: string | undefined): string {
 // ─── Form orchestrator ────────────────────────────────────────────────────────
 
 function NominationForm({ category, onBack }: { category: AwardCategory; onBack: () => void }) {
+  const { open: nominationsOpen } = useNominationsOpen();
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -310,8 +291,8 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
     setError("");
     
     // Check if nomination period is closed
-    if (isNominationPeriodClosed()) {
-      setError("The nomination period has closed and no new nominations are being accepted. The deadline was August 2, 2026 at midnight.");
+    if (!nominationsOpen) {
+      setError("The nomination period has closed and no new nominations are being accepted.");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -480,7 +461,7 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
   }
 
   // Check if nomination period is closed
-  const periodClosed = isNominationPeriodClosed();
+  const periodClosed = !nominationsOpen;
 
   if (periodClosed) {
     return (
@@ -504,14 +485,9 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
                 Nomination Period Has Closed
               </h2>
               <p className="text-red-800 mb-4">
-                Thank you for your interest! Unfortunately, the nomination period for SALEA 2026 has officially ended. 
+                Thank you for your interest! Nominations for SALEA 2026 are currently closed.
                 No new nominations are being accepted at this time.
               </p>
-              <div className="rounded-lg bg-red-100 px-4 py-3 border border-red-200">
-                <p className="text-sm text-red-700">
-                  <span className="font-semibold">Deadline was:</span> August 2, 2026 at midnight
-                </p>
-              </div>
               <p className="text-red-700 text-sm mt-4">
                 If you believe this is an error or have questions, please contact the awards team.
               </p>

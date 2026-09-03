@@ -79,6 +79,7 @@ import {
   logExportResults,
   logExportShortlisted,
   logToggleJudging,
+  logToggleNominations,
   logReportIssue,
   logAuditActionError,
   logUpdateNominationStatus,
@@ -102,6 +103,7 @@ import {
   resetPassword,
   registerUser,
 } from "@/lib/auth-firebase";
+import { setNominationsOpen } from "@/lib/nomination-settings";
 import SiteNav from "@/components/SiteNav";
 import { AdminSettings } from "@/components/AdminSettings";
 import { ForcePasswordChangeModal } from "@/components/ForcePasswordChangeModal";
@@ -245,15 +247,6 @@ export const Route = createFileRoute("/admin")({
     meta: [{ title: "Admin · SALEA 2026 Awards Management" }],
   }),
 });
-
-// ─── Nomination period deadline ────────────────────────────────────────────────
-
-const NOMINATION_DEADLINE = new Date("2026-08-02T00:00:00").getTime();
-
-function isNominationPeriodClosed(): boolean {
-  const now = new Date().getTime();
-  return now > NOMINATION_DEADLINE;
-}
 
 // ─── Admin quick-start guide ──────────────────────────────────────────────────
 
@@ -726,6 +719,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   >([]);
   const [judgeScoresLoaded, setJudgeScoresLoaded] = useState(false);
   const [realJudgingActive, setRealJudgingActive] = useState(false);
+  const [nominationsOpen, setNominationsOpenState] = useState(true);
   const [judgeNotifications, setJudgeNotifications] = useState<Record<string, any>>({});
   const [resettingVotes, setResettingVotes] = useState(false);
   const [resettingNominations, setResettingNominations] = useState(false);
@@ -890,6 +884,20 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
     return () => unsub();
   }, []);
 
+  // Real-time Firestore listener — admin settings (nominations open/closed)
+  useEffect(() => {
+    const unsub = onSnapshot(
+      doc(db, "admin_settings", "nominations"),
+      (snap) => {
+        setNominationsOpenState(snap.exists() ? (snap.data()?.open ?? true) : true);
+      },
+      (error) => {
+        console.error("[Firestore] Failed to load nomination settings:", error);
+      },
+    );
+    return () => unsub();
+  }, []);
+
   // Listen for judge notifications (incomplete submissions)
   useEffect(() => {
     const unsub = onSnapshot(
@@ -1011,6 +1019,19 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
       console.error("Error toggling judging:", err);
       if (err instanceof Error) {
         await logAuditActionError('TOGGLE_JUDGING', 'Failed to toggle judging', err);
+      }
+    }
+  }
+
+  async function toggleNominationsOpen() {
+    try {
+      const newOpen = !nominationsOpen;
+      await setNominationsOpen(newOpen);
+      await logToggleNominations(newOpen);
+    } catch (err) {
+      console.error("Error toggling nominations:", err);
+      if (err instanceof Error) {
+        await logAuditActionError('TOGGLE_NOMINATIONS', 'Failed to toggle nominations', err);
       }
     }
   }
@@ -1655,7 +1676,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
         </div>
 
         {/* Nomination Period Closed Banner */}
-        {isNominationPeriodClosed() && (
+        {!nominationsOpen && (
           <div className="rounded-2xl border-2 border-blue-300 bg-blue-50 px-6 py-4 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-200">
@@ -1664,7 +1685,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
               <div className="flex-1">
                 <p className="font-semibold text-blue-900">Nomination Period Closed</p>
                 <p className="text-sm text-blue-800">
-                  The nomination period ended on August 2, 2026 at midnight. No new nominations are being accepted.
+                  Nominations are currently closed. Use the "Nominations Open/Closed" button below to reopen them.
                 </p>
               </div>
             </div>
@@ -1674,6 +1695,22 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
         {/* Admin Actions Grid - Organized by category */}
         {canManage && (
           <div className="space-y-3">
+            {/* Primary Action: Open/Close Nominations */}
+            <button
+              onClick={toggleNominationsOpen}
+              className={`w-full flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                nominationsOpen
+                  ? "bg-green-100 text-green-700 border border-green-300 hover:bg-green-200"
+                  : "bg-red-100 text-red-700 border border-red-300 hover:bg-red-200"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <div className={`h-3 w-3 rounded-full ${nominationsOpen ? "bg-green-600" : "bg-red-600"}`} />
+                <span>{nominationsOpen ? "Nominations Open" : "Nominations Closed"}</span>
+              </div>
+              {nominationsOpen && <CheckCircle2 className="h-5 w-5" />}
+            </button>
+
             {/* Primary Action: Activate Real Judging */}
             <button
               onClick={toggleRealJudging}
