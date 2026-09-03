@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { downloadSession1ProgrammePDF, downloadSession2ProgrammePDF } from "@/lib/pdf-download";
 
 const session1Schedule = [
   { time: "10:00", title: "Welcome & Opening Address", desc: "Dean's remarks and programme introduction" },
@@ -36,49 +37,6 @@ const venueFacts = [
   { icon: Accessibility, label: "Access", value: "Step-free access · BSL interpreter on stage" },
   { icon: Shirt, label: "Dress code", value: "Black tie · Traditional attire warmly welcomed" },
 ];
-
-const downloadBothSessions = () => {
-  const content = `DURBAN UNIVERSITY OF TECHNOLOGY · STUDENT SERVICES
-Student Services Awards 2026
-A Night Where Excellence Wears a Crown · 21st Annual Gala
-
-DATE: 14 NOVEMBER 2026
-VENUE: FRED CROOKES SPORTS CENTRE
-DRESS: BLACK TIE
-
-===============================================
-SESSION 1: MORNING SESSION (10:00–13:00)
-===============================================
-${session1Schedule.map(s => `${s.time} — ${s.title}\n         ${s.desc}`).join('\n\n')}
-
-===============================================
-SESSION 2: EVENING SESSION (16:00–22:00)
-===============================================
-${session2Schedule.map(s => `${s.time} — ${s.title}\n         ${s.desc}`).join('\n\n')}
-
-VENUE DETAILS
-===============================================
-FRED CROOKES SPORTS CENTRE
-76 Steve Biko Road
-Durban, 4001
-
-Secure parking available
-Shuttle service from DUT Steve Biko Campus from 17:30
-Accessibility: step-free access, BSL interpreter on stage
-
-© 2026 Durban University of Technology
-Office of Student Services
-info@dut.ac.za · +27 31 373 2000
-`;
-  
-  const element = document.createElement('a');
-  element.setAttribute('href', `data:text/plain;charset=utf-8,${encodeURIComponent(content)}`);
-  element.setAttribute('download', 'SALEA-2026-Complete-Programme.txt');
-  element.style.display = 'none';
-  document.body.appendChild(element);
-  element.click();
-  document.body.removeChild(element);
-};
 
 export default function EventProgram() {
   const [activeSession, setActiveSession] = useState("session1");
@@ -174,18 +132,23 @@ export default function EventProgram() {
             </TabsContent>
           </Tabs>
 
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              downloadBothSessions();
-            }}
-            className="mt-6 inline-block"
-          >
-            <Button size="lg" className="bg-gold text-primary-foreground shadow-gold hover:opacity-95">
-              <Download className="mr-2 h-4 w-4" /> Download Full Programme (Session 1 & 2)
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Button
+              size="lg"
+              onClick={() => downloadSession1ProgrammePDF()}
+              className="bg-gold text-primary-foreground shadow-gold hover:opacity-95"
+            >
+              <Download className="mr-2 h-4 w-4" /> Download Session 1 Programme
             </Button>
-          </a>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => downloadSession2ProgrammePDF()}
+              className="border-primary/30 text-foreground hover:bg-accent"
+            >
+              <Download className="mr-2 h-4 w-4" /> Download Session 2 Programme
+            </Button>
+          </div>
         </div>
 
         {/* Venue card */}

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import SiteNav from "@/components/SiteNav";
 import EventProgram from "@/components/EventProgram";
 import { RouteTransitionLoader } from "@/components/RouteTransitionLoader";
-import { downloadGuidePDF, downloadProgrammePDF } from "@/lib/pdf-download";
+import { downloadGuidePDF, downloadSession1ProgrammePDF, downloadSession2ProgrammePDF } from "@/lib/pdf-download";
 import { useNominationsOpen } from "@/lib/nomination-settings";
 import { AWARD_CATEGORIES, AWARD_THEME } from "@/data/awards";
 
@@ -56,6 +56,7 @@ function Index() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [nominatingId, setNominatingId] = useState<string | null>(null);
+  const [downloadingSession, setDownloadingSession] = useState<"session1" | "session2" | null>(null);
   const navigate = useNavigate();
 
   const handleNominate = async (categoryId: string) => {
@@ -90,15 +91,27 @@ function Index() {
     }
   };
 
-  const handleDownloadProgrammePDF = async () => {
-    setIsDownloading(true);
+  const handleDownloadSession1PDF = async () => {
+    setDownloadingSession("session1");
     try {
-      await downloadProgrammePDF();
+      await downloadSession1ProgrammePDF();
     } catch (error) {
-      console.error("Failed to download programme PDF:", error);
-      alert("Failed to download programme. Please try again.");
+      console.error("Failed to download Session 1 programme PDF:", error);
+      alert("Failed to download Session 1 programme. Please try again.");
     } finally {
-      setIsDownloading(false);
+      setDownloadingSession(null);
+    }
+  };
+
+  const handleDownloadSession2PDF = async () => {
+    setDownloadingSession("session2");
+    try {
+      await downloadSession2ProgrammePDF();
+    } catch (error) {
+      console.error("Failed to download Session 2 programme PDF:", error);
+      alert("Failed to download Session 2 programme. Please try again.");
+    } finally {
+      setDownloadingSession(null);
     }
   };
 
@@ -529,7 +542,7 @@ function Index() {
               <div>
                 <h3 className="font-serif text-3xl font-bold text-foreground mb-4">Event Programme</h3>
                 <p className="text-muted-foreground mb-6">
-                  Download the complete event programme with clear session times and schedule details.
+                  Download the programme for the session you're attending, with clear session times and schedule details.
                 </p>
                 <ul className="space-y-3 text-sm mb-6">
                   <li className="flex items-start gap-3">
@@ -546,15 +559,16 @@ function Index() {
                   </li>
                 </ul>
               </div>
-              <div className="flex justify-center">
-                <motion.button 
-                  onClick={handleDownloadProgrammePDF} 
-                  disabled={isDownloading}
-                  whileHover={!isDownloading ? { scale: 1.05 } : {}}
-                  whileTap={!isDownloading ? { scale: 0.95 } : {}}
+              <div className="flex flex-col gap-4 items-center">
+                <motion.button
+                  onClick={handleDownloadSession1PDF}
+                  disabled={downloadingSession !== null}
+                  className="w-full"
+                  whileHover={downloadingSession === null ? { scale: 1.03 } : {}}
+                  whileTap={downloadingSession === null ? { scale: 0.97 } : {}}
                 >
-                  <Button className="bg-gold text-primary-foreground hover:bg-gold/90 flex items-center justify-center gap-3 transition-all disabled:opacity-70 h-14 px-8 text-base" disabled={isDownloading}>
-                    {isDownloading ? (
+                  <Button className="w-full bg-gold text-primary-foreground hover:bg-gold/90 flex items-center justify-center gap-3 transition-all disabled:opacity-70 h-14 px-8 text-base" disabled={downloadingSession !== null}>
+                    {downloadingSession === "session1" ? (
                       <>
                         <motion.div
                           animate={{ rotate: 360 }}
@@ -562,12 +576,38 @@ function Index() {
                         >
                           <Loader className="h-5 w-5" />
                         </motion.div>
-                        <span>Generating...</span>
+                        <span>Downloading...</span>
                       </>
                     ) : (
                       <>
                         <FileText className="h-5 w-5" />
-                        <span>Download Programme</span>
+                        <span>Download Session 1 Programme</span>
+                      </>
+                    )}
+                  </Button>
+                </motion.button>
+                <motion.button
+                  onClick={handleDownloadSession2PDF}
+                  disabled={downloadingSession !== null}
+                  className="w-full"
+                  whileHover={downloadingSession === null ? { scale: 1.03 } : {}}
+                  whileTap={downloadingSession === null ? { scale: 0.97 } : {}}
+                >
+                  <Button variant="outline" className="w-full border-primary/30 text-foreground hover:bg-accent flex items-center justify-center gap-3 transition-all disabled:opacity-70 h-14 px-8 text-base" disabled={downloadingSession !== null}>
+                    {downloadingSession === "session2" ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        >
+                          <Loader className="h-5 w-5" />
+                        </motion.div>
+                        <span>Downloading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-5 w-5" />
+                        <span>Download Session 2 Programme</span>
                       </>
                     )}
                   </Button>
