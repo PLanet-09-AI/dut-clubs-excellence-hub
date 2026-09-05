@@ -1,10 +1,11 @@
 import { motion } from "framer-motion";
-import { Download, MapPin, Clock, Accessibility, Car, Shirt } from "lucide-react";
+import { Download, Loader, MapPin, Clock, Accessibility, Car, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { downloadSession1ProgrammePDF, downloadSession2ProgrammePDF } from "@/lib/pdf-download";
+import DownloadProgressBar from "@/components/DownloadProgressBar";
 
 const session1Schedule = [
   { time: "10:00", title: "Welcome & Opening Address", desc: "Dean's remarks and programme introduction" },
@@ -40,7 +41,36 @@ const venueFacts = [
 
 export default function EventProgram() {
   const [activeSession, setActiveSession] = useState("session1");
+  const [downloadingSession, setDownloadingSession] = useState<"session1" | "session2" | null>(null);
   const isMobile = useIsMobile();
+
+  const handleDownloadSession1 = async () => {
+    setDownloadingSession("session1");
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await downloadSession1ProgrammePDF();
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    } catch (error) {
+      console.error("Failed to download Session 1 programme PDF:", error);
+      alert("Failed to download Session 1 programme. Please try again.");
+    } finally {
+      setDownloadingSession(null);
+    }
+  };
+
+  const handleDownloadSession2 = async () => {
+    setDownloadingSession("session2");
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await downloadSession2ProgrammePDF();
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    } catch (error) {
+      console.error("Failed to download Session 2 programme PDF:", error);
+      alert("Failed to download Session 2 programme. Please try again.");
+    } finally {
+      setDownloadingSession(null);
+    }
+  };
 
   return (
     <section id="program" className="relative z-10 mx-auto max-w-7xl px-6 py-24">
@@ -132,22 +162,58 @@ export default function EventProgram() {
             </TabsContent>
           </Tabs>
 
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Button
-              size="lg"
-              onClick={() => downloadSession1ProgrammePDF()}
-              className="bg-gold text-primary-foreground shadow-gold hover:opacity-95"
-            >
-              <Download className="mr-2 h-4 w-4" /> Download Session 1 Programme
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => downloadSession2ProgrammePDF()}
-              className="border-primary/30 text-foreground hover:bg-accent"
-            >
-              <Download className="mr-2 h-4 w-4" /> Download Session 2 Programme
-            </Button>
+          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-start">
+            <div className="w-full sm:w-auto">
+              <Button
+                size="lg"
+                onClick={handleDownloadSession1}
+                disabled={downloadingSession !== null}
+                className="h-auto min-h-11 w-full whitespace-normal bg-gold px-5 py-3 text-center text-sm leading-snug text-primary-foreground shadow-gold hover:opacity-95 disabled:opacity-70 sm:w-auto"
+              >
+                {downloadingSession === "session1" ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Loader className="mr-2 h-4 w-4 shrink-0" />
+                    </motion.div>
+                    Downloading...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4 shrink-0" /> Download Session 1 Programme
+                  </>
+                )}
+              </Button>
+              {downloadingSession === "session1" && <DownloadProgressBar />}
+            </div>
+            <div className="w-full sm:w-auto">
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={handleDownloadSession2}
+                disabled={downloadingSession !== null}
+                className="h-auto min-h-11 w-full whitespace-normal border-primary/30 px-5 py-3 text-center text-sm leading-snug text-foreground hover:bg-accent disabled:opacity-70 sm:w-auto"
+              >
+                {downloadingSession === "session2" ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Loader className="mr-2 h-4 w-4 shrink-0" />
+                    </motion.div>
+                    Downloading...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4 shrink-0" /> Download Session 2 Programme
+                  </>
+                )}
+              </Button>
+              {downloadingSession === "session2" && <DownloadProgressBar />}
+            </div>
           </div>
         </div>
 

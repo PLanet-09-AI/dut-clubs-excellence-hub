@@ -7,6 +7,7 @@ import SiteNav from "@/components/SiteNav";
 import EventProgram from "@/components/EventProgram";
 import { RouteTransitionLoader } from "@/components/RouteTransitionLoader";
 import { downloadGuidePDF, downloadSession1ProgrammePDF, downloadSession2ProgrammePDF } from "@/lib/pdf-download";
+import DownloadProgressBar from "@/components/DownloadProgressBar";
 import { useNominationsOpen } from "@/lib/nomination-settings";
 import { AWARD_CATEGORIES, AWARD_THEME } from "@/data/awards";
 
@@ -94,7 +95,9 @@ function Index() {
   const handleDownloadSession1PDF = async () => {
     setDownloadingSession("session1");
     try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
       await downloadSession1ProgrammePDF();
+      await new Promise((resolve) => setTimeout(resolve, 400));
     } catch (error) {
       console.error("Failed to download Session 1 programme PDF:", error);
       alert("Failed to download Session 1 programme. Please try again.");
@@ -106,7 +109,9 @@ function Index() {
   const handleDownloadSession2PDF = async () => {
     setDownloadingSession("session2");
     try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
       await downloadSession2ProgrammePDF();
+      await new Promise((resolve) => setTimeout(resolve, 400));
     } catch (error) {
       console.error("Failed to download Session 2 programme PDF:", error);
       alert("Failed to download Session 2 programme. Please try again.");
@@ -536,8 +541,8 @@ function Index() {
 
       {/* Download Programme */}
       <section className="relative z-10 border-t border-primary/10 bg-gradient-to-b from-background to-white/50 py-16">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="rounded-2xl border border-primary/20 bg-white/80 backdrop-blur p-8 sm:p-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="rounded-2xl border border-primary/20 bg-white/80 backdrop-blur p-5 sm:p-12">
             <div className="grid gap-8 sm:grid-cols-2 items-center">
               <div>
                 <h3 className="font-serif text-3xl font-bold text-foreground mb-4">Event Programme</h3>
@@ -559,59 +564,65 @@ function Index() {
                   </li>
                 </ul>
               </div>
-              <div className="flex flex-col gap-4 items-center">
-                <motion.button
-                  onClick={handleDownloadSession1PDF}
-                  disabled={downloadingSession !== null}
-                  className="w-full"
-                  whileHover={downloadingSession === null ? { scale: 1.03 } : {}}
-                  whileTap={downloadingSession === null ? { scale: 0.97 } : {}}
-                >
-                  <Button className="w-full bg-gold text-primary-foreground hover:bg-gold/90 flex items-center justify-center gap-3 transition-all disabled:opacity-70 h-14 px-8 text-base" disabled={downloadingSession !== null}>
-                    {downloadingSession === "session1" ? (
-                      <>
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                        >
-                          <Loader className="h-5 w-5" />
-                        </motion.div>
-                        <span>Downloading...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="h-5 w-5" />
-                        <span>Download Session 1 Programme</span>
-                      </>
-                    )}
-                  </Button>
-                </motion.button>
-                <motion.button
-                  onClick={handleDownloadSession2PDF}
-                  disabled={downloadingSession !== null}
-                  className="w-full"
-                  whileHover={downloadingSession === null ? { scale: 1.03 } : {}}
-                  whileTap={downloadingSession === null ? { scale: 0.97 } : {}}
-                >
-                  <Button variant="outline" className="w-full border-primary/30 text-foreground hover:bg-accent flex items-center justify-center gap-3 transition-all disabled:opacity-70 h-14 px-8 text-base" disabled={downloadingSession !== null}>
-                    {downloadingSession === "session2" ? (
-                      <>
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                        >
-                          <Loader className="h-5 w-5" />
-                        </motion.div>
-                        <span>Downloading...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="h-5 w-5" />
-                        <span>Download Session 2 Programme</span>
-                      </>
-                    )}
-                  </Button>
-                </motion.button>
+              <div className="flex w-full flex-col gap-4">
+                <div>
+                  <motion.button
+                    onClick={handleDownloadSession1PDF}
+                    disabled={downloadingSession !== null}
+                    className="w-full"
+                    whileHover={downloadingSession === null ? { scale: 1.02 } : {}}
+                    whileTap={downloadingSession === null ? { scale: 0.98 } : {}}
+                  >
+                    <Button className="h-auto min-h-14 w-full whitespace-normal bg-gold px-4 py-3 text-center text-sm leading-snug text-primary-foreground hover:bg-gold/90 disabled:opacity-70 sm:px-8 sm:text-base" disabled={downloadingSession !== null}>
+                      {downloadingSession === "session1" ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                          >
+                            <Loader className="h-5 w-5 shrink-0" />
+                          </motion.div>
+                          <span>Downloading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-5 w-5 shrink-0" />
+                          <span>Download Session 1 Programme</span>
+                        </>
+                      )}
+                    </Button>
+                  </motion.button>
+                  {downloadingSession === "session1" && <DownloadProgressBar />}
+                </div>
+                <div>
+                  <motion.button
+                    onClick={handleDownloadSession2PDF}
+                    disabled={downloadingSession !== null}
+                    className="w-full"
+                    whileHover={downloadingSession === null ? { scale: 1.02 } : {}}
+                    whileTap={downloadingSession === null ? { scale: 0.98 } : {}}
+                  >
+                    <Button variant="outline" className="h-auto min-h-14 w-full whitespace-normal border-primary/30 px-4 py-3 text-center text-sm leading-snug text-foreground hover:bg-accent disabled:opacity-70 sm:px-8 sm:text-base" disabled={downloadingSession !== null}>
+                      {downloadingSession === "session2" ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                          >
+                            <Loader className="h-5 w-5 shrink-0" />
+                          </motion.div>
+                          <span>Downloading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-5 w-5 shrink-0" />
+                          <span>Download Session 2 Programme</span>
+                        </>
+                      )}
+                    </Button>
+                  </motion.button>
+                  {downloadingSession === "session2" && <DownloadProgressBar />}
+                </div>
               </div>
             </div>
           </div>
