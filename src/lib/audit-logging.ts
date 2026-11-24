@@ -36,6 +36,7 @@ export type AuditAction =
   | 'CLEAR_JUDGE_SCORES'
   | 'VIEW_JUDGE_ACTIVITY'
   | 'EXPORT_JUDGE_REPORT'
+  | 'EXPORT_NOMINATIONS_ZIP'
   | 'REPORT_ISSUE';
 
 export interface AuditLog {
@@ -144,6 +145,22 @@ export async function logExportShortlisted(exportedCount: number): Promise<strin
     description: `Exported ${exportedCount} shortlisted nominations to CSV`,
     affectedCount: exportedCount,
     metadata: { exportedCount, format: 'CSV' },
+    status: 'success',
+  });
+}
+
+/**
+ * Log ZIP export of nominations (narrative reports + attachments)
+ */
+export async function logExportNominationsZip(
+  nominationCount: number,
+  scope: string,
+): Promise<string> {
+  return logAuditAction({
+    action: 'EXPORT_NOMINATIONS_ZIP',
+    description: `Downloaded ${nominationCount} nominations (${scope}) as ZIP with narrative reports and attachments`,
+    affectedCount: nominationCount,
+    metadata: { nominationCount, scope, format: 'ZIP' },
     status: 'success',
   });
 }

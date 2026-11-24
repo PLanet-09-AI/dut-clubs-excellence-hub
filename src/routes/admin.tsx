@@ -36,6 +36,7 @@ import {
   Shield,
   AlertCircle,
   MoreVertical,
+  FileArchive,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -90,6 +91,7 @@ import {
   logClearJudgeScores,
   logViewJudgeActivity,
   logExportJudgeReport,
+  logExportNominationsZip,
   getRecentAuditLogs,
   type AuditLog,
   type AuditAction,
@@ -107,6 +109,7 @@ import { setNominationsOpen } from "@/lib/nomination-settings";
 import SiteNav from "@/components/SiteNav";
 import { AdminSettings } from "@/components/AdminSettings";
 import { ForcePasswordChangeModal } from "@/components/ForcePasswordChangeModal";
+import { useZipExport, ZipExportStatus } from "@/components/ZipDownloadButton";
 import { User } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -739,6 +742,17 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   const [sendingToNomineeId, setSendingToNomineeId] = useState<string | null>(null);
   const [nomineeEmailResults, setNomineeEmailResults] = useState<{ [key: string]: { success: boolean; message: string } }>({});
   const [showAdminMenu, setShowAdminMenu] = useState(false);
+  // ZIP export (narrative reports + attachments). Shared by the Admin Actions
+  // "Download Everything" item and the per-category button by the results count.
+  const zipExport = useZipExport();
+  function downloadZip(rows: Nomination[], zipLabel: string | undefined, scope: string) {
+    if (rows.length === 0 || zipExport.busy) return;
+    // run() is invoked synchronously so the browser's "Save as" dialog can open.
+    void zipExport.run(rows, { zipLabel });
+    logExportNominationsZip(rows.length, scope).catch((err) =>
+      console.error("Failed to log export:", err),
+    );
+  }
   const [sendingShortlistEmails, setSendingShortlistEmails] = useState(false);
   const [shortlistEmailResults, setShortlistEmailResults] = useState<{ email: string; success: boolean; error?: string }[]>([]);
   const [showVideoPreview, setShowVideoPreview] = useState<{ url: string; name: string } | null>(null);
@@ -1791,6 +1805,24 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
 
                     <button
                       onClick={() => {
+                        downloadZip(nominations, "All Nominations", "all");
+                        setShowAdminMenu(false);
+                      }}
+                      disabled={nominations.length === 0 || zipExport.busy}
+                      title="One ZIP with a Word narrative report (every question and answer) and all attachments for every nominee, foldered by category"
+                      className="w-full flex items-center justify-start gap-3 rounded-lg px-4 py-2.5 text-sm transition hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FileArchive className="h-4 w-4 flex-shrink-0 text-primary" />
+                      <span className="flex-1 text-left">
+                        {zipExport.busy ? "Downloading Everything…" : "Download Everything (ZIP)"}
+                      </span>
+                      <Badge variant="secondary" className="ml-auto text-xs">
+                        {nominations.length}
+                      </Badge>
+                    </button>
+
+                    <button
+                      onClick={() => {
                         sendShortlistEmails();
                         setShowAdminMenu(false);
                       }}
@@ -1832,6 +1864,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
                   </div>
                 </div>
               )}
+              <ZipExportStatus zip={zipExport} />
             </div>
           </div>
         )}
@@ -2038,20 +2071,49 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
             </div>
           </div>
 
-          {/* Results count */}
+          {/* Results count + ZIP download of the current view */}
           {nominations.length > 0 && (
-            <p className="text-sm text-muted-foreground -mt-2">
-              Showing <span className="font-semibold text-foreground">{filtered.length}</span> of{" "}
-              {nominations.length} nominations
-              {selectedCategory !== "__all__" && (
-                <>
-                  {" "}in{" "}
-                  <span className="text-primary font-medium">
-                    {categoryTiles.find((c) => c.id === selectedCategory)?.name}
-                  </span>
-                </>
+            <div className="-mt-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-muted-foreground">
+                Showing <span className="font-semibold text-foreground">{filtered.length}</span> of{" "}
+                {nominations.length} nominations
+                {selectedCategory !== "__all__" && (
+                  <>
+                    {" "}in{" "}
+                    <span className="text-primary font-medium">
+                      {categoryTiles.find((c) => c.id === selectedCategory)?.name}
+                    </span>
+                  </>
+                )}
+              </p>
+              {canManage && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={filtered.length === 0 || zipExport.busy}
+                  onClick={() =>
+                    downloadZip(
+                      filtered,
+                      selectedCategory === "__all__" ? "All Nominations" : undefined,
+                      selectedCategory === "__all__" ? "current view" : `category ${selectedCategory}`,
+                    )
+                  }
+                  className="border-primary/40 text-primary"
+                >
+                  {zipExport.busy ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileArchive className="mr-2 h-4 w-4" />
+                  )}
+                  {zipExport.busy
+                    ? zipExport.busyText
+                    : selectedCategory === "__all__"
+                      ? `Download ZIP (${filtered.length})`
+                      : `Download Category ZIP (${filtered.length})`}
+                </Button>
               )}
-            </p>
+            </div>
           )}
 
           {/* Nomination cards */}
