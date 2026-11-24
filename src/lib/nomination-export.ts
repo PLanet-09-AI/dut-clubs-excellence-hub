@@ -1,15 +1,18 @@
 /**
  * nomination-export.ts
  *
- * Exports one or more nominations as a single ZIP containing, per nominee:
- *   - "Narrative Report.docx"  — Word document with every question, the nominee's
- *                                 answer, nominee/nominator details and an evidence index
- *   - "Narrative Report.html"  — same report for the browser, with clickable links
- *                                 to the attachments inside the extracted ZIP
- *   - "Attachments/…"          — every uploaded evidence file, foldered by question
- *                                 and evidence slot
- * plus a per-category "Summary.csv" and, if any file could not be fetched,
- * a "MISSING FILES.txt" with direct links.
+ * Exports one or more nominations as a single ZIP, one folder per nominee:
+ *
+ *   <Category>/                       (only when several categories are exported)
+ *     Summary.csv
+ *     01 - <Nominee> (<student #>)/
+ *       Narrative Report.docx         every question, answer, details, evidence index
+ *       Narrative Report.html         same, with clickable links to the files below
+ *       Q1 - <Section>/<Evidence type> - <file>
+ *   MISSING FILES.txt                 only if some attachments could not be fetched
+ *
+ * Path segments are length-capped so full paths stay under Windows' 260-character
+ * limit when the ZIP is extracted with Explorer's "Extract All".
  *
  * The ZIP is streamed (client-zip): attachments are fetched a few at a time and
  * written straight to disk when the browser supports the File System Access API
@@ -91,21 +94,59 @@ const FETCH_AHEAD = 4;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
+// Windows Explorer can't extract paths over 260 characters. Real admins extract into
+// e.g. "C:\Users\<name>\OneDrive - Durban University of Technology\Desktop\<zip name>\"
+// (~110 chars), so paths inside the ZIP are kept to ≤ ~140:
+//   category 24 + nominee 38 + question 30 + file 48 + 3 slashes = 143.
+const MAX_CATEGORY = 24;
+const MAX_NOMINEE = 38;
+const MAX_QUESTION = 30;
+const MAX_EVIDENCE_LABEL = 22;
+const MAX_FILE = 48;
+
 /** Make a string safe as a single path segment on Windows, macOS and Linux. */
-function safeSegment(value: string, maxLength = 80): string {
+function safeSegment(value: string, maxLength: number): string {
   const cleaned = (value || "")
+    .replace(/[\\/:]/g, "-")
     // eslint-disable-next-line no-control-regex
-    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_")
+    .replace(/[*?"<>|\u0000-\u001f]/g, "")
     .replace(/\s+/g, " ")
-    .trim()
-    .replace(/[. ]+$/, "");
-  const truncated = cleaned.length > maxLength ? cleaned.slice(0, maxLength).trim() : cleaned;
-  return truncated || "Untitled";
+    .trim();
+  const truncated = cleaned.length > maxLength ? cleaned.slice(0, maxLength) : cleaned;
+  // Windows rejects segments ending in a dot or space.
+  return truncated.replace(/[. ]+$/, "").trim() || "Untitled";
 }
 
-/** Return a file name unique within `used`, adding " (2)", " (3)"… before the extension. */
-function uniqueName(name: string, used: Set<string>): string {
-  const safe = safeSegment(name, 120);
+/** safeSegment, but cut at a word boundary when that keeps most of the text. */
+function shorten(value: string, maxLength: number): string {
+  const full = safeSegment(value, 1000);
+  if (full.length <= maxLength) return full;
+  const cut = full.slice(0, maxLength + 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  let base = lastSpace >= maxLength * 0.4 ? cut.slice(0, lastSpace) : full.slice(0, maxLength);
+  // Drop dangling connectors/punctuation: "Photos, posters or" → "Photos, posters".
+  let prev = "";
+  while (prev !== base) {
+    prev = base;
+    base = base
+      .replace(/[\s,;&/(-]+$/, "")
+      .replace(/\s+(and|or|of|the|for|to|with|from|in|on|by|a)$/i, "");
+  }
+  return base.replace(/[. ]+$/, "").trim() || full.slice(0, maxLength).trim() || "Untitled";
+}
+
+/** Like safeSegment, but keeps the file extension when shortening. */
+function safeFileName(name: string, maxLength: number): string {
+  const cleaned = safeSegment(name, 1000);
+  if (cleaned.length <= maxLength) return cleaned;
+  const dot = cleaned.lastIndexOf(".");
+  const ext = dot > 0 && cleaned.length - dot <= 10 ? cleaned.slice(dot) : "";
+  const base = shorten(cleaned.slice(0, cleaned.length - ext.length), maxLength - ext.length);
+  return `${base}${ext}`;
+}
+
+/** Return a name unique within `used` (case-insensitive), adding " (2)", " (3)"… before the extension. */
+function uniqueName(safe: string, used: Set<string>): string {
   if (!used.has(safe.toLowerCase())) {
     used.add(safe.toLowerCase());
     return safe;
@@ -118,6 +159,27 @@ function uniqueName(name: string, used: Set<string>): string {
   const result = `${base} (${n})${ext}`;
   used.add(result.toLowerCase());
   return result;
+}
+
+/** "01 - Nominee Name (22201242)" — student # only when it is a single plain number. */
+function nomineeFolderName(index: number, nom: ExportNomination): string {
+  const num = String(index + 1).padStart(2, "0");
+  const studentNo = (nom.studentNumber || "").trim();
+  const suffix = /^\d{6,10}$/.test(studentNo) ? ` (${studentNo})` : "";
+  const name = shorten(nom.nomineeName || "Unnamed", MAX_NOMINEE - num.length - 3 - suffix.length);
+  return `${num} - ${name}${suffix}`;
+}
+
+/** Category folder: the category's short name (e.g. "Dean's Prestigious") when known. */
+function categoryFolderName(categoryId: string, categoryName: string): string {
+  const short = AWARD_CATEGORIES.find((c) => c.id === categoryId)?.short;
+  return shorten(short || categoryName || categoryId || "Uncategorised", MAX_CATEGORY);
+}
+
+/** "<Evidence type> - <original file name>", length-capped with the extension kept. */
+function evidenceFileName(label: string, fileName: string): string {
+  const prefix = label ? `${shorten(label, MAX_EVIDENCE_LABEL)} - ` : "";
+  return `${prefix}${safeFileName(fileName || "file", MAX_FILE - prefix.length)}`;
 }
 
 function escapeHtml(text: string): string {
@@ -389,7 +451,7 @@ function buildSummaryCsv(jobs: ReportJob[]): string {
 
 // ─── planning ────────────────────────────────────────────────────────────────
 
-function planExport(nominations: ExportNomination[], rootName: string) {
+function planExport(nominations: ExportNomination[]) {
   const byCategory = new Map<string, ExportNomination[]>();
   for (const n of nominations) {
     const key = n.categoryName || n.categoryId || "Uncategorised";
@@ -400,11 +462,14 @@ function planExport(nominations: ExportNomination[], rootName: string) {
 
   const planned: PlannedFile[] = [];
   const categories: { prefix: string; jobs: ReportJob[] }[] = [];
+  const usedCategoryFolders = new Set<string>();
 
   for (const [categoryName, noms] of byCategory) {
+    // Single category: nominee folders sit at the top of the ZIP (the ZIP itself
+    // is named after the category). Several categories: one folder per category.
     const catPrefix = singleCategory
-      ? `${rootName}/`
-      : `${rootName}/${safeSegment(categoryName)}/`;
+      ? ""
+      : `${uniqueName(categoryFolderName(noms[0].categoryId, categoryName), usedCategoryFolders)}/`;
     const usedFolders = new Set<string>();
     const sorted = [...noms].sort((a, b) =>
       (a.nomineeName || "").localeCompare(b.nomineeName || ""),
@@ -412,10 +477,7 @@ function planExport(nominations: ExportNomination[], rootName: string) {
     const jobs: ReportJob[] = [];
 
     sorted.forEach((nom, i) => {
-      const folderName = uniqueName(
-        `${String(i + 1).padStart(2, "0")} - ${nom.nomineeName || "Unnamed"}${nom.studentNumber ? ` (${nom.studentNumber})` : ""}`,
-        usedFolders,
-      );
+      const folderName = uniqueName(nomineeFolderName(i, nom), usedFolders);
       const job: ReportJob = {
         nom,
         prefix: `${catPrefix}${folderName}/`,
@@ -428,7 +490,7 @@ function planExport(nominations: ExportNomination[], rootName: string) {
 
       const addFile = (questionId: string, folderRel: string, label: string, file: ExportFile) => {
         if (!usedPerFolder.has(folderRel)) usedPerFolder.set(folderRel, new Set());
-        const fileName = uniqueName(file.name || "file", usedPerFolder.get(folderRel)!);
+        const fileName = uniqueName(evidenceFileName(label, file.name), usedPerFolder.get(folderRel)!);
         const relPath = `${folderRel}/${fileName}`;
         planned.push({ zipPath: `${job.prefix}${relPath}`, relPath, file, job });
         if (!job.evidence.has(questionId)) job.evidence.set(questionId, []);
@@ -439,7 +501,7 @@ function planExport(nominations: ExportNomination[], rootName: string) {
       job.questions.forEach((q, qi) => {
         const slots = nom.uploads?.[q.id];
         if (!slots) return;
-        const qFolder = `Attachments/${safeSegment(`Q${qi + 1} - ${q.section}`, 60)}`;
+        const qFolder = shorten(`Q${qi + 1} - ${q.section}`, MAX_QUESTION);
         const slotKeys = Object.keys(slots).sort((a, b) =>
           a.localeCompare(b, undefined, { numeric: true }),
         );
@@ -447,8 +509,7 @@ function planExport(nominations: ExportNomination[], rootName: string) {
           const idx = Number(slotKey.replace(/^e/, ""));
           const label =
             Number.isInteger(idx) && q.evidence?.[idx] ? q.evidence[idx] : `Evidence ${slotKey}`;
-          const slotFolder = `${qFolder}/${safeSegment(label, 60)}`;
-          for (const file of slots[slotKey] ?? []) addFile(q.id, slotFolder, label, file);
+          for (const file of slots[slotKey] ?? []) addFile(q.id, qFolder, label, file);
           handledSlots.add(`${q.id}/${slotKey}`);
         }
       });
@@ -457,8 +518,7 @@ function planExport(nominations: ExportNomination[], rootName: string) {
       for (const [qid, slots] of Object.entries(nom.uploads ?? {})) {
         for (const [slotKey, files] of Object.entries(slots ?? {})) {
           if (handledSlots.has(`${qid}/${slotKey}`)) continue;
-          const folderRel = `Attachments/Other/${safeSegment(qid, 40)}/${safeSegment(slotKey, 20)}`;
-          for (const file of files ?? []) addFile(qid, folderRel, "Other evidence", file);
+          for (const file of files ?? []) addFile(qid, "Other evidence", "", file);
         }
       }
 
@@ -473,28 +533,53 @@ function planExport(nominations: ExportNomination[], rootName: string) {
 
 // ─── output sink ─────────────────────────────────────────────────────────────
 
+type SaveFileHandle = {
+  createWritable: () => Promise<WritableStream<Uint8Array>>;
+  /** Chrome/Edge: deletes the file. Not available everywhere. */
+  remove?: () => Promise<void>;
+};
+
 type SaveFilePicker = (options: {
   suggestedName?: string;
   types?: { description: string; accept: Record<string, string[]> }[];
-}) => Promise<{ createWritable: () => Promise<WritableStream<Uint8Array>> }>;
+}) => Promise<SaveFileHandle>;
+
+type SaveTarget = { handle: SaveFileHandle; writable: WritableStream<Uint8Array> };
 
 /**
  * Must be called synchronously from the click handler (before any await) so the
  * browser still treats the "Save as" dialog as user-initiated.
+ *
+ * Note: Chrome creates the chosen .zip as an EMPTY file straight away and only
+ * fills it when the stream closes — opening it before then shows "invalid ZIP".
  */
-function openSaveTarget(fileName: string): Promise<WritableStream<Uint8Array> | null> | null {
+function openSaveTarget(fileName: string): Promise<SaveTarget | null> | null {
   const picker = (window as unknown as { showSaveFilePicker?: SaveFilePicker }).showSaveFilePicker;
   if (typeof picker !== "function") return null;
   return picker({
     suggestedName: fileName,
     types: [{ description: "ZIP archive", accept: { "application/zip": [".zip"] } }],
   }).then(
-    (handle) => handle.createWritable(),
+    async (handle) => ({ handle, writable: await handle.createWritable() }),
     (err: unknown) => {
       if (err instanceof DOMException && err.name === "AbortError") throw err;
       return null; // picker unavailable (e.g. iframe) → fall back to blob download
     },
   );
+}
+
+/** Remove the empty placeholder file left behind when an export fails. */
+async function discardSaveTarget(target: SaveTarget) {
+  try {
+    await target.writable.abort();
+  } catch {
+    /* already errored/closed */
+  }
+  try {
+    await target.handle.remove?.();
+  } catch {
+    /* not supported — leave it */
+  }
 }
 
 function triggerDownload(blob: Blob, fileName: string) {
@@ -517,16 +602,19 @@ export async function exportNominationsZip(
 ): Promise<ExportResult> {
   if (nominations.length === 0) throw new Error("No nominations to export.");
 
-  const categoryNames = new Set(nominations.map((n) => n.categoryName || n.categoryId));
-  const rootName = safeSegment(
-    `SALEA 2026 - ${options.zipLabel ?? (categoryNames.size === 1 ? [...categoryNames][0] : "All Nominations")}`,
-    100,
-  );
-  const zipName = `${rootName} (${new Date().toISOString().split("T")[0]}).zip`;
+  const categoryIds = new Set(nominations.map((n) => n.categoryId));
+  // Kept short: Explorer's "Extract All" uses the ZIP name as the destination folder,
+  // which counts towards the 260-character path limit.
+  const label =
+    options.zipLabel ??
+    (categoryIds.size === 1
+      ? categoryFolderName(nominations[0].categoryId, nominations[0].categoryName)
+      : "All Nominations");
+  const zipName = `SALEA - ${shorten(label, 28)} ${new Date().toISOString().split("T")[0]}.zip`;
 
   // Ask where to save first — this must happen before any await.
   const targetPromise = openSaveTarget(zipName);
-  let target: WritableStream<Uint8Array> | null = null;
+  let target: SaveTarget | null = null;
   if (targetPromise) {
     try {
       target = await targetPromise;
@@ -535,7 +623,7 @@ export async function exportNominationsZip(
     }
   }
 
-  const { planned, categories } = planExport(nominations, rootName);
+  const { planned, categories } = planExport(nominations);
   const failed: ExportResult["failed"] = [];
   const total = planned.length;
   let done = 0;
@@ -578,10 +666,14 @@ export async function exportNominationsZip(
     options.onProgress?.({ done: total, total, phase: "finishing" });
     for (const { prefix, jobs } of categories) {
       for (const job of jobs) {
-        yield {
-          name: `${job.prefix}Narrative Report.docx`,
-          input: await buildDocx(buildReportBlocks(job), `${job.nom.nomineeName} — Narrative Report`),
-        };
+        // One bad report must not break the whole ZIP — the HTML version still goes in.
+        let docx: Uint8Array | null = null;
+        try {
+          docx = await buildDocx(buildReportBlocks(job), `${job.nom.nomineeName} — Narrative Report`);
+        } catch (err) {
+          console.error("Narrative .docx failed for", job.nom.id, err);
+        }
+        if (docx) yield { name: `${job.prefix}Narrative Report.docx`, input: docx };
         yield { name: `${job.prefix}Narrative Report.html`, input: buildReportHtml(job) };
       }
       yield { name: `${prefix}Summary.csv`, input: buildSummaryCsv(jobs) };
@@ -589,7 +681,7 @@ export async function exportNominationsZip(
 
     if (failed.length > 0) {
       yield {
-        name: `${rootName}/MISSING FILES.txt`,
+        name: "MISSING FILES.txt",
         input: [
           "The following attachments could not be downloaded into this ZIP.",
           "Open each link below while signed in to retrieve it manually.",
@@ -602,7 +694,13 @@ export async function exportNominationsZip(
 
   const response = downloadZip(entries());
   if (target) {
-    await response.body!.pipeTo(target);
+    try {
+      // preventAbort lets us clean up the placeholder file ourselves on failure.
+      await response.body!.pipeTo(target.writable, { preventAbort: true });
+    } catch (err) {
+      await discardSaveTarget(target);
+      throw err;
+    }
   } else {
     triggerDownload(await response.blob(), zipName);
   }
