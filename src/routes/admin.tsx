@@ -124,7 +124,13 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 // Tabs components removed — sidebar navigation used instead
-import { AWARD_CATEGORIES, FACULTIES, getCriteriaForCategory } from "@/data/awards";
+import {
+  AWARD_CATEGORIES,
+  AWARD_THEME,
+  FACULTIES,
+  getCriteriaForCategory,
+  getNominationYear,
+} from "@/data/awards";
 import {
   subscribePastWinners,
   addPastWinner,
@@ -154,6 +160,8 @@ type Nomination = {
   nominatorEmail: string;
   nominatorRelationship: string;
   isSelfNomination?: boolean;
+  /** Award cycle (e.g. 2026). Older nominations lack it — see getNominationYear(). */
+  awardYear?: number;
   answers: Record<string, string>;
   uploads?: Record<
     string,
@@ -696,6 +704,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("__all__");
   const [statusFilter, setStatusFilter] = useState<"all" | NominationStatus | "judging_pending">("all");
+  const [yearFilter, setYearFilter] = useState<"all" | number>("all");
   const [selfNomFilter, setSelfNomFilter] = useState(false);
   const [search, setSearch] = useState("");
   const [detailNom, setDetailNom] = useState<Nomination | null>(null);
@@ -745,10 +754,18 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
   // ZIP export (narrative reports + attachments). Shared by the Admin Actions
   // "Download Everything" item and the per-category button by the results count.
   const zipExport = useZipExport();
-  function downloadZip(rows: Nomination[], zipLabel: string | undefined, scope: string) {
+  function downloadZip(
+    rows: Nomination[],
+    zipLabel: string | undefined,
+    scope: string,
+    year?: number,
+  ) {
     if (rows.length === 0 || zipExport.busy) return;
     // run() is invoked synchronously so the browser's "Save as" dialog can open.
-    void zipExport.run(rows, { zipLabel });
+    void zipExport.run(
+      rows.map((n) => ({ ...n, awardYear: getNominationYear(n) })),
+      { zipLabel, year },
+    );
     logExportNominationsZip(rows.length, scope).catch((err) =>
       console.error("Failed to log export:", err),
     );
@@ -1255,10 +1272,24 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
     return Array.from(map.values());
   }, [nominations]);
 
+  // Award years present in the data, newest first (always includes the current cycle).
+  const nominationYears = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const n of nominations) {
+      const y = getNominationYear(n);
+      counts.set(y, (counts.get(y) ?? 0) + 1);
+    }
+    if (!counts.has(AWARD_THEME.year)) counts.set(AWARD_THEME.year, 0);
+    return [...counts.entries()]
+      .map(([year, count]) => ({ year, count }))
+      .sort((a, b) => b.year - a.year);
+  }, [nominations]);
+
   const filtered = useMemo(() => {
     return nominations.filter((n) => {
       if (selectedCategory !== "__all__" && n.categoryId !== selectedCategory) return false;
-      
+      if (yearFilter !== "all" && getNominationYear(n) !== yearFilter) return false;
+
       // Handle special "judging_pending" filter
       if (statusFilter === "judging_pending") {
         if (n.status !== "shortlisted") return false;
@@ -1279,7 +1310,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
       }
       return true;
     });
-  }, [nominations, selectedCategory, statusFilter, selfNomFilter, search, judgeScores]);
+  }, [nominations, selectedCategory, yearFilter, statusFilter, selfNomFilter, search, judgeScores]);
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
 
@@ -1803,23 +1834,32 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
                       </Badge>
                     </button>
 
-                    <button
-                      onClick={() => {
-                        downloadZip(nominations, "All Nominations", "all");
-                        setShowAdminMenu(false);
-                      }}
-                      disabled={nominations.length === 0 || zipExport.busy}
-                      title="One ZIP with a Word narrative report (every question and answer) and all attachments for every nominee, foldered by category"
-                      className="w-full flex items-center justify-start gap-3 rounded-lg px-4 py-2.5 text-sm transition hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <FileArchive className="h-4 w-4 flex-shrink-0 text-primary" />
-                      <span className="flex-1 text-left">
-                        {zipExport.busy ? "Downloading Everything…" : "Download Everything (ZIP)"}
-                      </span>
-                      <Badge variant="secondary" className="ml-auto text-xs">
-                        {nominations.length}
-                      </Badge>
-                    </button>
+                    {/* One "Download everything" item per award year */}
+                    {nominationYears.map(({ year, count }) => (
+                      <button
+                        key={year}
+                        onClick={() => {
+                          downloadZip(
+                            nominations.filter((n) => getNominationYear(n) === year),
+                            "All Nominations",
+                            `all ${year}`,
+                            year,
+                          );
+                          setShowAdminMenu(false);
+                        }}
+                        disabled={count === 0 || zipExport.busy}
+                        title={`One ZIP with every ${year} nomination: a Word narrative report (every question and answer) and all attachments per nominee, foldered by category`}
+                        className="w-full flex items-center justify-start gap-3 rounded-lg px-4 py-2.5 text-sm transition hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <FileArchive className="h-4 w-4 flex-shrink-0 text-primary" />
+                        <span className="flex-1 text-left">
+                          {zipExport.busy ? "Downloading…" : `Download Everything ${year} (ZIP)`}
+                        </span>
+                        <Badge variant="secondary" className="ml-auto text-xs">
+                          {count}
+                        </Badge>
+                      </button>
+                    ))}
 
                     <button
                       onClick={() => {
@@ -2058,6 +2098,22 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
                 </button>
               )}
             </div>
+            {/* Award-year filter — also scopes the category ZIP download */}
+            <div
+              className="flex overflow-hidden rounded-xl border border-primary/20 bg-muted/30 shrink-0"
+              role="group"
+              aria-label="Filter by award year"
+            >
+              {[{ value: "all" as const, label: "All years" }, ...nominationYears.map(({ year }) => ({ value: year, label: String(year) }))].map((y) => (
+                <button
+                  key={y.value}
+                  onClick={() => setYearFilter(y.value)}
+                  className={`px-3 py-1.5 text-xs font-medium transition ${yearFilter === y.value ? "bg-gold text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {y.label}
+                </button>
+              ))}
+            </div>
             <div className="flex overflow-hidden rounded-xl border border-primary/20 bg-muted/30 shrink-0">
               {STATUS_FILTERS.map((f) => (
                 <button
@@ -2096,7 +2152,8 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
                     downloadZip(
                       filtered,
                       selectedCategory === "__all__" ? "All Nominations" : undefined,
-                      selectedCategory === "__all__" ? "current view" : `category ${selectedCategory}`,
+                      `${selectedCategory === "__all__" ? "current view" : `category ${selectedCategory}`}${yearFilter === "all" ? "" : ` ${yearFilter}`}`,
+                      yearFilter === "all" ? undefined : yearFilter,
                     )
                   }
                   className="border-primary/40 text-primary"
@@ -2108,9 +2165,7 @@ function Dashboard({ onLogout, role, loggingOut }: { onLogout: () => void; role:
                   )}
                   {zipExport.busy
                     ? zipExport.busyText
-                    : selectedCategory === "__all__"
-                      ? `Download ZIP (${filtered.length})`
-                      : `Download Category ZIP (${filtered.length})`}
+                    : `Download ${selectedCategory === "__all__" ? "" : "Category "}${yearFilter === "all" ? "" : `${yearFilter} `}ZIP (${filtered.length})`}
                 </Button>
               )}
             </div>

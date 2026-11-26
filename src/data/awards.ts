@@ -138,6 +138,11 @@ export function computeWeightedAverage(
 }
 
 export const AWARD_THEME = {
+  /**
+   * Award cycle. New nominations are stamped with this as `awardYear`, and the
+   * admin panel filters / downloads by it. Update it (and `title`) each year.
+   */
+  year: 2026,
   title: "SALEA 2026",
   subtitle: "Recognising Excellence · Celebrating Leadership · Inspiring Greatness",
   eventName: "Student Academic & Leadership Excellence Awards",
@@ -157,6 +162,24 @@ export const AWARD_THEME = {
     { name: "Session 2", startTime: "16:00", endTime: "22:00" },
   ],
 };
+
+/**
+ * Award year of a nomination: the stamped `awardYear`, or — for nominations made
+ * before that field existed — the calendar year it was submitted.
+ */
+export function getNominationYear(n: {
+  awardYear?: number;
+  createdAt?: { toDate?: () => Date } | string | null;
+}): number {
+  if (typeof n.awardYear === "number" && n.awardYear > 2000) return n.awardYear;
+  const ts = n.createdAt;
+  if (ts && typeof ts === "object" && typeof ts.toDate === "function") return ts.toDate().getFullYear();
+  if (typeof ts === "string") {
+    const d = new Date(ts);
+    if (!Number.isNaN(d.getTime())) return d.getFullYear();
+  }
+  return AWARD_THEME.year;
+}
 
 export const AWARD_CATEGORIES: AwardCategory[] = [
   {

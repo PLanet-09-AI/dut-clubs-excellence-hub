@@ -31,28 +31,32 @@ export function useZipExport() {
   }, [busy]);
 
   /** Call directly from a click handler — the "Save as" dialog must open before any await. */
-  async function run(nominations: ExportNomination[], options: { zipLabel?: string } = {}) {
+  async function run(
+    nominations: ExportNomination[],
+    options: { zipLabel?: string; year?: number } = {},
+  ) {
     if (busy || nominations.length === 0) return;
     setMessage(null);
     setProgress({ done: 0, total: 0, phase: "fetching" });
     try {
       const result = await exportNominationsZip(nominations, {
         zipLabel: options.zipLabel,
+        year: options.year,
         onProgress: setProgress,
       });
       if (result.cancelled) {
         setMessage(null);
-      } else if (result.failed.length > 0) {
-        setMessage({
-          tone: "warn",
-          title: "ZIP saved — you can open it now",
-          text: `"${result.zipName}": ${result.nominationCount} nomination(s). ${result.failed.length} of ${result.fileCount + result.failed.length} attachment(s) couldn't be fetched — see "MISSING FILES.txt" inside the ZIP.`,
-        });
       } else {
+        const links = result.linkCount
+          ? ` ${result.linkCount} web link(s) (Facebook, Google Drive…) saved as clickable shortcuts.`
+          : "";
+        const missing = result.failed.length
+          ? ` ${result.failed.length} uploaded file(s) couldn't be included — see "MISSING FILES.txt".`
+          : "";
         setMessage({
-          tone: "ok",
+          tone: result.failed.length ? "warn" : "ok",
           title: "ZIP saved — you can open it now",
-          text: `"${result.zipName}": ${result.nominationCount} nomination(s) with ${result.fileCount} attachment(s).`,
+          text: `"${result.zipName}": ${result.nominationCount} nomination(s), ${result.fileCount} file(s).${links}${missing}`,
         });
       }
     } catch (err) {

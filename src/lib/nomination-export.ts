@@ -50,6 +50,8 @@ export type ExportNomination = {
   answers?: Record<string, string>;
   uploads?: Record<string, Record<string, ExportFile[]>>;
   status: string;
+  /** Award cycle the nomination belongs to (e.g. 2026). */
+  awardYear?: number;
 };
 
 export type ExportProgress = {
@@ -62,7 +64,9 @@ export type ExportResult = {
   zipName: string;
   nominationCount: number;
   fileCount: number;
-  failed: { nominee: string; category: string; file: string; url: string }[];
+  /** Evidence given as web links (Facebook, Google Drive…) — saved as .url shortcuts. */
+  linkCount: number;
+  failed: { nominee: string; category: string; file: string; url: string; reason: string }[];
   /** True when the user dismissed the "Save as" dialog. */
   cancelled?: boolean;
 };
@@ -77,7 +81,9 @@ type Question = {
 
 type PlannedFile = { zipPath: string; relPath: string; file: ExportFile; job: ReportJob };
 
-type EvidenceEntry = { label: string; file: ExportFile; relPath: string };
+type EvidenceEntry = { label: string; file: ExportFile; relPath: string; isLink?: boolean };
+
+type PlannedLink = { zipPath: string; url: string };
 
 type ReportJob = {
   nom: ExportNomination;
@@ -235,24 +241,98 @@ function questionsFor(nom: ExportNomination): Question[] {
   return Array.from(ids).map((id) => ({ id, section: "Response", prompt: id }));
 }
 
-async function fetchFileBlob(file: ExportFile): Promise<Blob> {
+/**
+ * True for evidence stored in Firebase Storage. Anything else (Facebook, Google
+ * Drive, TikTok, OneDrive…) is a web link the nominee pasted — it can't be
+ * downloaded into a ZIP, so it is saved as a clickable .url shortcut instead.
+ */
+function isStoredFile(file: ExportFile): boolean {
+  if (!file.url) return !!file.path;
+  try {
+    const host = new URL(file.url).hostname;
+    return host === "firebasestorage.googleapis.com" || host.endsWith("storage.googleapis.com");
+  } catch {
+    return !!file.path;
+  }
+}
+
+function linkHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "link";
+  }
+}
+
+/** Windows Internet Shortcut — double-click opens the link in the browser. */
+function urlShortcut(url: string): string {
+  return `[InternetShortcut]\r\nURL=${url.replace(/[\r\n]/g, "")}\r\n`;
+}
+
+class FetchError extends Error {
+  constructor(
+    message: string,
+    readonly permanent: boolean,
+  ) {
+    super(message);
+  }
+}
+
+async function fetchOnce(file: ExportFile): Promise<Blob> {
+  let status = 0;
   // 1) Tokenised download URL (works regardless of Storage security rules).
   if (file.url) {
     try {
       const res = await fetch(file.url);
       if (res.ok) return await res.blob();
+      status = res.status;
     } catch {
-      /* fall through to SDK */
+      /* network/CORS — fall through to SDK */
     }
   }
   // 2) Storage SDK using the signed-in user's credentials.
-  if (file.path) return await getBlob(storageRef(storage, file.path));
-  throw new Error("File has no URL or storage path");
+  if (file.path) {
+    try {
+      return await getBlob(storageRef(storage, file.path));
+    } catch (err) {
+      const code = (err as { code?: string }).code ?? "";
+      if (code === "storage/object-not-found" || status === 404) {
+        throw new FetchError("File no longer exists in storage (404) — ask the nominee to resend it", true);
+      }
+      if (code === "storage/unauthorized" || status === 403) {
+        throw new FetchError("Access denied (403)", true);
+      }
+      throw new FetchError(status ? `Download failed (HTTP ${status})` : "Network error", false);
+    }
+  }
+  if (status === 404) {
+    throw new FetchError("File no longer exists in storage (404) — ask the nominee to resend it", true);
+  }
+  throw new FetchError(status ? `Download failed (HTTP ${status})` : "Network error", false);
+}
+
+/** Fetch with up to 3 attempts; missing (404) or forbidden files fail immediately. */
+async function fetchFileBlob(file: ExportFile): Promise<Blob> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await fetchOnce(file);
+    } catch (err) {
+      lastError = err;
+      if (err instanceof FetchError && err.permanent) break;
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
+function awardTitle(nom: ExportNomination): string {
+  return nom.awardYear ? `SALEA ${nom.awardYear}` : AWARD_THEME.title;
 }
 
 function detailFields(nom: ExportNomination): [string, string][] {
   return [
-    ["Category", nom.categoryName || nom.categoryId],
+    ["Award", `${awardTitle(nom)} · ${nom.categoryName || nom.categoryId}`],
     ["Nominee", nom.nomineeName],
     ["Student number", nom.studentNumber],
     ["Email", nom.nomineeEmail],
@@ -285,7 +365,7 @@ function buildReportBlocks(job: ReportJob): DocBlock[] {
     { kind: "title", text: nom.nomineeName || "Unnamed nominee" },
     {
       kind: "subtitle",
-      text: `${nom.categoryName || nom.categoryId} — Narrative Report · ${AWARD_THEME.title}`,
+      text: `${nom.categoryName || nom.categoryId} — Narrative Report · ${awardTitle(nom)}`,
     },
     { kind: "h1", text: "Nominee details" },
     ...detailFields(nom).map(([label, value]) => ({ kind: "field" as const, label, value })),
@@ -307,15 +387,19 @@ function buildReportBlocks(job: ReportJob): DocBlock[] {
     if (note) blocks.push({ kind: "muted", text: note });
     const files = evidence.get(q.id) ?? [];
     if (files.length) {
-      blocks.push({ kind: "field", label: "Supporting evidence", value: `${files.length} file(s)` });
+      blocks.push({ kind: "field", label: "Supporting evidence", value: `${files.length} item(s)` });
       for (const e of files) {
         const isMissing = missing.has(e.relPath);
-        blocks.push({
-          kind: "bullet",
-          label: e.label,
-          text: `${e.file.name} (${formatSize(e.file.size)}) — ${isMissing ? e.file.url : e.relPath}`,
-          note: isMissing ? "[not included in ZIP — open link]" : undefined,
-        });
+        blocks.push(
+          e.isLink
+            ? { kind: "bullet", label: e.label, text: `Web link: ${e.file.url}` }
+            : {
+                kind: "bullet",
+                label: e.label,
+                text: `${e.file.name} (${formatSize(e.file.size)}) — ${isMissing ? e.file.url : e.relPath}`,
+                note: isMissing ? "[file no longer exists in storage]" : undefined,
+              },
+        );
       }
     }
   });
@@ -342,8 +426,11 @@ function buildReportHtml(job: ReportJob): string {
       const evidenceHtml = files.length
         ? `<div class="evidence"><h4>Supporting evidence</h4><ul>${files
             .map((e) => {
+              if (e.isLink) {
+                return `<li><span class="label">${escapeHtml(e.label)}:</span> <a href="${escapeHtml(e.file.url)}" target="_blank" rel="noopener">${escapeHtml(e.file.url)}</a> <span class="meta">web link · ${escapeHtml(linkHost(e.file.url))}</span></li>`;
+              }
               const link = missing.has(e.relPath)
-                ? `<a href="${escapeHtml(e.file.url)}">${escapeHtml(e.file.name)}</a> <span class="missing">(not included in ZIP — open online)</span>`
+                ? `${escapeHtml(e.file.name)} <span class="missing">(file no longer exists in storage — ask the nominee to resend)</span>`
                 : `<a href="${encodeHref(e.relPath)}">${escapeHtml(e.file.name)}</a>`;
               return `<li><span class="label">${escapeHtml(e.label)}:</span> ${link} <span class="meta">${formatSize(e.file.size)}</span></li>`;
             })
@@ -392,7 +479,7 @@ function buildReportHtml(job: ReportJob): string {
 </head>
 <body>
 <header>
-  <p class="kicker">${escapeHtml(AWARD_THEME.title)} · ${escapeHtml(AWARD_THEME.eventName)}</p>
+  <p class="kicker">${escapeHtml(awardTitle(nom))} · ${escapeHtml(AWARD_THEME.eventName)}</p>
   <h1>${escapeHtml(nom.nomineeName)}</h1>
   <p class="sub">${escapeHtml(nom.categoryName || nom.categoryId)} — Narrative Report</p>
 </header>
@@ -420,14 +507,15 @@ function buildSummaryCsv(jobs: ReportJob[]): string {
     "Nominator email",
     "Relationship",
     "Submitted",
-    "Attachments",
-    "Missing attachments",
+    "Award year",
+    "Files",
+    "Web links",
+    "Missing files",
   ];
   const lines = jobs.map((job) => {
     const { nom } = job;
-    const fileCount = Object.values(nom.uploads ?? {})
-      .flatMap((s) => Object.values(s ?? {}))
-      .flat().length;
+    const entries = [...job.evidence.values()].flat();
+    const linkCount = entries.filter((e) => e.isLink).length;
     return [
       job.folderName,
       nom.nomineeName,
@@ -440,7 +528,9 @@ function buildSummaryCsv(jobs: ReportJob[]): string {
       nom.nominatorEmail,
       nom.nominatorRelationship,
       formatDate(nom.createdAt),
-      fileCount,
+      nom.awardYear ?? "",
+      entries.length - linkCount - job.missing.size,
+      linkCount,
       job.missing.size,
     ]
       .map(csvCell)
@@ -461,6 +551,7 @@ function planExport(nominations: ExportNomination[]) {
   const singleCategory = byCategory.size === 1;
 
   const planned: PlannedFile[] = [];
+  const links: PlannedLink[] = [];
   const categories: { prefix: string; jobs: ReportJob[] }[] = [];
   const usedCategoryFolders = new Set<string>();
 
@@ -490,11 +581,15 @@ function planExport(nominations: ExportNomination[]) {
 
       const addFile = (questionId: string, folderRel: string, label: string, file: ExportFile) => {
         if (!usedPerFolder.has(folderRel)) usedPerFolder.set(folderRel, new Set());
-        const fileName = uniqueName(evidenceFileName(label, file.name), usedPerFolder.get(folderRel)!);
+        const isLink = !isStoredFile(file);
+        // Web links become "<Evidence type> - facebook.com.url" shortcuts.
+        const displayName = isLink ? `${linkHost(file.url)}.url` : file.name;
+        const fileName = uniqueName(evidenceFileName(label, displayName), usedPerFolder.get(folderRel)!);
         const relPath = `${folderRel}/${fileName}`;
-        planned.push({ zipPath: `${job.prefix}${relPath}`, relPath, file, job });
+        if (isLink) links.push({ zipPath: `${job.prefix}${relPath}`, url: file.url });
+        else planned.push({ zipPath: `${job.prefix}${relPath}`, relPath, file, job });
         if (!job.evidence.has(questionId)) job.evidence.set(questionId, []);
-        job.evidence.get(questionId)!.push({ label, file, relPath });
+        job.evidence.get(questionId)!.push({ label, file, relPath, isLink });
       };
 
       const handledSlots = new Set<string>();
@@ -528,7 +623,7 @@ function planExport(nominations: ExportNomination[]) {
     categories.push({ prefix: catPrefix, jobs });
   }
 
-  return { planned, categories };
+  return { planned, links, categories };
 }
 
 // ─── output sink ─────────────────────────────────────────────────────────────
@@ -598,7 +693,12 @@ function triggerDownload(blob: Blob, fileName: string) {
 
 export async function exportNominationsZip(
   nominations: ExportNomination[],
-  options: { zipLabel?: string; onProgress?: (p: ExportProgress) => void } = {},
+  options: {
+    zipLabel?: string;
+    /** Award year shown in the ZIP name, e.g. "SALEA 2026 - All Nominations …". */
+    year?: number;
+    onProgress?: (p: ExportProgress) => void;
+  } = {},
 ): Promise<ExportResult> {
   if (nominations.length === 0) throw new Error("No nominations to export.");
 
@@ -610,7 +710,9 @@ export async function exportNominationsZip(
     (categoryIds.size === 1
       ? categoryFolderName(nominations[0].categoryId, nominations[0].categoryName)
       : "All Nominations");
-  const zipName = `SALEA - ${shorten(label, 28)} ${new Date().toISOString().split("T")[0]}.zip`;
+  const years = new Set(nominations.map((n) => n.awardYear).filter(Boolean));
+  const year = options.year ?? (years.size === 1 ? [...years][0] : undefined);
+  const zipName = `SALEA${year ? ` ${year}` : ""} - ${shorten(label, 28)} ${new Date().toISOString().split("T")[0]}.zip`;
 
   // Ask where to save first — this must happen before any await.
   const targetPromise = openSaveTarget(zipName);
@@ -619,11 +721,11 @@ export async function exportNominationsZip(
     try {
       target = await targetPromise;
     } catch {
-      return { zipName, nominationCount: 0, fileCount: 0, failed: [], cancelled: true };
+      return { zipName, nominationCount: 0, fileCount: 0, linkCount: 0, failed: [], cancelled: true };
     }
   }
 
-  const { planned, categories } = planExport(nominations);
+  const { planned, links, categories } = planExport(nominations);
   const failed: ExportResult["failed"] = [];
   const total = planned.length;
   let done = 0;
@@ -639,12 +741,13 @@ export async function exportNominationsZip(
       pending.push(
         fetchFileBlob(item.file)
           .then((blob): ZipEntry => ({ name: item.zipPath, input: blob }))
-          .catch(() => {
+          .catch((err: unknown) => {
             failed.push({
               nominee: item.job.nom.nomineeName,
               category: item.job.nom.categoryName || item.job.nom.categoryId,
               file: item.file.name,
               url: item.file.url,
+              reason: err instanceof Error ? err.message : "Download failed",
             });
             item.job.missing.add(item.relPath);
             return null;
@@ -661,6 +764,9 @@ export async function exportNominationsZip(
       startNext();
       if (entry) yield entry;
     }
+
+    // Web-link evidence as clickable Windows shortcuts.
+    for (const link of links) yield { name: link.zipPath, input: urlShortcut(link.url) };
 
     // Reports last, so files that failed to download are flagged in them.
     options.onProgress?.({ done: total, total, phase: "finishing" });
@@ -683,10 +789,13 @@ export async function exportNominationsZip(
       yield {
         name: "MISSING FILES.txt",
         input: [
-          "The following attachments could not be downloaded into this ZIP.",
-          "Open each link below while signed in to retrieve it manually.",
+          "These uploaded files could not be included in this ZIP.",
+          "\"No longer exists in storage (404)\" means the file was deleted from Firebase",
+          "Storage — ask the nominee to resend it. Other errors: try the download again.",
           "",
-          ...failed.map((f) => `[${f.category}] ${f.nominee} — ${f.file}\r\n    ${f.url}`),
+          ...failed.map(
+            (f) => `[${f.category}] ${f.nominee} — ${f.file}\r\n    Reason: ${f.reason}\r\n    ${f.url}`,
+          ),
         ].join("\r\n"),
       };
     }
@@ -709,6 +818,7 @@ export async function exportNominationsZip(
     zipName,
     nominationCount: nominations.length,
     fileCount: total - failed.length,
+    linkCount: links.length,
     failed,
   };
 }

@@ -18,7 +18,13 @@ import {
 import { addDoc, collection, serverTimestamp, updateDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useNominationsOpen } from "@/lib/nomination-settings";
-import { AWARD_CATEGORIES, FACULTIES, type AwardCategory } from "@/data/awards";
+import {
+  AWARD_CATEGORIES,
+  AWARD_THEME,
+  FACULTIES,
+  getNominationYear,
+  type AwardCategory,
+} from "@/data/awards";
 import { useDraftForm } from "@/hooks/useDraftForm";
 import { EvidenceUploader, type UploadedFile, type EvidenceUploads } from "@/components/EvidenceUploader";
 import { validateDocumentsForCategory, getMissingDocumentsSummary } from "@/lib/document-validation";
@@ -326,6 +332,7 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
       answers,
       uploads,
       status: "pending",
+      awardYear: AWARD_THEME.year,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -387,9 +394,14 @@ function NominationForm({ category, onBack }: { category: AwardCategory; onBack:
       let docRef;
       let isUpdate = false;
 
-      if (existingResults.size > 0) {
-        // Update existing nomination (use first match)
-        const existingDoc = existingResults.docs[0];
+      // Only merge into a nomination from THIS award year — a returning nominee
+      // must not overwrite their nomination from a previous year.
+      const existingDoc = existingResults.docs.find(
+        (d) => getNominationYear(d.data()) === AWARD_THEME.year,
+      );
+
+      if (existingDoc) {
+        // Update existing nomination for this year
         docRef = existingDoc.ref;
         
         // Add updatedAt timestamp to track the merge
